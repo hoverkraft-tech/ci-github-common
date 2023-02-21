@@ -1,0 +1,25 @@
+name: "Get issue number"
+description: "Action to get Pull request or issue number"
+branding:
+  icon: hash
+  color: white
+
+outputs:
+  issue-number:
+    description: "The issue number."
+    value: ${{ steps.get-issue-number.outputs.result }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: get-issue-number
+      shell: bash
+      run: |
+        if [ ! -z "${{ github.event.pull_request.number }}" ]; then
+          echo "result=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+        elif [ ! -z "${{ github.event.issue.number }}" ]; then
+          echo "result=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+        else
+          echo "No PR or issue number found for the current event"
+          exit 1
+        fi

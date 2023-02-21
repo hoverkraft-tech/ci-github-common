@@ -1,0 +1,84 @@
+name: Internal - Main - Continuous Integration
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    uses: ./.github/workflows/__shared-ci.yml
+
+  prepare-release:
+    needs: ci
+    runs-on: "ubuntu-latest"
+    outputs:
+      changed-actions: ${{ steps.get-changed-actions.outputs.result }}
+      latest-tag: ${{ steps.get-latest-tag.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - id: get-latest-tag
+        uses: actions-ecosystem/action-get-latest-tag@v1
+
+      - id: changed-files
+        uses: tj-actions/changed-files@v35.5.6
+        with:
+          files: |
+            ./actions/*
+          dir_names: true
+          dir_names_exclude_root: true
+
+      - id: get-changed-actions
+        run: |
+          CHANGED_ACTIONS=()
+          for ACTION_FILE in actions/**/action.yml; do
+            ACTION_DIR=$(dirname "$ACTION_FILE")
+            # shellcheck disable=SC2193 
+            if [[ "${{ steps.changed-files.outputs.all_changed_and_modified_files }}" == *"$ACTION_DIR"* ]]; then
+              CHANGED_ACTIONS+=("$ACTION_DIR")
+            fi
+          done
+
+          JSON_CHANGED_ACTIONS=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${CHANGED_ACTIONS[@]}");
+
+          echo "result<<EOF" >> "$GITHUB_OUTPUT" && echo "$JSON_CHANGED_ACTIONS" >> "$GITHUB_OUTPUT" && echo "EOF" >> "$GITHUB_OUTPUT"
+
+  generate-actions-readme:
+    needs: prepare-release
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        action: ${{ fromJson(needs.prepare-release.outputs.changed-actions) }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: 📖 Generate README
+        uses: bitflight-devops/github-action-readme-generator@v1.3.14
+        with:
+          action: ${{ matrix.action }}/action.yml
+          readme: ${{ matrix.action }}/README.md
+          version_override: ${{ needs.prepare-release.outputs.latest-tag }}
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: changed-actions
+          path: ${{ github.workspace }}/**/${{ matrix.action }}/README.md
+
+  publish-actions-readme:
+    needs: generate-actions-readme
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3.1.0
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: changed-actions
+
+      - uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "chore: prepare release"
+          file_pattern: actions/**/README.md

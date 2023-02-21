@@ -1,0 +1,24 @@
+name: "Slugify"
+description: "Action to slugify a given string value"
+branding:
+  icon: link-2
+  color: white
+
+inputs:
+  value:
+    description: "The value to slugify"
+    required: true
+
+outputs:
+  result:
+    description: "The slugified value"
+    value: ${{ steps.slugifier.outputs.result }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: slugifier
+      shell: bash
+      run: |
+        SLUGIFIED_VALUE=$(echo "${{ inputs.value }}" | iconv -t ascii//TRANSLIT | sed -E -e 's/[^[:alnum:]]+/-/g' -e 's/^-+|-+$//g' | tr '[:upper:]' '[:lower:]')
+        echo "result=${SLUGIFIED_VALUE}" >> $GITHUB_OUTPUT

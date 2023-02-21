@@ -1,0 +1,21 @@
+# FIXME: Workaround for glob directories (https://github.com/dependabot/dependabot-core/issues/2178)
+name: Generate dependabot.yml config
+
+on:
+  workflow_call:
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Generate Dependabot Glob
+        uses: Makeshift/generate-dependabot-glob-action@v1.3.3
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          commit-message: "chore: update dependabot config"
+          title: "chore: update dependabot config"
+          body: "Update dependabot config for glob directories"

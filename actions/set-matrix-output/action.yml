@@ -1,0 +1,48 @@
+# Set matrix ouput in file to be uploaded as artifacts, because github action does not handle job outputs for matrix
+# Workaround for https://github.com/orgs/community/discussions/26639
+
+name: "Set matrix ouput"
+description: "Set matrix ouput in file to be uploaded as artifacts, because github action does not handle job outputs for matrix"
+branding:
+  icon: upload-cloud
+  color: white
+
+inputs:
+  value:
+    description: "The matrix output to set."
+    required: true
+  artifact-name:
+    description: "The name of the artifact to upload."
+    required: true
+outputs:
+  result:
+    description: "The matrix combined JSON outputs."
+    value: ${{ steps.get-issue-number.outputs.result }}
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      run: |
+        mkdir -p "/tmp/${{ inputs.artifact-name }}"
+
+        MAX_ATTEMPTS=10
+        MATRIX_OUTPUT_FILE=""
+        for i in $(seq 1 $MAX_ATTEMPTS); do
+          MATRIX_OUTPUT_FILE="/tmp/${{ inputs.artifact-name }}/${{ inputs.artifact-name }}-$(uuidgen).json"
+          if [ ! -f "$MATRIX_OUTPUT_FILE" ]; then
+            break
+          fi
+          MATRIX_OUTPUT_FILE=""
+        done
+        if [ -z "$MATRIX_OUTPUT_FILE" ]; then
+          echo "Failed to find unique file name after $MAX_ATTEMPTS attempts"
+          exit 1
+        fi
+
+        echo '${{ inputs.matrix-output }}' > "$MATRIX_OUTPUT_FILE"
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: /tmp/${{ inputs.artifact-name }}

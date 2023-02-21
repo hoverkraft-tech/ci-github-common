@@ -1,0 +1,31 @@
+# Download matrix ouputs from artifacts, because github action does not handle job outputs for matrix
+# Workaround for https://github.com/orgs/community/discussions/26639
+
+name: "Get matrix ouput"
+description: "Download matrix ouputs from artifacts, because github action does not handle job outputs for matrix"
+branding:
+  icon: download-cloud
+  color: white
+
+inputs:
+  artifact-name:
+    description: "The name of the artifact to download."
+    required: true
+outputs:
+  result:
+    description: "The matrix combined JSON outputs."
+    value: ${{ steps.get-matrix-outputs.outputs.result }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/download-artifact@v3
+      with:
+        name: ${{ inputs.artifact-name }}}
+        path: /tmp/${{ inputs.artifact-name }}
+
+    - id: read-artifacts
+      shell: bash
+      run: |
+        RESULT=$(jq -sc "." /tmp/${{ inputs.artifact-name }}/*.json)
+        echo "result<<EOF" >> "$GITHUB_OUTPUT" && echo "$RESULT" >> "$GITHUB_OUTPUT" && echo "EOF" >> "$GITHUB_OUTPUT"

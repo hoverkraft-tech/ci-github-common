@@ -1,0 +1,45 @@
+name: "Create or update comment"
+description: "Action to create or update comment in pull request or issue"
+branding:
+  icon: message-square
+  color: white
+
+inputs:
+  title:
+    description: "The comment title. Must be static and unique, will be used to retrieve the comment if exists already."
+    required: true
+  body:
+    description: "The comment body. See https://github.com/peter-evans/create-or-update-comment"
+    required: false
+  reactions:
+    description: "A comma separated list of reactions to add to the comment. See https://github.com/peter-evans/create-or-update-comment"
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      # FIXME: workaround until will be merged: https://github.com/actions/runner/pull/1684
+      run: |
+        [ -d ./self-actions ] || (mkdir -p ./self-actions/ && cp -r $GITHUB_ACTION_PATH/../* ./self-actions/)
+
+    - id: get-issue-number
+      uses: ./self-actions/get-issue-number
+
+    - uses: peter-evans/find-comment@v2
+      id: find-comment
+      with:
+        issue-number: ${{ steps.get-issue-number.outputs.issue-number }}
+        comment-author: "github-actions[bot]"
+        body-includes: ${{ inputs.title }}
+
+    - uses: peter-evans/create-or-update-comment@v2
+      with:
+        edit-mode: replace
+        comment-id: ${{ steps.find-comment.outputs.comment-id }}
+        issue-number: ${{ steps.get-issue-number.outputs.issue-number }}
+        body: |
+          ${{ inputs.title }}
+
+          ${{ inputs.body }}
+        reactions: ${{ inputs.reactions }}

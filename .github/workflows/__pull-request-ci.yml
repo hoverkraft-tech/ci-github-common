@@ -1,0 +1,10 @@
+name: Internal - Pull request - Continuous Integration
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Continuous Integration
+    uses: ./.github/workflows/__shared-ci.yml

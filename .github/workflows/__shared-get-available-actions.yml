@@ -1,0 +1,23 @@
+name: Internal - Get available actions
+
+on:
+  workflow_call:
+    outputs:
+      result:
+        description: 'Available actions. Example: ["composer","drupal-10"]'
+        value: ${{ jobs.get-available-actions.outputs.result }}
+
+jobs:
+  get-available-actions:
+    runs-on: "ubuntu-latest"
+    outputs:
+      result: ${{ steps.get-available-actions.outputs.result }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - id: get-available-actions
+        run: |
+          AVAILABLE_ACTIONS=$(find actions/* -maxdepth 0 -type d -exec basename {} \; | jq -Rnc "[inputs|select(length>0)]");
+          echo "result<<EOF" >> "$GITHUB_OUTPUT" && echo "$AVAILABLE_ACTIONS" >> "$GITHUB_OUTPUT" && echo "EOF" >> "$GITHUB_OUTPUT"
