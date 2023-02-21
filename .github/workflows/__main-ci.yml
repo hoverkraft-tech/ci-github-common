@@ -3,6 +3,7 @@ name: Internal - Main - Continuous Integration
 on:
   push:
     branches: [main]
+    tags: ["*"]
 
 jobs:
   ci:
@@ -62,6 +63,8 @@ jobs:
           action: ${{ matrix.action }}/action.yml
           readme: ${{ matrix.action }}/README.md
           version_override: ${{ needs.prepare-release.outputs.latest-tag }}
+        env:
+          INPUT_SHOW_LOGO: "true"
 
       - uses: actions/upload-artifact@v3
         with:
@@ -80,5 +83,5 @@ jobs:
 
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: "chore: prepare release"
+          commit_message: "chore: update actions README"
           file_pattern: actions/**/README.md

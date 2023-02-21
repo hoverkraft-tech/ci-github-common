@@ -1,5 +1,6 @@
 name: "Create or update comment"
 description: "Action to create or update comment in pull request or issue"
+author: Hoverkraft
 branding:
   icon: message-square
   color: white
