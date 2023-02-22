@@ -41,8 +41,7 @@ jobs:
           CHANGED_ACTIONS=()
           for ACTION_FILE in actions/**/action.yml; do
             ACTION_DIR=$(dirname "$ACTION_FILE")
-            # shellcheck disable=SC2193 
-            if [ "$IS_TAG_PUSH" != "true" ] && [[ "$CHANGED_FILES" == *"$ACTION_DIR"* ]]; then
+            if [ "$IS_TAG_PUSH" = "true" ] || [[ "$CHANGED_FILES" == *"$ACTION_DIR"* ]]; then
               CHANGED_ACTIONS+=("$ACTION_DIR")
             fi
           done
@@ -54,6 +53,7 @@ jobs:
   generate-actions-readme:
     needs: prepare-release
     runs-on: ubuntu-latest
+    if: ${{ needs.prepare-release.outputs.changed-actions != '[]' }}
     strategy:
       fail-fast: false
       matrix:
