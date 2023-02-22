@@ -1,28 +1,43 @@
 # Continuous Integration - GitHub - Common
 
+[![Continuous Integration](https://github.com/hoverkraft-tech/ci-github-common/actions/workflows/__main-ci.yml/badge.svg)](https://github.com/hoverkraft-tech/ci-github-common/actions/workflows/__main-ci.yml)
+[![GitHub tag](https://img.shields.io/github/tag/hoverkraft-tech/ci-github-common?include_prereleases=&sort=semver&color=blue)](https://github.com/hoverkraft-tech/ci-github-common/releases/)
+[![License](https://img.shields.io/badge/License-MIT-blue)](#license)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 Opinionated GitHub actions and workflows for common continuous integration needs
 
-## Workflows
-
-### [Generate dependabot config](.github/workflows/generate-dependabot-config.md)
-
-### [Semantic pull request](.github/workflows/semantic-pull-request.md)
+---
 
 ## Actions
 
-### [Generate dependabot glob](actions/generate-dependabot-glob/README.md)
+#### - [Generate dependabot glob](actions/generate-dependabot-glob/README.md)
 
-### [Checkout](actions/checkout/README.md)
+#### - [Checkout](actions/checkout/README.md)
 
-### [Create or update comment](actions/create-or-update-comment/README.md)
+#### - [Create or update comment](actions/create-or-update-comment/README.md)
 
-### [Get issue number](actions/get-issue-number/README.md)
+#### - [Get issue number](actions/get-issue-number/README.md)
 
-### [Get matrix outputs](actions/get-matrix-outputs/README.md)
+#### - [Get matrix outputs](actions/get-matrix-outputs/README.md)
 
-### [Set matrix output](actions/set-matrix-output/README.md)
+#### - [Set matrix output](actions/set-matrix-output/README.md)
 
-### [Slugify](actions/slugify/README.md)
+#### - [Slugify](actions/slugify/README.md)
+
+## Workflows
+
+### Reusable workflows
+
+#### [Generate dependabot config](.github/workflows/generate-dependabot-config.md)
+
+### Required workflows
+
+#### - [Greetings](.github/workflows/greetings.md)
+
+#### - [Semantic pull request](.github/workflows/semantic-pull-request.md)
+
+#### - [Stale](.github/workflows/stale.md)
 
 ## Contributing
 
@@ -30,12 +45,12 @@ Opinionated GitHub actions and workflows for common continuous integration needs
 
 ## Author
 
-🏢 **Hoverkraft <contact@hoverkraft.sh>**
+🏢 **Hoverkraft <contact@hoverkraft.cloud>**
 
-- Website: [https://hoverkraft.sh](https://hoverkraft.sh)
+- Website: [https://hoverkraft.cloud](https://hoverkraft.cloud)
 - Github: [@hoverkraft-tech](https://github.com/hoverkraft-tech)
 
 ## License
 
-📝 Copyright © 2023 [Hoverkraft <contact@hoverkraft.sh>](https://hoverkraft.sh).<br />
+📝 Copyright © 2023 [Hoverkraft <contact@hoverkraft.cloud>](https://hoverkraft.cloud).<br />
 This project is [MIT](LICENSE) licensed.
