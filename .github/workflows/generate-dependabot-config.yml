@@ -1,4 +1,9 @@
-# FIXME: Workaround for glob directories (https://github.com/dependabot/dependabot-core/issues/2178)
+# Generate Dependabot Config
+# ==========================
+# Reusable workflow to generate a dependabot config from predefined templates.
+# Mainly using [Generate Dependabot Glob Action](https://github.com/marketplace/actions/generate-dependabot-glob), to generate a dependabot config from a glob pattern.
+# Workaround for missing official support of glob directories [https://github.com/dependabot/dependabot-core/issues/2178](https://github.com/dependabot/dependabot-core/issues/2178)
+
 on:
   workflow_call:
 
@@ -17,3 +22,4 @@ jobs:
           commit-message: "chore: update dependabot config"
           title: "chore: update dependabot config"
           body: "Update dependabot config for glob directories"
+          signoff: true

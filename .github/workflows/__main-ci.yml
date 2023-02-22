@@ -66,7 +66,10 @@ jobs:
         with:
           action: ${{ matrix.action }}/action.yml
           readme: ${{ matrix.action }}/README.md
+          versioning_enabled: true
+          version_prefix: ""
           version_override: ${{ needs.prepare-release.outputs.latest-tag }}
+
         env:
           INPUT_SHOW_LOGO: "true"
 
