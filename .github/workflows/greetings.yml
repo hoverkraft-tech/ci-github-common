@@ -1,13 +1,38 @@
 name: Greetings
 
-on: [pull_request, issues]
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    branches: [main]
+
+  workflow_call:
+    inputs:
+      issue-message:
+        description: "Comment to post on an individual's first issue. See https://github.com/actions/first-interaction#usage"
+        type: string
+        required: false
+      pr-message:
+        description: "Comment to post on an individual's first pull request. See https://github.com/actions/first-interaction#usage"
+        type: string
+        required: false
+    secrets:
+      github-token:
+        description: "Token for the repository. Can be passed in using {{ secrets.GITHUB_TOKEN }}. See https://github.com/actions/first-interaction#usage"
+        required: true
 
 jobs:
   greeting:
     runs-on: ubuntu-latest
     steps:
+      - id: set-variables
+        run: |
+          echo "issue-message=${$(echo "${{ inputs.issue-message }}"):-"Hi, thank for reporting an issue, we will check it out very soon"}" >> "$GITHUB_OUTPUT"
+          echo "pr-message=${$(echo "${{ inputs.pr-message }}"):-"Hi, thank you for creating your PR, we will check it out very soon"}" >> "$GITHUB_OUTPUT"
+          echo "REPO_TOKEN=${$(echo "${{ secrets.github-token }}"):-"${{ secrets.GITHUB_TOKEN}}" >> $GITHUB_ENV
+
       - uses: actions/first-interaction@v1
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          issue-message: "Hi, thank for reporting an issue, we will check it out very soon"
-          pr-message: "Hi, thank you for creating your PR, we will check it out very soon"
+          repo-token: ${{ env.REPO_TOKEN }}
+          issue-message: ${{ steps.set-variables.outputs.issue-message }}
+          pr-message: ${{ steps.set-variables.outputs.pr-message }}
