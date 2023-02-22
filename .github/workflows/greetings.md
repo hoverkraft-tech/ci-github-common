@@ -1,7 +1,9 @@
-# Workflow - Semantic pull request
+# Workflow - Greetings
 
-Workflow to ensure "Squash and merge" Pull Request strategy provides a valid commit message.
-Check that the title follows the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
+Workflow to greet new contributors.
+
+- On issue creation, a comment is added to the issue.
+- On first contribution, a comment is added to the pull request.
 
 ## Usage
 
@@ -12,5 +14,5 @@ Configure workflow to be required in your organization settings.
 - Go to your organization actions settings to add a new required workflow: Settings > Actions > General > Required workflows > Add workflow
   `https://github.com/organizations/[your-organization]/settings/actions/required_workflows/new` (replace `[your-organization]` with your organization name)
 - Select the repository `ci-github-common`
-- Select the workflow file: `.github/workflows/semantic-pull-request.yml`
+- Select the workflow file: `.github/workflows/greetings.yml`
 - Add workflow
