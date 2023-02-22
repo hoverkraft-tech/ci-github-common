@@ -1,6 +1,4 @@
 # FIXME: Workaround for glob directories (https://github.com/dependabot/dependabot-core/issues/2178)
-name: Generate dependabot.yml config
-
 on:
   workflow_call:
 

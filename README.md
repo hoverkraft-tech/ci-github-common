@@ -29,7 +29,7 @@ Opinionated GitHub actions and workflows for common continuous integration needs
 
 ### Reusable workflows
 
-#### [Generate dependabot config](.github/workflows/generate-dependabot-config.md)
+#### - [Generate dependabot config](.github/workflows/generate-dependabot-config.md)
 
 ### Required workflows
 
