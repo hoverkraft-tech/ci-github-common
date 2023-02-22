@@ -12,11 +12,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      # FIXME: enable this once we have a working workflow
-      # - name: 👕 Lint Code Base
-      #   uses: github/super-linter/slim@v4
-      #   env:
-      #     VALIDATE_ALL_CODEBASE: false
-      #     LOG_LEVEL: WARN
-      #     DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 👕 Lint Code Base
+        uses: github/super-linter/slim@v4
+        env:
+          VALIDATE_ALL_CODEBASE: false
+          LOG_LEVEL: WARN
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
