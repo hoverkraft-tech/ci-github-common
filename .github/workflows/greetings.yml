@@ -29,7 +29,7 @@ jobs:
         run: |
           echo "issue-message=${$(echo "${{ inputs.issue-message }}"):-"Hi, thank for reporting an issue, we will check it out very soon"}" >> "$GITHUB_OUTPUT"
           echo "pr-message=${$(echo "${{ inputs.pr-message }}"):-"Hi, thank you for creating your PR, we will check it out very soon"}" >> "$GITHUB_OUTPUT"
-          echo "REPO_TOKEN=${$(echo "${{ secrets.github-token }}"):-"${{ secrets.GITHUB_TOKEN }}}" >> "$GITHUB_ENV"
+          echo "REPO_TOKEN=${$(echo "${{ secrets.github-token }}"):-"${{ secrets.GITHUB_TOKEN }}"}" >> "$GITHUB_ENV"
 
       - uses: actions/first-interaction@v1
         with:
