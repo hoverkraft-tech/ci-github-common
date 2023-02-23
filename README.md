@@ -11,8 +11,6 @@ Opinionated GitHub actions and workflows for common continuous integration needs
 
 ## Actions
 
-#### - [Generate dependabot glob](actions/generate-dependabot-config/README.md)
-
 #### - [Checkout](actions/checkout/README.md)
 
 #### - [Create or update comment](actions/create-or-update-comment/README.md)

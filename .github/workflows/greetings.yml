@@ -27,9 +27,12 @@ jobs:
     steps:
       - id: set-variables
         run: |
-          echo "issue-message=${$(echo "${{ inputs.issue-message }}"):-"Hi, thank for reporting an issue, we will check it out very soon"}" >> "$GITHUB_OUTPUT"
-          echo "pr-message=${$(echo "${{ inputs.pr-message }}"):-"Hi, thank you for creating your PR, we will check it out very soon"}" >> "$GITHUB_OUTPUT"
-          echo "REPO_TOKEN=${$(echo "${{ secrets.github-token }}"):-"${{ secrets.GITHUB_TOKEN}}" >> $GITHUB_ENV
+          ISSUE_MESSAGE="${{ inputs.issue-message }}"
+          echo "issue-message=${ISSUE_MESSAGE:-"Hi, thank for reporting an issue, we will check it out very soon"}" >> "$GITHUB_OUTPUT"
+          PR_MESSAGE="${{ inputs.pr-message }}"
+          echo "pr-message=${PR_MESSAGE:-"Hi, thank you for creating your PR, we will check it out very soon"}" >> "$GITHUB_OUTPUT"
+          GITHUB_TOKEN="${{ secrets.github-token }}"
+          echo "REPO_TOKEN=${GITHUB_TOKEN:-"${{ secrets.GITHUB_TOKEN }}"}" >> "$GITHUB_ENV"
 
       - uses: actions/first-interaction@v1
         with:
