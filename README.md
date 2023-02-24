@@ -11,31 +11,27 @@ Opinionated GitHub actions and workflows for common continuous integration needs
 
 ## Actions
 
-#### - [Checkout](actions/checkout/README.md)
+### - [Checkout](actions/checkout/README.md)
 
-#### - [Create or update comment](actions/create-or-update-comment/README.md)
+### - [Create or update comment](actions/create-or-update-comment/README.md)
 
-#### - [Get issue number](actions/get-issue-number/README.md)
+### - [Get issue number](actions/get-issue-number/README.md)
 
-#### - [Get matrix outputs](actions/get-matrix-outputs/README.md)
+### - [Get matrix outputs](actions/get-matrix-outputs/README.md)
 
-#### - [Set matrix output](actions/set-matrix-output/README.md)
+### - [Set matrix output](actions/set-matrix-output/README.md)
 
-#### - [Slugify](actions/slugify/README.md)
+### - [Slugify](actions/slugify/README.md)
 
 ## Workflows
 
-### Reusable workflows
+### - [Generate dependabot config](.github/workflows/generate-dependabot-config.md)
 
-#### - [Generate dependabot config](.github/workflows/generate-dependabot-config.md)
+### - [Greetings](.github/workflows/greetings.md)
 
-### Required workflows
+### - [Semantic pull request](.github/workflows/semantic-pull-request.md)
 
-#### - [Greetings](.github/workflows/greetings.md)
-
-#### - [Semantic pull request](.github/workflows/semantic-pull-request.md)
-
-#### - [Stale](.github/workflows/stale.md)
+### - [Stale](.github/workflows/stale.md)
 
 ## Contributing
 
