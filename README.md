@@ -23,7 +23,7 @@ Opinionated GitHub actions and workflows for common continuous integration needs
 
 ### - [Slugify](actions/slugify/README.md)
 
-## Workflows
+## Reusable Workflows
 
 ### - [Generate dependabot config](.github/workflows/generate-dependabot-config.md)
 

@@ -1,18 +1,66 @@
-# Workflow - Greetings
+<!-- start title -->
+
+# GitHub Reusable Workflow: Greetings
+
+<!-- end title -->
+<!-- start description -->
 
 Workflow to greet new contributors.
+Mainly using [First Interaction Action](https://github.com/actions/first-interaction), with some opinionated defaults.
 
 - On issue creation, a comment is added to the issue.
 - On first contribution, a comment is added to the pull request.
 
-## Usage
+<!-- end description -->
+<!-- start contents -->
+<!-- end contents -->
+<!-- start usage -->
 
-### As required workflow
+```yaml
+name: Mark stale issues and pull requests
 
-Configure workflow to be required in your organization settings.
+on:
+  schedule:
+    - cron: "30 1 * * *"
 
-- Go to your organization actions settings to add a new required workflow: Settings > Actions > General > Required workflows > Add workflow
-  `https://github.com/organizations/[your-organization]/settings/actions/required_workflows/new` (replace `[your-organization]` with your organization name)
-- Select the repository `ci-github-common`
-- Select the workflow file: `.github/workflows/greetings.yml`
-- Add workflow
+jobs:
+  main:
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/greetings.yml@main
+    secrets:
+      # Token for the repository. Can be passed in using "${{ secrets.GITHUB_TOKEN }}".
+      # See https://github.com/actions/first-interaction#usage
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    # Optional customizations.
+    with:
+      # Comment to post on an individual's first issue.
+      # See https://github.com/actions/first-interaction#usage
+      # Default: "Hi, thank for reporting an issue, we will check it out very soon"
+      issue-message: ""
+      # Comment to post on an individual's first pull request.
+      # See https://github.com/actions/first-interaction#usage
+      # Default: "Hi, thank you for creating your PR, we will check it out very soon"
+      pr-message: ""
+```
+
+<!-- end usage -->
+<!-- start secrets -->
+
+| **Secret**                    | **Description**                                                                                                                        |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **<code>github-token</code>** | Token for the repository. Can be passed in using "${{ secrets.GITHUB_TOKEN }}". See https://github.com/actions/first-interaction#usage |
+
+<!-- end secrets -->
+<!-- start inputs -->
+
+| **Input**                      | **Description**                                                                                               | **Default**                                                                     | **Required** |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------ |
+| **<code>issue-message</code>** | Comment to post on an individual's first issue. See https://github.com/actions/first-interaction#usage        | <code>Hi, thank for reporting an issue, we will check it out very soon</code>   | **false**    |
+| **<code>issue-message</code>** | Comment to post on an individual's first pull request. See https://github.com/actions/first-interaction#usage | <code>Hi, thank you for creating your PR, we will check it out very soon</code> | **false**    |
+
+<!-- end inputs -->
+
+<!-- start outputs -->
+<!-- end outputs -->
+<!-- start [.github/ghadocs/examples/] -->
+<!-- end [.github/ghadocs/examples/] -->

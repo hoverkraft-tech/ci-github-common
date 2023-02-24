@@ -4,17 +4,62 @@ on:
   schedule:
     - cron: "30 1 * * *"
 
+  workflow_call:
+    inputs:
+      stale-issue-message:
+        description: "Comment on the staled issues. See https://github.com/actions/stale#stale-issue-message"
+        type: string
+        required: false
+      stale-pr-message:
+        description: "Comment on the staled PRs. See https://github.com/actions/stale#stale-pr-message"
+        type: string
+        required: false
+      stale-issue-label:
+        description: "Label to apply on staled issues. See https://github.com/actions/stale#stale-issue-label"
+        type: string
+        required: false
+      exempt-issue-labels:
+        description: "Labels on issues exempted from stale. See https://github.com/actions/stale#exempt-issue-labels"
+        type: string
+        required: false
+      stale-pr-label:
+        description: "Label to apply on staled PRs. See https://github.com/actions/stale#stale-pr-label"
+        type: string
+        required: false
+      exempt-pr-labels:
+        description: "Labels on PRs exempted from stale. See https://github.com/actions/stale#exempt-pr-labels"
+        type: string
+        required: false
+    secrets:
+      github-token:
+        description: "Token for the repository. Can be passed in using {{ secrets.GITHUB_TOKEN }}. See https://github.com/actions/first-interaction#usage"
+        required: true
+
 jobs:
   stale:
     runs-on: ubuntu-latest
 
     steps:
+      - id: set-variables
+        run: |
+          STALE_ISSUE_MESSAGE="${{ inputs.stale-issue-message }}"
+          echo "stale-issue-message=${STALE_ISSUE_MESSAGE:-"This issue is stale"}" >> "$GITHUB_OUTPUT"
+          STALE_PR_MESSAGE="${{ inputs.stale-pr-message }}"
+          echo "stale-pr-message=${STALE_PR_MESSAGE:-"This PR is stale"}" >> "$GITHUB_OUTPUT"
+          STALE_ISSUE_LABEL="${{ inputs.stale-issue-label }}"
+          echo "stale-issue-label=${STALE_ISSUE_LABEL:-"no-issue-activity"}" >> "$GITHUB_OUTPUT"
+          EXEMPT_ISSUE_LABELS="${{ inputs.exempt-issue-labels }}"
+          echo "exempt-issue-labels=${EXEMPT_ISSUE_LABELS:-"awaiting-approval,work-in-progress"}" >> "$GITHUB_OUTPUT"
+          STALE_PR_LABEL="${{ inputs.stale-pr-label }}"
+          echo "stale-pr-label=${STALE_PR_LABEL:-"no-pr-activity"}" >> "$GITHUB_OUTPUT"
+          EXEMPT_PR_LABELS="${{ inputs.exempt-pr-labels }}"
+          echo "exempt-pr-labels=${EXEMPT_PR_LABELS:-"awaiting-approval,work-in-progress"}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/stale@v7
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          stale-issue-message: "This issue is stale"
-          stale-pr-message: "This PR is stale"
-          stale-issue-label: "no-issue-activity"
-          exempt-issue-labels: "awaiting-approval,work-in-progress"
-          stale-pr-label: "no-pr-activity"
-          exempt-pr-labels: "awaiting-approval,work-in-progress"
+          stale-issue-message: ${{ steps.set-variables.outputs.stale-issue-message }}
+          stale-pr-message: ${{ steps.set-variables.outputs.stale-pr-message }}
+          stale-issue-label: ${{ steps.set-variables.outputs.stale-issue-label }}
+          exempt-issue-labels: ${{ steps.set-variables.outputs.exempt-issue-labels }}
+          stale-pr-label: ${{ steps.set-variables.outputs.stale-pr-label }}
+          exempt-pr-labels: ${{ steps.set-variables.outputs.exempt-pr-labels }}

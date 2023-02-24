@@ -18,7 +18,7 @@ on:
         required: false
     secrets:
       github-token:
-        description: "Token for the repository. Can be passed in using {{ secrets.GITHUB_TOKEN }}. See https://github.com/actions/first-interaction#usage"
+        description: 'Token for the repository. Can be passed in using "${{ secrets.GITHUB_TOKEN }}". See https://github.com/actions/first-interaction#usage'
         required: true
 
 jobs:
