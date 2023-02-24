@@ -1,16 +1,51 @@
-# Workflow - Semantic pull request
+<!-- start title -->
+
+# GitHub Reusable Workflow: Semantic pull request
+
+<!-- end title -->
+<!-- start description -->
 
 Workflow to ensure "Squash and merge" Pull Request strategy provides a valid commit message.
 Check that the title follows the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
+Mainly using [action-semantic-pull-request](https://github.com/amannn/action-semantic-pull-request#installation), with some opinionated defaults.
 
-## Usage
+<!-- end description -->
+<!-- start contents -->
+<!-- end contents -->
+<!-- start usage -->
 
-### As required workflow
+```yaml
+name: "Pull Request - Semantic Lint"
 
-Configure workflow to be required in your organization settings.
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - synchronize
 
-- Go to your organization actions settings to add a new required workflow: Settings > Actions > General > Required workflows > Add workflow
-  `https://github.com/organizations/[your-organization]/settings/actions/required_workflows/new` (replace `[your-organization]` with your organization name)
-- Select the repository `ci-github-common`
-- Select the workflow file: `.github/workflows/semantic-pull-request.yml`
-- Add workflow
+jobs:
+  main:
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@main
+    secrets:
+      # Token for the repository. Can be passed in using "${{ secrets.GITHUB_TOKEN }}".
+      # See https://github.com/amannn/action-semantic-pull-request#installation
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+<!-- end usage -->
+<!-- start secrets -->
+
+| **Secret**                    | **Description**                                                                                                                                         |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **<code>github-token</code>** | Token for the repository. Can be passed in using "${{ secrets.GITHUB_TOKEN }}". See https://github.com/amannn/action-semantic-pull-request#installation |
+
+<!-- end secrets -->
+<!-- start inputs -->
+
+<!-- end inputs -->
+
+<!-- start outputs -->
+<!-- end outputs -->
+<!-- start [.github/ghadocs/examples/] -->
+<!-- end [.github/ghadocs/examples/] -->
