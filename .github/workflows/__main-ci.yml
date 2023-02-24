@@ -81,6 +81,10 @@ jobs:
   publish-actions-readme:
     needs: generate-actions-readme
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v3.1.0
 
@@ -92,3 +96,4 @@ jobs:
         with:
           commit_message: "chore: update actions README"
           file_pattern: actions/**/README.md
+          branch: main
