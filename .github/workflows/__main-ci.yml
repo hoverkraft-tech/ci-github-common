@@ -26,7 +26,7 @@ jobs:
 
       - id: changed-files
         if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
-        uses: tj-actions/changed-files@v35.5.6
+        uses: tj-actions/changed-files@v35.6.0
         with:
           files: |
             ./actions/*
