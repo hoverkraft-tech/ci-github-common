@@ -95,5 +95,7 @@ jobs:
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: "chore: update actions README"
+          commit_options: "--no-verify --signoff"
+          push_options: "--force-with-lease"
           file_pattern: actions/**/README.md
           branch: main
