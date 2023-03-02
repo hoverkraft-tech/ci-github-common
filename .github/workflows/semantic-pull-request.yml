@@ -16,7 +16,7 @@ on:
   workflow_call:
     secrets:
       github-token:
-        description: 'Token for the repository. Can be passed in using "${{ secrets.GITHUB_TOKEN }}". See https://github.com/amannn/action-semantic-pull-request#installation'
+        description: 'Token for the repository. Can be passed in using "secrets.GITHUB_TOKEN". See https://github.com/amannn/action-semantic-pull-request#installation'
         required: true
 
 jobs:
