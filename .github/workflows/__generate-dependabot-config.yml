@@ -1,4 +1,5 @@
 name: Internal - Generate dependabot.yml config
+
 on:
   push:
     branches:
