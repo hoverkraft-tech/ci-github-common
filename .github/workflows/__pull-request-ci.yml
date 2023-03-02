@@ -6,5 +6,6 @@ on:
 
 jobs:
   ci:
-    name: Continuous Integration
     uses: ./.github/workflows/__shared-ci.yml
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}

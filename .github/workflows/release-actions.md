@@ -28,15 +28,15 @@ jobs:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/release-actions.yml@main
     with:
       # Private Access Token for commiting changes and bypassing branch protection if any.
-      github-token: ${{ secrets.GH_PAT }}
+      private-access-token: ${{ secrets.GH_PAT }}
 ```
 
 <!-- end usage -->
 <!-- start secrets -->
 
-| **Secret**                    | **Description**                                                                    |
-| ----------------------------- | ---------------------------------------------------------------------------------- |
-| **<code>github-token</code>** | Private Access Token for commiting changes and bypassing branch protection if any. |
+| **Secret**                            | **Description**                                                                    |
+| ------------------------------------- | ---------------------------------------------------------------------------------- |
+| **<code>private-access-token</code>** | Private Access Token for commiting changes and bypassing branch protection if any. |
 
 <!-- end secrets -->
 <!-- start inputs -->

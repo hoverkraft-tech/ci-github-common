@@ -9,13 +9,12 @@ name: Release Actions
 on:
   workflow_call:
     secrets:
-      github-token:
+      private-access-token:
         description: "Private Access Token for commiting changes and bypassing branch protection if any."
         required: true
 
 jobs:
   prepare-release:
-    needs: ci
     runs-on: "ubuntu-latest"
     outputs:
       changed-actions: ${{ steps.get-changed-actions.outputs.result }}
@@ -93,7 +92,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3.1.0
         with:
-          token: ${{ secrets.token }}
+          token: ${{ secrets.private-access-token }}
 
       - uses: actions/download-artifact@v3
         with:

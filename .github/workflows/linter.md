@@ -36,9 +36,9 @@ jobs:
 <!-- end usage -->
 <!-- start secrets -->
 
-| **Secret**                    | **Description**                                                                                                                                                               |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **<code>github-token</code>** | Token for marking the status of linter run in the Checks section. Can be passed in using "${{ secrets.GITHUB_TOKEN }}". See https://github.com/github/super-linter#how-to-use |
+| **Secret**                    | **Description**                                                                                                                                                                                                                    |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **<code>github-token</code>** | Token for marking the status of linter run in the Checks section. Can be passed in using "${{ secrets.GITHUB_TOKEN }}". See [https://github.com/github/super-linter#how-to-use](https://github.com/github/super-linter#how-to-use) |
 
 <!-- end secrets -->
 <!-- start inputs -->
