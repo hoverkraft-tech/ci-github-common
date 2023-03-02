@@ -1,3 +1,8 @@
+# Stale
+# ==========================
+# Reusable workflow to manage stale issues and pull requests.
+# Mainly using [Stale Action](https://github.com/actions/stale), with some opinionated defaults.
+
 name: Mark stale issues and pull requests
 
 on:

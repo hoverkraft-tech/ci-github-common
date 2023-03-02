@@ -1,3 +1,10 @@
+# Greetings
+# ==========================
+# Workflow to greet new contributors.
+# Mainly using [First Interaction Action](https://github.com/actions/first-interaction), with some opinionated defaults.
+# - On issue creation, a comment is added to the issue.
+# - On first contribution, a comment is added to the pull request.
+
 name: Greetings
 
 on:
