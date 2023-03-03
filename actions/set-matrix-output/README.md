@@ -13,7 +13,7 @@ Set matrix ouput in file to be uploaded as artifacts, because github action does
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@main
+- uses: hoverkraft-tech/ci-github-common@v0.3.0
   with:
     # The matrix output to set.
     value: ""

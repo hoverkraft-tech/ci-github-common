@@ -13,7 +13,7 @@ Action to create or update comment in pull request or issue
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@main
+- uses: hoverkraft-tech/ci-github-common@v0.3.0
   with:
     # The comment title. Must be static and unique, will be used to retrieve the
     # comment if exists already.

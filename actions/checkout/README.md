@@ -13,7 +13,7 @@ Action to checkout the repository compatible for PRs, issues and push events. Wo
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@main
+- uses: hoverkraft-tech/ci-github-common@v0.3.0
   with:
     # Number of commits to fetch. 0 indicates all history for all branches and tags.
     # See https://github.com/actions/checkout#usage
