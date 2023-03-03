@@ -70,6 +70,7 @@ jobs:
         with:
           action: ${{ matrix.action }}/action.yml
           readme: ${{ matrix.action }}/README.md
+          repository: ${{ github.repository }}/${{ matrix.action }}
           pretty: true
           versioning_enabled: true
           version_prefix: ""
