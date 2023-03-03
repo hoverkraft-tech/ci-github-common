@@ -18,6 +18,7 @@ jobs:
     runs-on: "ubuntu-latest"
     outputs:
       changed-actions: ${{ steps.get-changed-actions.outputs.result }}
+      changed-workflows: ${{ steps.get-changed-workflows.outputs.result }}
       latest-tag: ${{ steps.get-latest-tag.outputs.tag }}
 
     steps:
@@ -29,30 +30,59 @@ jobs:
         uses: actions-ecosystem/action-get-latest-tag@v1
 
       - id: changed-files
-        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
+        if: ${{ ! (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) }}
         uses: tj-actions/changed-files@v35.6.0
         with:
           files: |
             ./actions/*
-          dir_names: true
+            ./.github/workflows/*
           dir_names_exclude_root: true
+
+      - id: changed-variables
+        run: |
+          IS_TAG_PUSH="${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}"
+          echo "is-tag-push=$IS_TAG_PUSH" >> "$GITHUB_OUTPUT"
+
+          CHANGED_FILES="${{ steps.changed-files.outputs.all_changed_and_modified_files }}"
+          echo "changed-files=$CHANGED_FILES" >> "$GITHUB_OUTPUT"
+
+
+          CURRENT_WORKFLOW=$(echo "${{ github.workflow_ref }}" | sed "s|${{ github.repository }}/||g" | sed 's/@.*//g')
+          WORKFLOW_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$CURRENT_WORKFLOW"* ]] && echo "true" || echo "false")
+          echo "workflow-has-changed=$WORKFLOW_HAS_CHANGED" >> "$GITHUB_OUTPUT"
 
       - id: get-changed-actions
         run: |
-          CHANGED_FILES="${{ steps.changed-files.outputs.all_changed_and_modified_files }}"
-          IS_TAG_PUSH="${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}"
+          CHANGED_FILES="${{ steps.changed-variables.outputs.changed-files }}"
 
           CHANGED_ACTIONS=()
           for ACTION_FILE in actions/**/action.yml; do
-            ACTION_DIR=$(dirname "$ACTION_FILE")
-            if [ "$IS_TAG_PUSH" = "true" ] || [[ "$CHANGED_FILES" == *"$ACTION_DIR"* ]]; then
+            if [ "${{ steps.changed-variables.outputs.workflow-has-changed }}" = "true" ] || [ "${{ steps.changed-variables.outputs.is-tag-push }}" = "true" ] || [[ "$CHANGED_FILES" == *"$ACTION_FILE"* ]]; then
+              ACTION_DIR=$(dirname "$ACTION_FILE")
               CHANGED_ACTIONS+=("$ACTION_DIR")
             fi
           done
 
           JSON_CHANGED_ACTIONS=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${CHANGED_ACTIONS[@]}");
-
           echo "result<<EOF" >> "$GITHUB_OUTPUT" && echo "$JSON_CHANGED_ACTIONS" >> "$GITHUB_OUTPUT" && echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - id: get-changed-workflows
+        run: |
+          CHANGED_FILES="${{ steps.changed-variables.outputs.changed-files }}"
+
+          CHANGED_WORKFLOWS=()
+          for WORKFLOW_FILE in .github/workflows/*.yml; do
+            if [[ $(basename "$WORKFLOW_FILE") == __* ]]; then
+              continue
+            fi            
+
+            if [ "${{ steps.changed-variables.outputs.workflow-has-changed }}" = "true" ] || [ "${{ steps.changed-variables.outputs.is-tag-push }}" = "true" ] || [[ "$CHANGED_FILES" == *"$WORKFLOW_FILE"* ]]; then
+              CHANGED_WORKFLOWS+=("$WORKFLOW_FILE")
+            fi
+          done
+
+          JSON_CHANGED_WORKFLOWS=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${CHANGED_WORKFLOWS[@]}");
+          echo "result<<EOF" >> "$GITHUB_OUTPUT" && echo "$JSON_CHANGED_WORKFLOWS" >> "$GITHUB_OUTPUT" && echo "EOF" >> "$GITHUB_OUTPUT"
 
   generate-actions-readme:
     needs: prepare-release
@@ -70,19 +100,47 @@ jobs:
         with:
           action: ${{ matrix.action }}/action.yml
           readme: ${{ matrix.action }}/README.md
-          repository: ${{ github.repository }}/${{ matrix.action }}
+          repo: ${{ github.event.repository.name }}/${{ matrix.action }}
           pretty: true
           versioning_enabled: true
           version_prefix: ""
           version_override: ${{ needs.prepare-release.outputs.latest-tag }}
-
         env:
           INPUT_SHOW_LOGO: "true"
 
       - uses: actions/upload-artifact@v3
         with:
-          name: changed-actions
+          name: changed-files
           path: ${{ github.workspace }}/**/${{ matrix.action }}/README.md
+
+  generate-workflows-readme:
+    needs: prepare-release
+    runs-on: ubuntu-latest
+    if: ${{ needs.prepare-release.outputs.changed-workflows != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        workflow: ${{ fromJson(needs.prepare-release.outputs.changed-workflows) }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: 📖 Generate README
+        id: generate-readme
+        run:
+          # Readme file is same name but without yml by .md extension
+          WORKFLOW_FILE="${{ matrix.workflow }}"
+          README_FILE="${WORKFLOW_FILE%.*}.md"
+
+          echo "readme-file=${README_FILE}" >> "$GITHUB_OUTPUT"
+
+          WORKFLOW_FULL_PATH="${{ github.repository }}/${WORKFLOW_FILE}"
+
+          sed -i "s|${WORKFLOW_FULL_PATH}@.*|${WORKFLOW_FULL_PATH}@${{ needs.prepare-release.outputs.latest-tag }}|g" "${README_FILE}"
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: changed-files
+          path: ${{ github.workspace }}/**/${{ steps.generate-readme.outputs.readme-file }}
 
   publish-actions-readme:
     needs: generate-actions-readme
@@ -98,7 +156,7 @@ jobs:
 
       - uses: actions/download-artifact@v3
         with:
-          name: changed-actions
+          name: changed-files
 
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
