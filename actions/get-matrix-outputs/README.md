@@ -5,7 +5,7 @@
 <!-- end title -->
 <!-- start description -->
 
-Download matrix ouputs from artifacts, because github action does not handle job outputs for matrix
+Download matrix ouputs from artifacts, because GitHub action does not handle job outputs for matrix
 
 <!-- end description -->
 <!-- start contents -->

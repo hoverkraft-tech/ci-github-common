@@ -5,7 +5,7 @@
 <!-- end title -->
 <!-- start description -->
 
-Set matrix ouput in file to be uploaded as artifacts, because github action does not handle job outputs for matrix
+Set matrix ouput in file to be uploaded as artifacts, because GitHub action does not handle job outputs for matrix
 
 <!-- end description -->
 <!-- start contents -->

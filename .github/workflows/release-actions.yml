@@ -70,6 +70,7 @@ jobs:
         with:
           action: ${{ matrix.action }}/action.yml
           readme: ${{ matrix.action }}/README.md
+          pretty: true
           versioning_enabled: true
           version_prefix: ""
           version_override: ${{ needs.prepare-release.outputs.latest-tag }}
