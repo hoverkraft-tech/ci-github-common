@@ -34,9 +34,9 @@ jobs:
 <!-- end usage -->
 <!-- start secrets -->
 
-| **Secret**                            | **Description**                                                                    |
-| ------------------------------------- | ---------------------------------------------------------------------------------- |
-| **<code>private-access-token</code>** | Private Access Token for commiting changes and bypassing branch protection if any. |
+| **Secret**                            | **Description**                                                                                                                                                                            |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **<code>private-access-token</code>** | Private Access Token for commiting changes and bypassing branch protection if any. Needs following permissions: <ul><li>"Repository permissions" > "Contents" > "Read and write"</li></ul> |
 
 <!-- end secrets -->
 <!-- start inputs -->
