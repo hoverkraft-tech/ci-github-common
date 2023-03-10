@@ -46,41 +46,53 @@ jobs:
           CHANGED_FILES="${{ steps.changed-files.outputs.all_changed_and_modified_files }}"
           echo "changed-files=$CHANGED_FILES" >> "$GITHUB_OUTPUT"
 
-
           CURRENT_WORKFLOW=$(echo "${{ github.workflow_ref }}" | sed "s|${{ github.repository }}/||g" | sed 's/@.*//g')
-          WORKFLOW_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$CURRENT_WORKFLOW"* ]] && echo "true" || echo "false")
-          echo "workflow-has-changed=$WORKFLOW_HAS_CHANGED" >> "$GITHUB_OUTPUT"
+          CURRENT_WORKFLOW_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$CURRENT_WORKFLOW"* ]] && echo "true" || echo "false")
+          echo "workflow-has-changed=$CURRENT_WORKFLOW_HAS_CHANGED" >> "$GITHUB_OUTPUT"
 
       - id: get-changed-actions
         run: |
           CHANGED_FILES="${{ steps.changed-variables.outputs.changed-files }}"
+          CURRENT_WORKFLOW_HAS_CHANGED="${{ steps.changed-variables.outputs.workflow-has-changed }}"
+          IS_TAG_PUSH="${{ steps.changed-variables.outputs.is-tag-push }}"
 
           CHANGED_ACTIONS=()
           for ACTION_FILE in actions/**/action.yml; do
-            if [ "${{ steps.changed-variables.outputs.workflow-has-changed }}" = "true" ] || [ "${{ steps.changed-variables.outputs.is-tag-push }}" = "true" ] || [[ "$CHANGED_FILES" == *"$ACTION_FILE"* ]]; then
+            ACTION_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$ACTION_FILE"* ]] && echo "true" || echo "false")
+            echo "::debug::Action $ACTION_FILE has changed: $ACTION_HAS_CHANGED"
+
+            if [ "$CURRENT_WORKFLOW_HAS_CHANGED" = "true" ] || [ "$IS_TAG_PUSH" = "true" ] || [ "$ACTION_HAS_CHANGED" = "true" ]; then
               ACTION_DIR=$(dirname "$ACTION_FILE")
               CHANGED_ACTIONS+=("$ACTION_DIR")
             fi
           done
 
+          echo "::debug::Changed actions: ${CHANGED_ACTIONS[*]}"
           JSON_CHANGED_ACTIONS=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${CHANGED_ACTIONS[@]}");
           echo "result<<EOF" >> "$GITHUB_OUTPUT" && echo "$JSON_CHANGED_ACTIONS" >> "$GITHUB_OUTPUT" && echo "EOF" >> "$GITHUB_OUTPUT"
 
       - id: get-changed-workflows
         run: |
           CHANGED_FILES="${{ steps.changed-variables.outputs.changed-files }}"
+          CURRENT_WORKFLOW_HAS_CHANGED="${{ steps.changed-variables.outputs.workflow-has-changed }}"
+          IS_TAG_PUSH="${{ steps.changed-variables.outputs.is-tag-push }}"
 
           CHANGED_WORKFLOWS=()
           for WORKFLOW_FILE in .github/workflows/*.yml; do
+            # Ignore internal workflows
             if [[ $(basename "$WORKFLOW_FILE") == __* ]]; then
               continue
-            fi            
+            fi
 
-            if [ "${{ steps.changed-variables.outputs.workflow-has-changed }}" = "true" ] || [ "${{ steps.changed-variables.outputs.is-tag-push }}" = "true" ] || [[ "$CHANGED_FILES" == *"$WORKFLOW_FILE"* ]]; then
+            WORKFLOW_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$WORKFLOW_FILE"* ]] && echo "true" || echo "false")
+            echo "::debug::Workflow $WORKFLOW_FILE has changed: $WORKFLOW_HAS_CHANGED"
+
+            if [ "$CURRENT_WORKFLOW_HAS_CHANGED" = "true" ] || [ "$IS_TAG_PUSH" = "true" ] || [ "$WORKFLOW_HAS_CHANGED" = "true" ]; then
               CHANGED_WORKFLOWS+=("$WORKFLOW_FILE")
             fi
           done
 
+          echo "::debug::Changed workflows: ${CHANGED_WORKFLOWS[*]}"
           JSON_CHANGED_WORKFLOWS=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${CHANGED_WORKFLOWS[@]}");
           echo "result<<EOF" >> "$GITHUB_OUTPUT" && echo "$JSON_CHANGED_WORKFLOWS" >> "$GITHUB_OUTPUT" && echo "EOF" >> "$GITHUB_OUTPUT"
 
