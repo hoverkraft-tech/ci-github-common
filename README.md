@@ -29,6 +29,10 @@ Opinionated GitHub actions and workflows for common continuous integration needs
 
 ### - [Greetings](.github/workflows/greetings.md)
 
+### - [Linter](.github/workflows/linter.md)
+
+### - [Release actions](.github/workflows/release-actions.md)
+
 ### - [Semantic pull request](.github/workflows/semantic-pull-request.md)
 
 ### - [Stale](.github/workflows/stale.md)
