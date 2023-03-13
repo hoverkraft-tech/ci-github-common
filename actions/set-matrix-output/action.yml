@@ -15,10 +15,6 @@ inputs:
   artifact-name:
     description: "The name of the artifact to upload."
     required: true
-outputs:
-  result:
-    description: "The matrix combined JSON outputs."
-    value: ${{ steps.get-issue-number.outputs.result }}
 
 runs:
   using: "composite"
@@ -41,7 +37,7 @@ runs:
           exit 1
         fi
 
-        echo '${{ inputs.matrix-output }}' > "$MATRIX_OUTPUT_FILE"
+        echo '${{ inputs.value }}' > "$MATRIX_OUTPUT_FILE"
 
     - uses: actions/upload-artifact@v3
       with:
