@@ -1,0 +1,32 @@
+name: Internal - Test for get matrix outputs
+
+on:
+  workflow_call:
+
+jobs:
+  set-and-get-matrix-outputs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: ./actions/set-matrix-output
+        with:
+          value: '"test content 1"'
+          artifact-name: "test-matrix-outputs"
+
+      - uses: ./actions/set-matrix-output
+        with:
+          value: '"test content 2"'
+          artifact-name: "test-matrix-outputs"
+
+      - id: get-matrix-outputs
+        uses: ./actions/get-matrix-outputs
+        with:
+          artifact-name: test-matrix-outputs
+
+      - name: Check matrix outputs
+        run: |
+          if [ "${{ steps.get-matrix-outputs.outputs.result }}" != '["test content 1","test content 2"]' ]; then
+            echo "Get matrix outputs result is not valid"
+            exit 1
+          fi

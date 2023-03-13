@@ -12,3 +12,8 @@ jobs:
     uses: ./.github/workflows/linter.yml
     secrets:
       github-token: ${{ secrets.github-token }}
+
+  test-matrix-outputs:
+    name: Test get & set matrix outputs actions
+    needs: linter
+    uses: ./.github/workflows/__test-matrix-outputs.yml

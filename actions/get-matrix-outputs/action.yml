@@ -15,14 +15,14 @@ inputs:
 outputs:
   result:
     description: "The matrix combined JSON outputs."
-    value: ${{ steps.get-matrix-outputs.outputs.result }}
+    value: ${{ steps.read-artifacts.outputs.result }}
 
 runs:
   using: "composite"
   steps:
     - uses: actions/download-artifact@v3
       with:
-        name: ${{ inputs.artifact-name }}}
+        name: ${{ inputs.artifact-name }}
         path: /tmp/${{ inputs.artifact-name }}
 
     - id: read-artifacts
