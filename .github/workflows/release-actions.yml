@@ -45,6 +45,7 @@ jobs:
           dir_names_exclude_root: true
 
       - id: changed-variables
+        shell: bash
         run: |
           CHANGED_FILES="${{ steps.changed-files.outputs.all_changed_and_modified_files }}"
           echo "changed-files=$CHANGED_FILES" >> "$GITHUB_OUTPUT"
@@ -54,6 +55,7 @@ jobs:
           echo "workflow-has-changed=$CURRENT_WORKFLOW_HAS_CHANGED" >> "$GITHUB_OUTPUT"
 
       - id: get-changed-actions
+        shell: bash
         run: |
           CHANGED_FILES="${{ steps.changed-variables.outputs.changed-files }}"
           CURRENT_WORKFLOW_HAS_CHANGED="${{ steps.changed-variables.outputs.workflow-has-changed }}"
@@ -75,6 +77,7 @@ jobs:
           echo "result<<EOF" >> "$GITHUB_OUTPUT" && echo "$JSON_CHANGED_ACTIONS" >> "$GITHUB_OUTPUT" && echo "EOF" >> "$GITHUB_OUTPUT"
 
       - id: get-changed-workflows
+        shell: bash
         run: |
           CHANGED_FILES="${{ steps.changed-variables.outputs.changed-files }}"
           CURRENT_WORKFLOW_HAS_CHANGED="${{ steps.changed-variables.outputs.workflow-has-changed }}"
