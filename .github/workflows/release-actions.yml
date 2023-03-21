@@ -95,7 +95,7 @@ jobs:
             echo "::debug::File $FILE has changed: $WORKFLOW_HAS_CHANGED, should update file: $SHOULD_UPDATE_FILE"
 
             if [ "$SHOULD_UPDATE_FILE" == "true" ]; then
-              CHANGED_WORKFLOWS+=("$WORKFLOW_FILE")
+              CHANGED_WORKFLOWS+=("$FILE")
             fi
           done
 
