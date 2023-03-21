@@ -163,7 +163,7 @@ jobs:
           path: ${{ github.workspace }}/**/${{ steps.generate-readme.outputs.readme-file }}
 
   publish-actions-readme:
-    needs: generate-actions-readme
+    needs: [generate-actions-readme, generate-workflows-readme]
     runs-on: ubuntu-latest
 
     permissions:
