@@ -1,0 +1,22 @@
+name: Internal - Test for slugify action
+
+on:
+  workflow_call:
+
+jobs:
+  set-and-get-matrix-outputs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - id: slugify
+        uses: ./actions/slugify
+        with:
+          value: test content
+
+      - name: Check slugify outputs
+        run: |
+          if [ "${{ steps.slugify.outputs.result }}" != 'test-content' ]; then
+            echo "Slugify outputs result is not valid"
+            exit 1
+          fi
