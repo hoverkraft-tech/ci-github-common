@@ -52,19 +52,21 @@ jobs:
 
           CURRENT_WORKFLOW=$(echo "${{ github.workflow_ref }}" | sed "s|${{ github.repository }}/||g" | sed 's/@.*//g')
           CURRENT_WORKFLOW_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$CURRENT_WORKFLOW"* ]] && echo "true" || echo "false")
-          echo "workflow-has-changed=$CURRENT_WORKFLOW_HAS_CHANGED" >> "$GITHUB_OUTPUT"
+          UPDATE_ALL="${{ inputs.update-all }}"
+
+          FORCE_UPDATE=$([[ "$CURRENT_WORKFLOW_HAS_CHANGED" = "true" || "$UPDATE_ALL" = "true" ]] && echo "true" || echo "false")
+          echo "force-update=$FORCE_UPDATE" >> "$GITHUB_OUTPUT"
 
       - id: get-changed-actions
         shell: bash
         run: |
           CHANGED_FILES="${{ steps.changed-variables.outputs.changed-files }}"
-          CURRENT_WORKFLOW_HAS_CHANGED="${{ steps.changed-variables.outputs.workflow-has-changed }}"
-          UPDATE_ALL="${{ inputs.update-all }}"
+          FORCE_UPDATE="${{ steps.changed-variables.outputs.force-update }}"
 
           CHANGED_ACTIONS=()
           for FILE in actions/**/action.yml; do
             ACTION_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$FILE"* ]] && echo "true" || echo "false")
-            SHOULD_UPDATE_FILE=$([[ "$CURRENT_WORKFLOW_HAS_CHANGED" = "true" || "$UPDATE_ALL" = "true" || "$ACTION_HAS_CHANGED" = "true" ]] && echo "true" || echo "false")
+            SHOULD_UPDATE_FILE=$([[ "$FORCE_UPDATE" = "true" || "$ACTION_HAS_CHANGED" = "true" ]] && echo "true" || echo "false")
             echo "::debug::File $FILE has changed: $ACTION_HAS_CHANGED, should update file: $SHOULD_UPDATE_FILE"
 
             if [ "$SHOULD_UPDATE_FILE" == "true" ]; then
@@ -80,8 +82,7 @@ jobs:
         shell: bash
         run: |
           CHANGED_FILES="${{ steps.changed-variables.outputs.changed-files }}"
-          CURRENT_WORKFLOW_HAS_CHANGED="${{ steps.changed-variables.outputs.workflow-has-changed }}"
-          UPDATE_ALL="${{ inputs.update-all }}"
+          FORCE_UPDATE="${{ steps.changed-variables.outputs.force-update }}"
 
           CHANGED_WORKFLOWS=()
           for FILE in .github/workflows/*.yml; do
@@ -91,7 +92,7 @@ jobs:
             fi
 
             WORKFLOW_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$FILE"* ]] && echo "true" || echo "false")
-            SHOULD_UPDATE_FILE=$([[ "$CURRENT_WORKFLOW_HAS_CHANGED" = "true" || "$UPDATE_ALL" = "true" || "$WORKFLOW_HAS_CHANGED" = "true" ]] && echo "true" || echo "false")
+            SHOULD_UPDATE_FILE=$([[ "$FORCE_UPDATE" = "true" || "$WORKFLOW_HAS_CHANGED" = "true" ]] && echo "true" || echo "false")
             echo "::debug::File $FILE has changed: $WORKFLOW_HAS_CHANGED, should update file: $SHOULD_UPDATE_FILE"
 
             if [ "$SHOULD_UPDATE_FILE" == "true" ]; then
