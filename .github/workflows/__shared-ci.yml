@@ -13,7 +13,10 @@ jobs:
     secrets:
       github-token: ${{ secrets.github-token }}
 
-  test-matrix-outputs:
-    name: Test get & set matrix outputs actions
+  test-action-matrix-outputs:
     needs: linter
-    uses: ./.github/workflows/__test-matrix-outputs.yml
+    uses: ./.github/workflows/__test-action-matrix-outputs.yml
+
+  test-action-slugify:
+    needs: linter
+    uses: ./.github/workflows/__test-action-slugify.yml
