@@ -8,6 +8,12 @@ name: Release Actions
 
 on:
   workflow_call:
+    inputs:
+      update-all:
+        description: "Update all actions and workflows, regardless of changes."
+        required: false
+        default: false
+        type: boolean
     secrets:
       private-access-token:
         description: "Private Access Token for commiting changes and bypassing branch protection if any."
@@ -30,7 +36,7 @@ jobs:
         uses: actions-ecosystem/action-get-latest-tag@v1
 
       - id: changed-files
-        if: ${{ ! (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) }}
+        if: ${{ inputs.update-all == true }}
         uses: tj-actions/changed-files@v35.6.4
         with:
           files: |
@@ -40,9 +46,6 @@ jobs:
 
       - id: changed-variables
         run: |
-          IS_TAG_PUSH="${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}"
-          echo "is-tag-push=$IS_TAG_PUSH" >> "$GITHUB_OUTPUT"
-
           CHANGED_FILES="${{ steps.changed-files.outputs.all_changed_and_modified_files }}"
           echo "changed-files=$CHANGED_FILES" >> "$GITHUB_OUTPUT"
 
@@ -54,20 +57,20 @@ jobs:
         run: |
           CHANGED_FILES="${{ steps.changed-variables.outputs.changed-files }}"
           CURRENT_WORKFLOW_HAS_CHANGED="${{ steps.changed-variables.outputs.workflow-has-changed }}"
-          IS_TAG_PUSH="${{ steps.changed-variables.outputs.is-tag-push }}"
+          UPDATE_ALL="${{ inputs.update-all }}"
 
           CHANGED_ACTIONS=()
-          for ACTION_FILE in actions/**/action.yml; do
-            ACTION_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$ACTION_FILE"* ]] && echo "true" || echo "false")
-            echo "::debug::Action $ACTION_FILE has changed: $ACTION_HAS_CHANGED"
+          for FILE in actions/**/action.yml; do
+            ACTION_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$FILE"* ]] && echo "true" || echo "false")
+            SHOULD_UPDATE_FILE=$([[ "$CURRENT_WORKFLOW_HAS_CHANGED" = "true" || "$UPDATE_ALL" = "true" || "$ACTION_HAS_CHANGED" = "true" ]] && echo "true" || echo "false")
+            echo "::debug::File $FILE has changed: $ACTION_HAS_CHANGED, should update file: $SHOULD_UPDATE_FILE"
 
-            if [ "$CURRENT_WORKFLOW_HAS_CHANGED" = "true" ] || [ "$IS_TAG_PUSH" = "true" ] || [ "$ACTION_HAS_CHANGED" = "true" ]; then
-              ACTION_DIR=$(dirname "$ACTION_FILE")
-              CHANGED_ACTIONS+=("$ACTION_DIR")
+            if [ "$SHOULD_UPDATE_FILE" == "true" ]; then
+              CHANGED_ACTIONS+=("$(dirname "$FILE")")
             fi
           done
 
-          echo "::debug::Changed actions: ${CHANGED_ACTIONS[*]}"
+          echo "::debug::Changed files: ${CHANGED_ACTIONS[*]}"
           JSON_CHANGED_ACTIONS=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${CHANGED_ACTIONS[@]}");
           echo "result<<EOF" >> "$GITHUB_OUTPUT" && echo "$JSON_CHANGED_ACTIONS" >> "$GITHUB_OUTPUT" && echo "EOF" >> "$GITHUB_OUTPUT"
 
@@ -75,24 +78,25 @@ jobs:
         run: |
           CHANGED_FILES="${{ steps.changed-variables.outputs.changed-files }}"
           CURRENT_WORKFLOW_HAS_CHANGED="${{ steps.changed-variables.outputs.workflow-has-changed }}"
-          IS_TAG_PUSH="${{ steps.changed-variables.outputs.is-tag-push }}"
+          UPDATE_ALL="${{ inputs.update-all }}"
 
           CHANGED_WORKFLOWS=()
-          for WORKFLOW_FILE in .github/workflows/*.yml; do
+          for FILE in .github/workflows/*.yml; do
             # Ignore internal workflows
-            if [[ $(basename "$WORKFLOW_FILE") == __* ]]; then
+            if [[ $(basename "$FILE") == __* ]]; then
               continue
             fi
 
-            WORKFLOW_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$WORKFLOW_FILE"* ]] && echo "true" || echo "false")
-            echo "::debug::Workflow $WORKFLOW_FILE has changed: $WORKFLOW_HAS_CHANGED"
+            WORKFLOW_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$FILE"* ]] && echo "true" || echo "false")
+            SHOULD_UPDATE_FILE=$([[ "$CURRENT_WORKFLOW_HAS_CHANGED" = "true" || "$UPDATE_ALL" = "true" || "$WORKFLOW_HAS_CHANGED" = "true" ]] && echo "true" || echo "false")
+            echo "::debug::File $FILE has changed: $WORKFLOW_HAS_CHANGED, should update file: $SHOULD_UPDATE_FILE"
 
-            if [ "$CURRENT_WORKFLOW_HAS_CHANGED" = "true" ] || [ "$IS_TAG_PUSH" = "true" ] || [ "$WORKFLOW_HAS_CHANGED" = "true" ]; then
+            if [ "$SHOULD_UPDATE_FILE" == "true" ]; then
               CHANGED_WORKFLOWS+=("$WORKFLOW_FILE")
             fi
           done
 
-          echo "::debug::Changed workflows: ${CHANGED_WORKFLOWS[*]}"
+          echo "::debug::Changed files: ${CHANGED_WORKFLOWS[*]}"
           JSON_CHANGED_WORKFLOWS=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${CHANGED_WORKFLOWS[@]}");
           echo "result<<EOF" >> "$GITHUB_OUTPUT" && echo "$JSON_CHANGED_WORKFLOWS" >> "$GITHUB_OUTPUT" && echo "EOF" >> "$GITHUB_OUTPUT"
 
