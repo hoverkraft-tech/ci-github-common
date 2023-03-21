@@ -36,7 +36,7 @@ jobs:
         uses: actions-ecosystem/action-get-latest-tag@v1
 
       - id: changed-files
-        if: ${{ inputs.update-all == true }}
+        if: ${{ inputs.update-all == false }}
         uses: tj-actions/changed-files@v35.7.2
         with:
           files: |
