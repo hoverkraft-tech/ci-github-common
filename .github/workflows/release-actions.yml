@@ -164,6 +164,7 @@ jobs:
 
   publish-actions-readme:
     needs: [generate-actions-readme, generate-workflows-readme]
+    if: always()
     runs-on: ubuntu-latest
 
     permissions:
