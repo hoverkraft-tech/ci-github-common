@@ -22,7 +22,7 @@ on:
 
 jobs:
   main:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/stale.yml@main
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/stale.yml@0.3.2
 
     # Optional customizations.
     with:

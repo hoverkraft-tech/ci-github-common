@@ -26,7 +26,7 @@ on:
 
 jobs:
   main:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@main
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@0.3.2
     secrets:
       # Token for marking the status of linter run in the Checks section. Can be passed in using "${{ secrets.GITHUB_TOKEN }}".
       # See https://github.com/github/super-linter#how-to-use
