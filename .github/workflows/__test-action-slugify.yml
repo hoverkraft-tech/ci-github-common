@@ -4,7 +4,7 @@ on:
   workflow_call:
 
 jobs:
-  set-and-get-matrix-outputs:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
