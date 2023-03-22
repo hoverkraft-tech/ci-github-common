@@ -25,7 +25,7 @@ on:
 
 jobs:
   release:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/release-actions.yml@0.3.3
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/release-actions.yml@0.3.4
     with:
       # Private Access Token for commiting changes and bypassing branch protection if any.
       private-access-token: ${{ secrets.GH_PAT }}
