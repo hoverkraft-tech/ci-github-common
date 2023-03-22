@@ -22,7 +22,7 @@ on:
       - main
 jobs:
   main:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/generate-dependabot-config.yml@0.3.2
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/generate-dependabot-config.yml@0.3.3
 ```
 
 <!-- end usage -->
