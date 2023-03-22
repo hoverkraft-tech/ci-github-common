@@ -64,7 +64,7 @@ jobs:
           FORCE_UPDATE="${{ steps.changed-variables.outputs.force-update }}"
 
           CHANGED_ACTIONS=()
-          for FILE in actions/**/action.yml; do
+          for FILE in $(find actions -name "action.yml" -type f); do
             ACTION_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$FILE"* ]] && echo "true" || echo "false")
             SHOULD_UPDATE_FILE=$([[ "$FORCE_UPDATE" = "true" || "$ACTION_HAS_CHANGED" = "true" ]] && echo "true" || echo "false")
             echo "::debug::File $FILE has changed: $ACTION_HAS_CHANGED, should update file: $SHOULD_UPDATE_FILE"
