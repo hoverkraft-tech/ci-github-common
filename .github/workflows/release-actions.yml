@@ -184,8 +184,7 @@ jobs:
           commit_message: |
             chore: update actions README
 
-
-            skip-checks:true
+            [skip ci]
           commit_options: "--no-verify --signoff"
           push_options: "--force-with-lease"
           branch: main
