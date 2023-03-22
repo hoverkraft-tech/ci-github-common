@@ -164,7 +164,7 @@ jobs:
 
   publish-actions-readme:
     needs: [generate-actions-readme, generate-workflows-readme]
-    if: always() && contains(needs.*.result, 'success')
+    if: always() && contains(needs.*.result, 'success') && !contains(needs.*.result, 'failure')
     runs-on: ubuntu-latest
 
     permissions:
