@@ -7,7 +7,7 @@ branding:
 
 inputs:
   github-token:
-    description: 'Token for marking the status of linter run in the Checks section. Can be passed in using "secrets.GITHUB_TOKEN". See https://github.com/github/super-linter#how-to-use'
+    description: 'Github token for creating and merging pull request (permissions contents: write and pull-requests: write). Can be passed in using "secrets.GITHUB_TOKEN". See https://github.com/peter-evans/create-pull-request#action-inputs'
     required: true
   branch:
     description: "The pull request branch name"
