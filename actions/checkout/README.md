@@ -25,6 +25,19 @@ Action to checkout the repository compatible for PRs, issues and push events. Wo
     lfs: ""
 ```
 
+### Integration in workflow
+
+Set permissions to read contents and pull-requests. This is required to get the PR branch.
+
+```yaml
+on: issue_comment
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  - uses: hoverkraft-tech/ci-github-common/actions/checkout@v0.3.3
+```
+
 <!-- end usage -->
 <!-- start inputs -->
 
