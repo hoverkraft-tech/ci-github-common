@@ -179,12 +179,13 @@ jobs:
         with:
           name: changed-files
 
-      - uses: stefanzweifel/git-auto-commit-action@v4
+      - uses: hoverkraft-tech/ci-github-common/create-and-merge-pull-request@main
         with:
-          commit_message: |
-            chore: update actions README
+          github-token: ${{ secrets.github-token }}
+          branch: docs/actions-readme
+          title: "docs: update actions README"
+          body:
+          commit-message: |
+            docs: update actions README
 
             [skip ci]
-          commit_options: "--no-verify --signoff"
-          push_options: "--force-with-lease"
-          branch: main
