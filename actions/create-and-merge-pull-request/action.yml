@@ -1,0 +1,41 @@
+name: "Create and merge Pull Request"
+description: "Action to create and merge Pull Request"
+author: Hoverkraft
+branding:
+  icon: git-pull-request
+  color: gray-dark
+
+inputs:
+  github-token:
+    description: 'Token for marking the status of linter run in the Checks section. Can be passed in using "secrets.GITHUB_TOKEN". See https://github.com/github/super-linter#how-to-use'
+    required: true
+  branch:
+    description: "The pull request branch name"
+    required: true
+  title:
+    description: "The pull request title"
+    required: true
+  body:
+    description: "The pull request body"
+    required: true
+  commit-message:
+    description: "The commit message for the pull request"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: peter-evans/create-pull-request@v4.2.4
+      id: create-pull-request
+      with:
+        token: ${{ inputs.github-token }}
+        commit-message: ${{ inputs.commit-message }}
+        signoff: true
+        base: ${{ github.event.repository.default_branch }}
+        delete-branch: true
+
+    - uses: juliangruber/merge-pull-request-action@v1
+      if: steps.create-pull-request.outputs.pull-request-operation != 'closed'
+      with:
+        github-token: ${{ inputs.github-token }}
+        number: ${{ steps.create-pull-request.outputs.pull-request-number }}
