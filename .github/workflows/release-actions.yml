@@ -179,7 +179,7 @@ jobs:
         with:
           name: changed-files
 
-      - uses: hoverkraft-tech/ci-github-common/create-and-merge-pull-request@main
+      - uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@main
         with:
           github-token: ${{ secrets.github-token }}
           branch: docs/actions-readme
