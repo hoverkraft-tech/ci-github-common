@@ -10,6 +10,16 @@ Action to checkout the repository compatible for PRs, issues and push events. Wo
 <!-- end description -->
 <!-- start contents -->
 <!-- end contents -->
+
+Set permissions to read contents and pull-requests. This is required to get the PR branch.
+
+```yaml
+on: issue_comment
+permissions:
+  contents: read
+  pull-requests: read
+```
+
 <!-- start usage -->
 
 ```yaml

@@ -181,10 +181,10 @@ jobs:
       - uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@main
         with:
           github-token: ${{ secrets.github-token }}
-          branch: docs/actions-readme
-          title: "docs: update actions README"
-          body:
+          branch: docs/actions-workflows-documentation-update
+          title: "docs: update actions and workflows documentation"
+          body: Update actions and workflows documentation
           commit-message: |
-            docs: update actions README
+            docs: update actions and workflows documentation
 
             [skip ci]
