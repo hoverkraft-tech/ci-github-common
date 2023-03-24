@@ -36,9 +36,9 @@ jobs:
 <!-- end usage -->
 <!-- start secrets -->
 
-| **Secret**                    | **Description**                                                                                                                                         |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **<code>github-token</code>** | Token for the repository. Can be passed in using "${{ secrets.GITHUB_TOKEN }}". See https://github.com/amannn/action-semantic-pull-request#installation |
+| **Secret**                    | **Description**                                                                                                                                                                                               |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **<code>github-token</code>** | Token for the repository. Can be passed in using "${{ secrets.GITHUB_TOKEN }}". See [https://github.com/amannn/action-semantic-pull-request#installation](https://github.com/actions/first-interaction#usage) |
 
 <!-- end secrets -->
 <!-- start inputs -->
