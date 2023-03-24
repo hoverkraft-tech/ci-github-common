@@ -46,17 +46,17 @@ jobs:
 <!-- end usage -->
 <!-- start secrets -->
 
-| **Secret**                    | **Description**                                                                                                                        |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **<code>github-token</code>** | Token for the repository. Can be passed in using "${{ secrets.GITHUB_TOKEN }}". See https://github.com/actions/first-interaction#usage |
+| **Secret**                    | **Description**                                                                                                                                                                              |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **<code>github-token</code>** | Token for the repository. Can be passed in using "${{ secrets.GITHUB_TOKEN }}". See [https://github.com/actions/first-interaction#usage](https://github.com/actions/first-interaction#usage) |
 
 <!-- end secrets -->
 <!-- start inputs -->
 
-| **Input**                      | **Description**                                                                                               | **Default**                                                                     | **Required** |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------ |
-| **<code>issue-message</code>** | Comment to post on an individual's first issue. See https://github.com/actions/first-interaction#usage        | <code>Hi, thank for reporting an issue, we will check it out very soon</code>   | **false**    |
-| **<code>issue-message</code>** | Comment to post on an individual's first pull request. See https://github.com/actions/first-interaction#usage | <code>Hi, thank you for creating your PR, we will check it out very soon</code> | **false**    |
+| **Input**                      | **Description**                                                                                                                                                     | **Default**                                                                     | **Required** |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------ |
+| **<code>issue-message</code>** | Comment to post on an individual's first issue. See [https://github.com/actions/first-interaction#usage](https://github.com/actions/first-interaction#usage)        | <code>Hi, thank for reporting an issue, we will check it out very soon</code>   | **false**    |
+| **<code>issue-message</code>** | Comment to post on an individual's first pull request. See [https://github.com/actions/first-interaction#usage](https://github.com/actions/first-interaction#usage) | <code>Hi, thank you for creating your PR, we will check it out very soon</code> | **false**    |
 
 <!-- end inputs -->
 
