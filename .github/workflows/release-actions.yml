@@ -64,7 +64,7 @@ jobs:
           FORCE_UPDATE="${{ steps.changed-variables.outputs.force-update }}"
 
           CHANGED_ACTIONS=()
-          for FILE in $(find actions -name "action.yml" -type f); do
+          find actions -name "action.yml" -type f | while read -r FILE; do
             ACTION_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$FILE"* ]] && echo "true" || echo "false")
             SHOULD_UPDATE_FILE=$([[ "$FORCE_UPDATE" = "true" || "$ACTION_HAS_CHANGED" = "true" ]] && echo "true" || echo "false")
             echo "::debug::File $FILE has changed: $ACTION_HAS_CHANGED, should update file: $SHOULD_UPDATE_FILE"
@@ -163,7 +163,7 @@ jobs:
           path: ${{ github.workspace }}/**/${{ steps.generate-readme.outputs.readme-file }}
 
   publish-actions-readme:
-    needs: [generate-actions-readme, generate-workflows-readme]
+    needs: [prepare-release, generate-actions-readme, generate-workflows-readme]
     if: always() && (needs.prepare-release.outputs.changed-actions != '[]' || needs.prepare-release.outputs.changed-workflows != '[]')
     runs-on: ubuntu-latest
 
