@@ -38,12 +38,13 @@ runs:
         commit-message: ${{ inputs.commit-message }}
 
     - uses: juliangruber/approve-pull-request-action@v2.0.4
+      if: steps.create-pull-request.outputs.pull-request-operation && steps.create-pull-request.outputs.pull-request-operation != 'closed'
       with:
         github-token: ${{ inputs.github-token }}
         number: ${{ steps.create-pull-request.outputs.pull-request-number }}
 
     - uses: juliangruber/merge-pull-request-action@v1
-      if: steps.create-pull-request.outputs.pull-request-operation != 'closed'
+      if: steps.create-pull-request.outputs.pull-request-operation && steps.create-pull-request.outputs.pull-request-operation != 'closed'
       with:
         github-token: ${{ inputs.github-token }}
         number: ${{ steps.create-pull-request.outputs.pull-request-number }}
