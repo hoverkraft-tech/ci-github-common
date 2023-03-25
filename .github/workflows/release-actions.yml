@@ -16,8 +16,7 @@ on:
         type: boolean
     secrets:
       github-token:
-        description: 'Github token for creating and merging pull request. Can be passed in using "secrets.GITHUB_TOKEN". See https://github.com/hoverkraft-tech/ci-github-common/tree/main/actions/create-and-merge-pull-request'
-        required: true
+        description: 'GitHub token for creating and merging pull request. See https://github.com/hoverkraft-tech/ci-github-common/tree/main/actions/create-and-merge-pull-request'
 
 jobs:
   prepare-release:
@@ -180,7 +179,7 @@ jobs:
 
       - uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@main
         with:
-          github-token: ${{ secrets.github-token }}
+          github-token: ${{ secrets.github-token || github.token }}
           branch: docs/actions-workflows-documentation-update
           title: "docs: update actions and workflows documentation"
           body: Update actions and workflows documentation
