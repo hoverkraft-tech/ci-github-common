@@ -1,5 +1,5 @@
 name: "Create and merge Pull Request"
-description: "Action to create and merge Pull Request"
+description: "Action to create and merge Pull Request. Opinionated, set Github Actions bot as author, and use rebase merge method"
 author: Hoverkraft
 branding:
   icon: git-pull-request
@@ -25,6 +25,13 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - shell: bash
+      # FIXME: workaround until will be merged: https://github.com/actions/runner/pull/1684
+      run: mkdir -p ./self-actions/ && cp -r $GITHUB_ACTION_PATH/../* ./self-actions/
+
+    - id: github-actions-bot-user
+      uses: ./self-actions/get-github-actions-bot-user
+
     - uses: peter-evans/create-pull-request@v4.2.4
       id: create-pull-request
       with:
@@ -36,15 +43,11 @@ runs:
         title: ${{ inputs.title }}
         body: ${{ inputs.body }}
         commit-message: ${{ inputs.commit-message }}
-
-    - uses: juliangruber/approve-pull-request-action@v2.0.4
-      if: steps.create-pull-request.outputs.pull-request-operation && steps.create-pull-request.outputs.pull-request-operation != 'closed'
-      with:
-        github-token: ${{ inputs.github-token }}
-        number: ${{ steps.create-pull-request.outputs.pull-request-number }}
+        author: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
 
     - uses: juliangruber/merge-pull-request-action@v1
       if: steps.create-pull-request.outputs.pull-request-operation && steps.create-pull-request.outputs.pull-request-operation != 'closed'
       with:
         github-token: ${{ inputs.github-token }}
         number: ${{ steps.create-pull-request.outputs.pull-request-number }}
+        method: rebase

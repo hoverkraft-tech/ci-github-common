@@ -16,10 +16,9 @@ jobs:
       - name: Generate Dependabot Glob
         uses: Makeshift/generate-dependabot-glob-action@v1.3.3
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v4
+      - uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@main
         with:
-          commit-message: "chore: update dependabot config"
+          github-token: ${{ secrets.github-token }}
+          branch: chore/dependabot-config
           title: "chore: update dependabot config"
-          body: "Update dependabot config for glob directories"
-          signoff: true
+          body: Update dependabot config for glob directories
