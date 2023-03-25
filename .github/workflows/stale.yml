@@ -56,7 +56,7 @@ jobs:
           EXEMPT_PR_LABELS="${{ inputs.exempt-pr-labels }}"
           echo "exempt-pr-labels=${EXEMPT_PR_LABELS:-"awaiting-approval,work-in-progress"}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/stale@v7
+      - uses: actions/stale@v8
         with:
           stale-issue-message: ${{ steps.set-variables.outputs.stale-issue-message }}
           stale-pr-message: ${{ steps.set-variables.outputs.stale-pr-message }}
