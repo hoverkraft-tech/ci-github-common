@@ -23,10 +23,20 @@ on:
 jobs:
   main:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/generate-dependabot-config.yml@0.3.4
+    secrets:
+      # GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write).
+      # Can be passed in using "secrets.GITHUB_TOKEN".
+      # See https://github.com/hoverkraft-tech/ci-github-common/blob/main/actions/create-and-merge-pull-request
+      github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 <!-- end usage -->
 <!-- start secrets -->
+
+| **Secret**                    | **Description**                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **<code>github-token</code>** | GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). Can be passed in using "secrets.GITHUB_TOKEN". See [https://github.com/hoverkraft-tech/ci-github-common/blob/main/actions/create-and-merge-pull-request](https://github.com/hoverkraft-tech/ci-github-common/blob/main/actions/create-and-merge-pull-request) |
+
 <!-- end secrets -->
 <!-- start inputs -->
 
