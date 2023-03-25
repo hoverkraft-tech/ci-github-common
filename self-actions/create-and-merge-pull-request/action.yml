@@ -1,0 +1,53 @@
+name: "Create and merge Pull Request"
+description: "Action to create and merge Pull Request. Opinionated, set Github Actions bot as author, and use rebase merge method"
+author: Hoverkraft
+branding:
+  icon: git-pull-request
+  color: gray-dark
+
+inputs:
+  github-token:
+    description: 'GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). Can be passed in using "secrets.GITHUB_TOKEN". See https://github.com/peter-evans/create-pull-request#action-inputs'
+    required: true
+  branch:
+    description: "The pull request branch name"
+    required: true
+  title:
+    description: "The pull request title"
+    required: true
+  body:
+    description: "The pull request body"
+    required: true
+  commit-message:
+    description: "The commit message for the pull request"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      # FIXME: workaround until will be merged: https://github.com/actions/runner/pull/1684
+      run: mkdir -p ./self-actions/ && cp -r $GITHUB_ACTION_PATH/../* ./self-actions/
+
+    - id: github-actions-bot-user
+      uses: ./self-actions/get-github-actions-bot-user
+
+    - uses: peter-evans/create-pull-request@v4.2.4
+      id: create-pull-request
+      with:
+        token: ${{ inputs.github-token }}
+        signoff: true
+        base: ${{ github.event.repository.default_branch }}
+        delete-branch: true
+        branch: ${{ inputs.branch }}
+        title: ${{ inputs.title }}
+        body: ${{ inputs.body }}
+        commit-message: ${{ inputs.commit-message }}
+        author: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
+
+    - uses: juliangruber/merge-pull-request-action@v1
+      if: steps.create-pull-request.outputs.pull-request-operation && steps.create-pull-request.outputs.pull-request-operation != 'closed'
+      with:
+        github-token: ${{ inputs.github-token }}
+        number: ${{ steps.create-pull-request.outputs.pull-request-number }}
+        method: rebase
