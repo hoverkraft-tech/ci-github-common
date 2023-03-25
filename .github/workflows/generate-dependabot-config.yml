@@ -8,8 +8,8 @@ on:
   workflow_call:
     secrets:
       github-token:
-        description: 'GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). Can be passed in using "secrets.GITHUB_TOKEN". See https://github.com/hoverkraft-tech/ci-github-common/blob/main/actions/create-and-merge-pull-request'
-        required: true
+        description: 'GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See https://github.com/hoverkraft-tech/ci-github-common/blob/main/actions/create-and-merge-pull-request'
+        required: false
 
 jobs:
   main:
@@ -22,7 +22,8 @@ jobs:
 
       - uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@main
         with:
-          github-token: ${{ secrets.github-token }}
+          github-token: ${{ secrets.github-token || github.token }}
           branch: chore/dependabot-config
           title: "chore: update dependabot config"
           body: Update dependabot config for glob directories
+          commit-message: "chore: update dependabot config"

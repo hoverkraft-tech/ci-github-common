@@ -8,7 +8,7 @@ branding:
 inputs:
   github-token:
     description: 'GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). Can be passed in using "secrets.GITHUB_TOKEN". See https://github.com/peter-evans/create-pull-request#action-inputs'
-    required: true
+    default: ${{ github.token }}
   branch:
     description: "The pull request branch name"
     required: true

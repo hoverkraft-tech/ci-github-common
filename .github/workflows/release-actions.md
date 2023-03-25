@@ -27,19 +27,25 @@ jobs:
   release:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/release-actions.yml@0.3.4
     with:
-      # Private Access Token for commiting changes and bypassing branch protection if any.
-      private-access-token: ${{ secrets.GH_PAT }}
+      # GitHub token for creating and merging pull request.
+      # See https://github.com/hoverkraft-tech/ci-github-common/tree/main/actions/create-and-merge-pull-request
+      # Default GITHUB_TOKEN
+      github-token: ""
 ```
 
 <!-- end usage -->
 <!-- start secrets -->
 
-| **Secret**                            | **Description**                                                                                                                                                                            |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **<code>private-access-token</code>** | Private Access Token for commiting changes and bypassing branch protection if any. Needs following permissions: <ul><li>"Repository permissions" > "Contents" > "Read and write"</li></ul> |
+| **Secret**                    | **Description**                                                                                                                                                                                                                                                    | **Default**               | **Required** |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------- | ------------ |
+| **<code>github-token</code>** | GitHub token for creating and merging pull request. See [https://github.com/hoverkraft-tech/ci-github-common/tree/main/actions/create-and-merge-pull-request](https://github.com/hoverkraft-tech/ci-github-common/tree/main/actions/create-and-merge-pull-request) | <code>GITHUB_TOKEN</code> | **false**    |
 
 <!-- end secrets -->
 <!-- start inputs -->
+
+| **Input**                   | **Description**                                          | **Default**        | **Required** |
+| --------------------------- | -------------------------------------------------------- | ------------------ | ------------ |
+| **<code>update-all</code>** | Update all actions and workflows, regardless of changes. | <code>false</code> | **false**    |
 
 <!-- end inputs -->
 

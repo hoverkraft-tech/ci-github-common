@@ -28,17 +28,18 @@ jobs:
   main:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@0.3.4
     secrets:
-      # Token for marking the status of linter run in the Checks section. Can be passed in using "${{ secrets.GITHUB_TOKEN }}".
+      # Token for marking the status of linter run in the Checks section.
       # See https://github.com/github/super-linter#how-to-use
-      github-token: ${{ secrets.GITHUB_TOKEN }}
+      # Default GITHUB_TOKEN
+      github-token: ""
 ```
 
 <!-- end usage -->
 <!-- start secrets -->
 
-| **Secret**                    | **Description**                                                                                                                                                                                                                    |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **<code>github-token</code>** | Token for marking the status of linter run in the Checks section. Can be passed in using "${{ secrets.GITHUB_TOKEN }}". See [https://github.com/github/super-linter#how-to-use](https://github.com/github/super-linter#how-to-use) |
+| **Secret**                    | **Description**                                                                                                                                                              | **Default**               | **Required** |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------ |
+| **<code>github-token</code>** | Token for marking the status of linter run in the Checks section. See [https://github.com/github/super-linter#how-to-use](https://github.com/github/super-linter#how-to-use) | <code>GITHUB_TOKEN</code> | **false**    |
 
 <!-- end secrets -->
 <!-- start inputs -->
