@@ -7,3 +7,5 @@ on:
 jobs:
   main:
     uses: ./.github/workflows/generate-dependabot-config.yml
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}

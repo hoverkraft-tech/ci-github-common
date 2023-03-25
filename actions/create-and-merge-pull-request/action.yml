@@ -32,6 +32,11 @@ runs:
     - id: github-actions-bot-user
       uses: ./self-actions/get-github-actions-bot-user
 
+    - shell: bash
+      # FIXME: workaround until will be merged: https://github.com/actions/runner/pull/1684
+      run: |
+        rm -fr ./self-actions
+
     - uses: peter-evans/create-pull-request@v4.2.4
       id: create-pull-request
       with:
