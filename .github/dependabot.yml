@@ -11,6 +11,10 @@ updates:
     schedule:
       interval: weekly
   - package-ecosystem: github-actions
+    directory: /actions/create-and-merge-pull-request
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
     directory: /actions/create-or-update-comment
     schedule:
       interval: weekly
