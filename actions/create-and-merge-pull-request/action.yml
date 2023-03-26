@@ -1,5 +1,5 @@
 name: "Create and merge Pull Request"
-description: "Action to create and merge Pull Request. Opinionated, set Github Actions bot as author, and use rebase merge method"
+description: "Action to create and merge Pull Request. Opinionated, set Github Actions bot as author"
 author: Hoverkraft
 branding:
   icon: git-pull-request
@@ -55,4 +55,3 @@ runs:
       with:
         github-token: ${{ inputs.github-token }}
         number: ${{ steps.create-pull-request.outputs.pull-request-number }}
-        method: rebase
