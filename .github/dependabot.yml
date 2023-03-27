@@ -19,7 +19,7 @@ updates:
     schedule:
       interval: weekly
   - package-ecosystem: github-actions
-    directory: /actions/get-authenticated-user
+    directory: /actions/get-github-actions-bot-user
     schedule:
       interval: weekly
   - package-ecosystem: github-actions
