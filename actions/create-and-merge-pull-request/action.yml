@@ -9,6 +9,7 @@ inputs:
   github-token:
     description: "GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See https://github.com/peter-evans/create-pull-request#action-inputs"
     default: ${{ github.token }}
+    required: true
   private-access-token:
     description: "GitHub private access token for approving & merging pull request. Must be different from github-token. See https://cli.github.com/manual/gh_pr_merge"
     required: true
