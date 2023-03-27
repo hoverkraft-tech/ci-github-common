@@ -1,13 +1,16 @@
 name: "Create and merge Pull Request"
-description: "Action to create and merge Pull Request. Opinionated, set Github Actions bot as author."
+description: "Action to create and merge Pull Request. Opinionated, set Github Actions bot as author, approve merge request before merging if private access token is provided then rebase and merge."
 author: Hoverkraft
 branding:
   icon: git-pull-request
   color: gray-dark
 
 inputs:
+  github-token:
+    description: "GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See https://github.com/peter-evans/create-pull-request#action-inputs"
+    default: ${{ github.token }}
   private-access-token:
-    description: "GitHub private access token for creating and merging pull request. See https://github.com/juliangruber/merge-pull-request-action"
+    description: "GitHub private access token for approving & merging pull request. Must be different from github-token. See https://cli.github.com/manual/gh_pr_merge"
     required: true
   branch:
     description: "The pull request branch name"
@@ -25,18 +28,22 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/github-script@v6
-      id: authenticated-user
-      if: inputs.private-access-token
-      with:
-        script: |
-          core.setOutput("name","hoverkraft-bot[bot]");
-          core.setOutput("email", "128996893+hoverkraft-bot[bot]@users.noreply.github.com");
+    - shell: bash
+      # FIXME: workaround until will be merged: https://github.com/actions/runner/pull/1684
+      run: mkdir -p ./self-actions/ && cp -r $GITHUB_ACTION_PATH/../* ./self-actions/
+
+    - id: github-actions-bot-user
+      uses: ./self-actions/get-github-actions-bot-user
+
+    - shell: bash
+      # FIXME: workaround until will be merged: https://github.com/actions/runner/pull/1684
+      run: |
+        rm -fr ./self-actions
 
     - uses: peter-evans/create-pull-request@v4.2.4
       id: create-pull-request
       with:
-        token: ${{ inputs.private-access-token }}
+        token: ${{ inputs.github-token }}
         signoff: true
         base: ${{ github.event.repository.default_branch }}
         delete-branch: true
@@ -44,12 +51,18 @@ runs:
         title: ${{ inputs.title }}
         body: ${{ inputs.body }}
         commit-message: ${{ inputs.commit-message }}
-        author: ${{ steps.authenticated-user.outputs.name }} <${{ steps.authenticated-user.outputs.email }}>
-        committer: ${{ steps.authenticated-user.outputs.name }} <${{ steps.authenticated-user.outputs.email }}>
+        author: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
+        committer: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
+
+    - uses: juliangruber/approve-pull-request-action@v2.0.4
+      if: inputs.private-access-token && steps.create-pull-request.outputs.pull-request-number && steps.create-pull-request.outputs.pull-request-operation != 'closed'
+      with:
+        github-token: ${{ inputs.private-access-token }}
+        number: ${{ steps.create-pull-request.outputs.pull-request-number }}
 
     - name: Merge pull request
       if: steps.create-pull-request.outputs.pull-request-number && steps.create-pull-request.outputs.pull-request-operation != 'closed'
       shell: bash
-      run: gh pr merge -R "${{ github.repository }}" --merge --admin "${{ steps.create-pull-request.outputs.pull-request-number }}"
+      run: gh pr merge -R "${{ github.repository }}" --rebase --admin "${{ steps.create-pull-request.outputs.pull-request-number }}"
       env:
-        GH_TOKEN: ${{ inputs.private-access-token }}
+        GH_TOKEN: ${{ inputs.private-access-token || inputs.github-token }}
