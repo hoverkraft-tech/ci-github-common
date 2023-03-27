@@ -1,5 +1,5 @@
 name: "Create and merge Pull Request"
-description: "Action to create and merge Pull Request. Opinionated, set Github Actions bot as author"
+description: "Action to create and merge Pull Request. Opinionated, set Github Actions bot as author, approve merge request before merging if private access token is provided."
 author: Hoverkraft
 branding:
   icon: git-pull-request
@@ -7,8 +7,10 @@ branding:
 
 inputs:
   github-token:
-    description: 'GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). Can be passed in using "secrets.GITHUB_TOKEN". See https://github.com/peter-evans/create-pull-request#action-inputs'
+    description: "GitHub token for creating pull request (permissions contents: write and pull-requests: write). See https://github.com/peter-evans/create-pull-request#action-inputs"
     default: ${{ github.token }}
+  private-access-token:
+    description: "GitHub private access token for approving and merging pull request. See https://github.com/juliangruber/merge-pull-request-action"
   branch:
     description: "The pull request branch name"
     required: true
@@ -50,8 +52,14 @@ runs:
         commit-message: ${{ inputs.commit-message }}
         author: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
 
-    - uses: juliangruber/merge-pull-request-action@v1
+    - uses: juliangruber/approve-pull-request-action@v2.0.4
+      if: inputs.private-access-token && steps.create-pull-request.outputs.pull-request-operation && steps.create-pull-request.outputs.pull-request-operation != 'closed'
+      with:
+        github-token: ${{ inputs.private-access-token }}
+        number: ${{ steps.create-pull-request.outputs.pull-request-number }}
+
+    - uses: juliangruber/merge-pull-request-action@v1.0.0
       if: steps.create-pull-request.outputs.pull-request-operation && steps.create-pull-request.outputs.pull-request-operation != 'closed'
       with:
-        github-token: ${{ inputs.github-token }}
+        github-token: ${{ inputs.private-access-token || inputs.github-token }}
         number: ${{ steps.create-pull-request.outputs.pull-request-number }}
