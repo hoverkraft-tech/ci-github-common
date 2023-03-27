@@ -64,4 +64,4 @@ runs:
       with:
         github-token: ${{ inputs.private-access-token || inputs.github-token }}
         number: ${{ steps.create-pull-request.outputs.pull-request-number }}
-        method: rebase
+        method: merge
