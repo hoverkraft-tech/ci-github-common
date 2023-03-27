@@ -27,9 +27,6 @@ runs:
     - id: get-issue-number
       uses: ./self-actions/get-issue-number
 
-    - id: github-actions-bot-user
-      uses: ./self-actions/get-github-actions-bot-user
-
     - shell: bash
       # FIXME: workaround until will be merged: https://github.com/actions/runner/pull/1684
       run: |
@@ -39,7 +36,7 @@ runs:
       id: find-comment
       with:
         issue-number: ${{ steps.get-issue-number.outputs.issue-number }}
-        comment-author: ${{ steps.github-actions-bot-user.outputs.name }}
+        comment-author: github-actions[bot]
         body-includes: ${{ inputs.title }}
 
     - uses: peter-evans/create-or-update-comment@v2

@@ -25,17 +25,13 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - shell: bash
-      # FIXME: workaround until will be merged: https://github.com/actions/runner/pull/1684
-      run: mkdir -p ./self-actions/ && cp -r $GITHUB_ACTION_PATH/../* ./self-actions/
-
-    - id: github-actions-bot-user
-      uses: ./self-actions/get-github-actions-bot-user
-
-    - shell: bash
-      # FIXME: workaround until will be merged: https://github.com/actions/runner/pull/1684
-      run: |
-        rm -fr ./self-actions
+    - uses: actions/github-script@v6
+      id: authenticated-user
+      if: inputs.private-access-token
+      with:
+        script: |
+          core.setOutput("name","hoverkraft-bot[bot]");
+          core.setOutput("email", "128996893+hoverkraft-bot[bot]@users.noreply.github.com");
 
     - uses: peter-evans/create-pull-request@v4.2.4
       id: create-pull-request
@@ -48,12 +44,12 @@ runs:
         title: ${{ inputs.title }}
         body: ${{ inputs.body }}
         commit-message: ${{ inputs.commit-message }}
-        author: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
-        committer: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
+        author: ${{ steps.authenticated-user.outputs.name }} <${{ steps.authenticated-user.outputs.email }}>
+        committer: ${{ steps.authenticated-user.outputs.name }} <${{ steps.authenticated-user.outputs.email }}>
 
-    - uses: juliangruber/merge-pull-request-action@v1.0.0
-      if: steps.create-pull-request.outputs.pull-request-operation && steps.create-pull-request.outputs.pull-request-operation != 'closed'
-      with:
-        github-token: ${{ inputs.private-access-token }}
-        number: ${{ steps.create-pull-request.outputs.pull-request-number }}
-        method: merge
+    - name: Merge pull request
+      if: steps.create-pull-request.outputs.pull-request-number && steps.create-pull-request.outputs.pull-request-operation != 'closed'
+      shell: bash
+      run: gh pr merge -R "${{ github.repository }}" --merge --admin "${{ steps.create-pull-request.outputs.pull-request-number }}"
+      env:
+        GH_TOKEN: ${{ inputs.private-access-token }}
