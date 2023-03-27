@@ -15,3 +15,6 @@ jobs:
     uses: ./.github/workflows/release-actions.yml
     with:
       update-all: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch' }}
+      github-app-id: ${{ vars.CI_BOT_APP_ID }}
+    secrets:
+      github-app-key: ${{ secrets.CI_BOT_APP_PRIVATE_KEY }}
