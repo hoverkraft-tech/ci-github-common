@@ -1,16 +1,14 @@
 name: "Create and merge Pull Request"
-description: "Action to create and merge Pull Request. Opinionated, set Github Actions bot as author, approve merge request before merging if private access token is provided then rebase and merge."
+description: "Action to create and merge Pull Request. Opinionated, set Github Actions bot as author."
 author: Hoverkraft
 branding:
   icon: git-pull-request
   color: gray-dark
 
 inputs:
-  github-token:
-    description: "GitHub token for creating pull request (permissions contents: write and pull-requests: write). See https://github.com/peter-evans/create-pull-request#action-inputs"
-    default: ${{ github.token }}
   private-access-token:
-    description: "GitHub private access token for approving and merging pull request. See https://github.com/juliangruber/merge-pull-request-action"
+    description: "GitHub private access token for creating and merging pull request. See https://github.com/juliangruber/merge-pull-request-action"
+    required: true
   branch:
     description: "The pull request branch name"
     required: true
@@ -42,8 +40,8 @@ runs:
     - uses: peter-evans/create-pull-request@v4.2.4
       id: create-pull-request
       with:
-        token: ${{ inputs.github-token }}
-        signoff: false
+        token: ${{ inputs.private-access-token }}
+        signoff: true
         base: ${{ github.event.repository.default_branch }}
         delete-branch: true
         branch: ${{ inputs.branch }}
@@ -53,15 +51,9 @@ runs:
         author: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
         committer: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
 
-    - uses: juliangruber/approve-pull-request-action@v2.0.4
-      if: inputs.private-access-token && steps.create-pull-request.outputs.pull-request-operation && steps.create-pull-request.outputs.pull-request-operation != 'closed'
-      with:
-        github-token: ${{ inputs.private-access-token }}
-        number: ${{ steps.create-pull-request.outputs.pull-request-number }}
-
     - uses: juliangruber/merge-pull-request-action@v1.0.0
       if: steps.create-pull-request.outputs.pull-request-operation && steps.create-pull-request.outputs.pull-request-operation != 'closed'
       with:
-        github-token: ${{ inputs.private-access-token || inputs.github-token }}
+        github-token: ${{ inputs.private-access-token }}
         number: ${{ steps.create-pull-request.outputs.pull-request-number }}
         method: merge
