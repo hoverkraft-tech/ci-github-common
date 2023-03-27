@@ -43,7 +43,7 @@ runs:
       id: create-pull-request
       with:
         token: ${{ inputs.github-token }}
-        signoff: true
+        signoff: false
         base: ${{ github.event.repository.default_branch }}
         delete-branch: true
         branch: ${{ inputs.branch }}

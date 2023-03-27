@@ -13,7 +13,11 @@ Opinionated GitHub actions and workflows for common continuous integration needs
 
 ### - [Checkout](actions/checkout/README.md)
 
+### - [Create and merge pull request](actions/create-and-merge-pull-request/README.md)
+
 ### - [Create or update comment](actions/create-or-update-comment/README.md)
+
+### - [Get GitHub actions bot user](actions/get-github-actions-bot-user/README.md)
 
 ### - [Get issue number](actions/get-issue-number/README.md)
 
