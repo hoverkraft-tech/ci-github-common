@@ -10,18 +10,21 @@ on:
   workflow_call:
     inputs: 
       github-app-id:
-        description: "GitHub App ID to generate GitHub token. See https://github.com/tibdex/github-app-token"   
+        description: "GitHub App ID to generate GitHub token in place of private-access-token. See https://github.com/tibdex/github-app-token"
         required: false
         type: string
     secrets:
       github-token:
-        description: 'GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See https://github.com/hoverkraft-tech/ci-github-common/blob/main/actions/create-and-merge-pull-request'
+        description: "GitHub token for creating pull request (permissions contents: write and pull-requests: write). See https://github.com/hoverkraft-tech/ci-github-common/blob/main/actions/create-and-merge-pull-request"
         required: false
+      private-access-token:
+        description: "GitHub private access token for approving and merging pull request. See https://github.com/juliangruber/merge-pull-request-action"
       github-app-key:
-        description: 'GitHub App private key to generate GitHub token. See https://github.com/tibdex/github-app-token'
+        description: "GitHub App private key to generate GitHub token in place of private-access-token. See https://github.com/tibdex/github-app-token"
 
 jobs:
-  main:
+  generate-dependabot-config:
+    name: Generate Dependabot Config
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -38,8 +41,12 @@ jobs:
 
       - uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@main
         with:
-          github-token: ${{ steps.generate-token.outputs.token || secrets.github-token || github.token }}
+          github-token: ${{ secrets.github-token || github.token }}
+          private-access-token: ${{ steps.generate-token.outputs.token || secrets.private-access-token }}
           branch: chore/dependabot-config
           title: "chore: update dependabot config"
           body: Update dependabot config for glob directories
-          commit-message: "chore: update dependabot config"
+          commit-message: |
+            chore: update dependabot config
+
+            [skip ci]

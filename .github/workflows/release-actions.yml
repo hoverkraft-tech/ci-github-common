@@ -15,16 +15,16 @@ on:
         default: false
         type: boolean
       github-app-id:
-        description: "GitHub App ID to generate GitHub token. See https://github.com/tibdex/github-app-token"
+        description: "GitHub App ID to generate GitHub token in place of private-access-token. See https://github.com/tibdex/github-app-token"
         required: false
         type: string
     secrets:
       github-token:
-        description: 'GitHub token for creating pull request. See https://github.com/hoverkraft-tech/ci-github-common/tree/main/actions/create-and-merge-pull-request'
+        description: "GitHub token for creating pull request. See https://github.com/hoverkraft-tech/ci-github-common/tree/main/actions/create-and-merge-pull-request"
       private-access-token:
         description: "GitHub private access token for approving and merging pull request. See https://github.com/juliangruber/merge-pull-request-action"
       github-app-key:
-        description: 'GitHub App private key to generate GitHub token in place of private-access-token. See https://github.com/tibdex/github-app-token'
+        description: "GitHub App private key to generate GitHub token in place of private-access-token. See https://github.com/tibdex/github-app-token"
 
 jobs:
   prepare-release:
