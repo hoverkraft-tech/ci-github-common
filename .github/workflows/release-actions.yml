@@ -15,7 +15,7 @@ on:
         default: false
         type: boolean
       github-app-id:
-        description: "GitHub App ID to generate GitHub token. See https://github.com/tibdex/github-app-token"   
+        description: "GitHub App ID to generate GitHub token. See https://github.com/tibdex/github-app-token"
         required: false
         type: string
     secrets:
