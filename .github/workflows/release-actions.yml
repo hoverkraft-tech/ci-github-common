@@ -19,10 +19,8 @@ on:
         required: false
         type: string
     secrets:
-      github-token:
-        description: "GitHub token for creating pull request. See https://github.com/hoverkraft-tech/ci-github-common/tree/main/actions/create-and-merge-pull-request"
       private-access-token:
-        description: "GitHub private access token for approving and merging pull request. See https://github.com/juliangruber/merge-pull-request-action"
+        description: "GitHub private access token for creating and merging pull request. See https://github.com/juliangruber/merge-pull-request-action"
       github-app-key:
         description: "GitHub App private key to generate GitHub token in place of private-access-token. See https://github.com/tibdex/github-app-token"
 
@@ -71,7 +69,7 @@ jobs:
           FORCE_UPDATE="${{ steps.changed-variables.outputs.force-update }}"
 
           CHANGED_ACTIONS=()
-          find actions -name "action.yml" -type f | while read -r FILE; do
+          while read -r FILE; do
             ACTION_HAS_CHANGED=$([[ "$CHANGED_FILES" == *"$FILE"* ]] && echo "true" || echo "false")
             SHOULD_UPDATE_FILE=$([[ "$FORCE_UPDATE" = "true" || "$ACTION_HAS_CHANGED" = "true" ]] && echo "true" || echo "false")
             echo "::debug::File $FILE has changed: $ACTION_HAS_CHANGED, should update file: $SHOULD_UPDATE_FILE"
@@ -79,7 +77,7 @@ jobs:
             if [ "$SHOULD_UPDATE_FILE" == "true" ]; then
               CHANGED_ACTIONS+=("$(dirname "$FILE")")
             fi
-          done
+          done < <(find actions -name "action.yml" -type f)
 
           echo "::debug::Changed files: ${CHANGED_ACTIONS[*]}"
           JSON_CHANGED_ACTIONS=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${CHANGED_ACTIONS[@]}");
@@ -194,7 +192,6 @@ jobs:
 
       - uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@main
         with:
-          github-token: ${{ secrets.github-token || github.token }}
           private-access-token: ${{ steps.generate-token.outputs.token || secrets.private-access-token }}
           branch: docs/actions-workflows-documentation-update
           title: "docs: update actions and workflows documentation"
