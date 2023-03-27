@@ -17,7 +17,7 @@ Opinionated GitHub actions and workflows for common continuous integration needs
 
 ### - [Create or update comment](actions/create-or-update-comment/README.md)
 
-### - [Get authenticated user](actions/get-authenticated-user/README.md)
+### - [Get github actions bot user](actions/get-github-actions-bot-user/README.md)
 
 ### - [Get issue number](actions/get-issue-number/README.md)
 
