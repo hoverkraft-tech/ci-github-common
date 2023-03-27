@@ -1,5 +1,5 @@
 name: "Create and merge Pull Request"
-description: "Action to create and merge Pull Request. Opinionated, set Github Actions bot as author, approve merge request before merging if private access token is provided."
+description: "Action to create and merge Pull Request. Opinionated, set Github Actions bot as author, approve merge request before merging if private access token is provided then rebase and merge."
 author: Hoverkraft
 branding:
   icon: git-pull-request
@@ -51,6 +51,7 @@ runs:
         body: ${{ inputs.body }}
         commit-message: ${{ inputs.commit-message }}
         author: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
+        committer: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
 
     - uses: juliangruber/approve-pull-request-action@v2.0.4
       if: inputs.private-access-token && steps.create-pull-request.outputs.pull-request-operation && steps.create-pull-request.outputs.pull-request-operation != 'closed'
@@ -63,3 +64,4 @@ runs:
       with:
         github-token: ${{ inputs.private-access-token || inputs.github-token }}
         number: ${{ steps.create-pull-request.outputs.pull-request-number }}
+        method: rebase
