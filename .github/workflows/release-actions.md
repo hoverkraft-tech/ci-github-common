@@ -30,17 +30,21 @@ jobs:
       # Update all actions and workflows, regardless of changes.
       update-all: false
 
-      # GitHub App ID to generate GitHub token.
+      # GitHub App ID to generate GitHub token in place of private-access-token.
       # See https://github.com/tibdex/github-app-token
       github-app-id: ""
 
     secrets:
-      # GitHub token for creating and merging pull request.
+      # GitHub token for creating pull request.
       # See https://github.com/hoverkraft-tech/ci-github-common/tree/main/actions/create-and-merge-pull-request
       # Default GITHUB_TOKEN
       github-token: ""
 
-      # GitHub App private key to generate GitHub token.
+      # GitHub private access token for approving and merging pull request.
+      # See https://github.com/juliangruber/merge-pull-request-action"
+      private-access-token:
+
+      # GitHub App private key to generate GitHub token in place of private-access-token.
       # See https://github.com/tibdex/github-app-token
       github-app-key: ""
 ```
@@ -48,18 +52,19 @@ jobs:
 <!-- end usage -->
 <!-- start secrets -->
 
-| **Secret**                      | **Description**                                                                                                                                                                                                                                                    | **Default**               | **Required** |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------- | ------------ |
-| **<code>github-token</code>**   | GitHub token for creating and merging pull request. See [https://github.com/hoverkraft-tech/ci-github-common/tree/main/actions/create-and-merge-pull-request](https://github.com/hoverkraft-tech/ci-github-common/tree/main/actions/create-and-merge-pull-request) | <code>GITHUB_TOKEN</code> | **false**    |
-| **<code>github-app-key</code>** | GitHub App private key to generate GitHub token. See [https://github.com/tibdex/github-app-token](https://github.com/tibdex/github-app-token)                                                                                                                      | <code></code>             | **false**    |
+| **Secret**                            | **Description**                                                                                                                                                                                                                                        | **Default**               | **Required** |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------- | ------------ |
+| **<code>github-token</code>**         | GitHub token for creating pull request. See [https://github.com/hoverkraft-tech/ci-github-common/tree/main/actions/create-and-merge-pull-request](https://github.com/hoverkraft-tech/ci-github-common/tree/main/actions/create-and-merge-pull-request) | <code>GITHUB_TOKEN</code> | **false**    |
+| **<code>private-access-token</code>** | GitHub private access token for approving and merging pull request. See [https://github.com/juliangruber/merge-pull-request-action](https://github.com/juliangruber/merge-pull-request-action)                                                         | <code>GITHUB_TOKEN</code> | **false**    |
+| **<code>github-app-key</code>**       | GitHub App private key to generate GitHub token in place of private-access-token. See [https://github.com/tibdex/github-app-token](https://github.com/tibdex/github-app-token)                                                                         | <code></code>             | **false**    |
 
 <!-- end secrets -->
 <!-- start inputs -->
 
-| **Input**                      | **Description**                                                                                                                      | **Default**        | **Required** |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------ | ------------ |
-| **<code>update-all</code>**    | Update all actions and workflows, regardless of changes.                                                                             | <code>false</code> | **false**    |
-| **<code>github-app-id</code>** | GitHub App ID to generate GitHub token. See [https://github.com/tibdex/github-app-token](https://github.com/tibdex/github-app-token) | <code></code>      | **false**    |
+| **Input**                      | **Description**                                                                                                                                                       | **Default**        | **Required** |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------ |
+| **<code>update-all</code>**    | Update all actions and workflows, regardless of changes.                                                                                                              | <code>false</code> | **false**    |
+| **<code>github-app-id</code>** | GitHub App ID to generate GitHub token in place of private-access-token. See [https://github.com/tibdex/github-app-token](https://github.com/tibdex/github-app-token) | <code></code>      | **false**    |
 
 <!-- end inputs -->
 
