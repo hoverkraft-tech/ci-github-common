@@ -10,7 +10,7 @@ outputs:
     description: "The GitHub Actions bot user email."
     value: "41898282+github-actions[bot]@users.noreply.github.com"
   name:
-    description: "The GitHub Actions bot user name."
+    description: "The GitHub Actions bot username."
     value: "github-actions[bot]"
 
 runs:

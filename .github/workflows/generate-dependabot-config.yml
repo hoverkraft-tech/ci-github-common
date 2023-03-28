@@ -10,16 +10,14 @@ on:
   workflow_call:
     inputs: 
       github-app-id:
-        description: "GitHub App ID to generate GitHub token in place of private-access-token. See https://github.com/tibdex/github-app-token"
+        description: "GitHub App ID to generate GitHub token in place of github-token. See https://github.com/tibdex/github-app-token"
         required: false
         type: string
     secrets:
       github-token:
         description: "GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See [actions/create-and-merge-pull-request](../../actions/create-and-merge-pull-request)"
-      private-access-token:
-        description: "GitHub private access token for approving & merging pull request. Must be different from github-token. See [actions/create-and-merge-pull-request](../../actions/create-and-merge-pull-request)"
       github-app-key:
-        description: "GitHub App private key to generate GitHub token in place of private-access-token. See https://github.com/tibdex/github-app-token"
+        description: "GitHub App private key to generate GitHub token in place of github-token. See https://github.com/tibdex/github-app-token"
 
 jobs:
   generate-dependabot-config:
@@ -40,8 +38,7 @@ jobs:
 
       - uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@main
         with:
-          github-token: ${{ secrets.github-token || github.token }}
-          private-access-token: ${{ steps.generate-token.outputs.token || secrets.private-access-token }}
+          github-token: ${{ steps.generate-token.outputs.token || secrets.github-token || github.token }}
           branch: chore/dependabot-config
           title: "chore: update dependabot config"
           body: Update dependabot config for glob directories

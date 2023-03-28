@@ -5,7 +5,7 @@
 <!-- end title -->
 <!-- start description -->
 
-Action to create and merge Pull Request. Opinionated, set Github Actions bot as author, approve merge request before merging if private access token is provided then rebase and merge.
+Action to create and merge Pull Request. Opinionated, set GitHub Actions bot as author, approve merge request before merging if private access token is provided then rebase and merge.
 
 <!-- end description -->
 
@@ -21,7 +21,7 @@ Allow GitHub Actions to create and approve pull requests](https://docs.github.co
   with:
     # GitHub token for creating and merging pull request (permissions contents: write
     # and pull-requests: write). See https://github.com/peter-evans/create-pull-request#action-inputs
-    # Default: ${{ github.token }}
+    # Default: GITHUB_TOKEN
     github-token: ""
 
     # GitHub private access token for approving & merging pull request. Must be
@@ -44,14 +44,14 @@ Allow GitHub Actions to create and approve pull requests](https://docs.github.co
 <!-- end usage -->
 <!-- start inputs -->
 
-| **Input**                             | **Description**                                                                                                                                                                 | **Default**                      | **Required** |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------ |
-| **<code>github-token</code>**         | GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See https://github.com/peter-evans/create-pull-request#action-inputs | <code>${{ github.token }}</code> | **false**    |
-| **<code>private-access-token</code>** | GitHub private access token for approving & merging pull request. Must be different from github-token. See https://cli.github.com/manual/gh_pr_merge                            |                                  | **true**     |
-| **<code>branch</code>**               | The pull request branch name                                                                                                                                                    |                                  | **true**     |
-| **<code>title</code>**                | The pull request title                                                                                                                                                          |                                  | **true**     |
-| **<code>body</code>**                 | The pull request body                                                                                                                                                           |                                  | **true**     |
-| **<code>commit-message</code>**       | The commit message for the pull request                                                                                                                                         |                                  | **true**     |
+| **Input**                             | **Description**                                                                                                                                                                                                                                     | **Default**               | **Required** |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------ |
+| **<code>github-token</code>**         | GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See [https://github.com/peter-evans/create-pull-request#action-inputs](https://github.com/peter-evans/create-pull-request#action-inputs) | <code>GITHUB_TOKEN</code> | **false**    |
+| **<code>private-access-token</code>** | GitHub private access token for approving & merging pull request. Must be different from github-token. See [https://cli.github.com/manual/gh_pr_merge](https://cli.github.com/manual/gh_pr_merge)                                                   |                           | **true**     |
+| **<code>branch</code>**               | The pull request branch name                                                                                                                                                                                                                        |                           | **true**     |
+| **<code>title</code>**                | The pull request title                                                                                                                                                                                                                              |                           | **true**     |
+| **<code>body</code>**                 | The pull request body                                                                                                                                                                                                                               |                           | **true**     |
+| **<code>commit-message</code>**       | The commit message for the pull request                                                                                                                                                                                                             |                           | **true**     |
 
 <!-- end inputs -->
 <!-- start outputs -->
