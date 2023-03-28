@@ -1,5 +1,5 @@
 name: "Create and merge Pull Request"
-description: "Action to create and merge Pull Request. Opinionated, set Github Actions bot as author, approve merge request before merging if private access token is provided then rebase and merge."
+description: "Action to create and merge Pull Request. Opinionated, set GitHub Actions bot as author, then rebase and merge."
 author: Hoverkraft
 branding:
   icon: git-pull-request
@@ -7,12 +7,9 @@ branding:
 
 inputs:
   github-token:
-    description: "GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See https://github.com/peter-evans/create-pull-request#action-inputs"
+    description: "GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See [https://github.com/peter-evans/create-pull-request#action-inputs](https://github.com/peter-evans/create-pull-request#action-inputs)"
     default: ${{ github.token }}
-    required: true
-  private-access-token:
-    description: "GitHub private access token for approving & merging pull request. Must be different from github-token. See https://cli.github.com/manual/gh_pr_merge"
-    required: true
+    required: false
   branch:
     description: "The pull request branch name"
     required: true
@@ -55,15 +52,9 @@ runs:
         author: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
         committer: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
 
-    - uses: juliangruber/approve-pull-request-action@v2.0.4
-      if: inputs.private-access-token && steps.create-pull-request.outputs.pull-request-number && steps.create-pull-request.outputs.pull-request-operation != 'closed'
-      with:
-        github-token: ${{ inputs.private-access-token }}
-        number: ${{ steps.create-pull-request.outputs.pull-request-number }}
-
     - name: Merge pull request
       if: steps.create-pull-request.outputs.pull-request-number && steps.create-pull-request.outputs.pull-request-operation != 'closed'
       shell: bash
       run: gh pr merge -R "${{ github.repository }}" --rebase --admin "${{ steps.create-pull-request.outputs.pull-request-number }}"
       env:
-        GH_TOKEN: ${{ inputs.private-access-token || inputs.github-token }}
+        GH_TOKEN: ${{ inputs.github-token }}
