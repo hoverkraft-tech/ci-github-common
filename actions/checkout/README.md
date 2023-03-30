@@ -5,7 +5,7 @@
 <!-- end title -->
 <!-- start description -->
 
-Action to checkout the repository compatible for PRs, issues and push events. Workaround for https://github.com/actions/checkout/issues/331
+Action to checkout the repository compatible for PRs, issues and push events. Workaround for [https://github.com/actions/checkout/issues/331](https://github.com/actions/checkout/issues/331)
 
 <!-- end description -->
 <!-- start contents -->
@@ -26,11 +26,11 @@ permissions:
 - uses: hoverkraft-tech/ci-github-common/actions/checkout@v0.4.1
   with:
     # Number of commits to fetch. 0 indicates all history for all branches and tags.
-    # See https://github.com/actions/checkout#usage
+    # See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)
     # Default: 1
     fetch-depth: ""
 
-    # Whether to download Git-LFS files. See https://github.com/actions/checkout#usage
+    # Whether to download Git-LFS files. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)
     # Default: false
     lfs: ""
 ```
@@ -38,10 +38,10 @@ permissions:
 <!-- end usage -->
 <!-- start inputs -->
 
-| **Input**                    | **Description**                                                                                                              | **Default**    | **Required** |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------ |
-| **<code>fetch-depth</code>** | Number of commits to fetch. 0 indicates all history for all branches and tags. See https://github.com/actions/checkout#usage | <code>1</code> | **false**    |
-| **<code>lfs</code>**         | Whether to download Git-LFS files. See https://github.com/actions/checkout#usage                                             |                | **false**    |
+| **Input**                    | **Description**                                                                                                                                                           | **Default**    | **Required** |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------ |
+| **<code>fetch-depth</code>** | Number of commits to fetch. 0 indicates all history for all branches and tags. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage) | <code>1</code> | **false**    |
+| **<code>lfs</code>**         | Whether to download Git-LFS files. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)                                             |                | **false**    |
 
 <!-- end inputs -->
 <!-- start outputs -->
