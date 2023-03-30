@@ -10,10 +10,10 @@ inputs:
     description: "The comment title. Must be static and unique, will be used to retrieve the comment if exists already."
     required: true
   body:
-    description: "The comment body. See https://github.com/peter-evans/create-or-update-comment"
+    description: "The comment body. See [https://github.com/peter-evans/create-or-update-comment](https://github.com/peter-evans/create-or-update-comment)"
     required: false
   reactions:
-    description: "A comma separated list of reactions to add to the comment. See https://github.com/peter-evans/create-or-update-comment"
+    description: "A comma separated list of reactions to add to the comment. See [https://github.com/peter-evans/create-or-update-comment](https://github.com/peter-evans/create-or-update-comment)"
     required: false
 
 runs:

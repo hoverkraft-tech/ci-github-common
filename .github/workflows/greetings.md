@@ -47,9 +47,9 @@ jobs:
 <!-- end usage -->
 <!-- start secrets -->
 
-| **Secret**                    | **Description**                                                                                                                                                                              | **Default**               | **Required** |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------ |
-| **<code>github-token</code>** | Token for the repository. Can be passed in using "${{ secrets.GITHUB_TOKEN }}". See [https://github.com/actions/first-interaction#usage](https://github.com/actions/first-interaction#usage) | <code>GITHUB_TOKEN</code> | **false**    |
+| **Secret**                    | **Description**                                                                                                                        | **Default**               | **Required** |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------ |
+| **<code>github-token</code>** | Token for the repository. See [https://github.com/actions/first-interaction#usage](https://github.com/actions/first-interaction#usage) | <code>GITHUB_TOKEN</code> | **false**    |
 
 <!-- end secrets -->
 <!-- start inputs -->
