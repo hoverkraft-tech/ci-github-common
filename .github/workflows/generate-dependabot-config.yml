@@ -8,7 +8,7 @@ name: Generate Dependabot Config
 
 on:
   workflow_call:
-    inputs: 
+    inputs:
       github-app-id:
         description: "GitHub App ID to generate GitHub token in place of github-token. See https://github.com/tibdex/github-app-token"
         required: false

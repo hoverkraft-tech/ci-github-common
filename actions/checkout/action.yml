@@ -1,5 +1,5 @@
 name: "Checkout"
-description: "Action to checkout the repository compatible for PRs, issues and push events. Workaround for https://github.com/actions/checkout/issues/331"
+description: "Action to checkout the repository compatible for PRs, issues and push events. Workaround for [https://github.com/actions/checkout/issues/331](https://github.com/actions/checkout/issues/331)"
 author: Hoverkraft
 branding:
   icon: git-branch
@@ -7,10 +7,10 @@ branding:
 
 inputs:
   fetch-depth:
-    description: "Number of commits to fetch. 0 indicates all history for all branches and tags. See https://github.com/actions/checkout#usage"
+    description: "Number of commits to fetch. 0 indicates all history for all branches and tags. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)"
     default: "1"
   lfs:
-    description: "Whether to download Git-LFS files. See https://github.com/actions/checkout#usage"
+    description: "Whether to download Git-LFS files. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)"
     default: false
 
 runs:
