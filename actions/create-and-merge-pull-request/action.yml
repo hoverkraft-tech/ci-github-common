@@ -52,8 +52,36 @@ runs:
         author: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
         committer: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
 
-    - name: Merge pull request
+    - id: wait-for-pull-request-mergable-by-admin
+      name: Wait for pull request mergable by admin
       if: steps.create-pull-request.outputs.pull-request-number && steps.create-pull-request.outputs.pull-request-operation != 'closed'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          let attemps = 0;
+          const maxAttemps = 10;
+          while (attemps < maxAttemps) {
+            const { data: { mergable, mergeable_state } } = await github.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: ${{ steps.create-pull-request.outputs.pull-request-number }},
+            });
+
+            if (mergable === true) {
+              core.setOutput('is-mergeable', true);
+              return;
+            }
+
+            core.debug(`Pull request is not mergable, mergeable_state: ${mergeable_state}`);
+
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            attemps++;
+          }
+
+          core.error('Pull request is not mergable');
+
+    - name: Merge pull request
+      if: steps.wait-for-pull-request-mergable-by-admin.outputs.is-mergeable
       shell: bash
       run: gh pr merge -R "${{ github.repository }}" --rebase --admin "${{ steps.create-pull-request.outputs.pull-request-number }}"
       env:
