@@ -16,7 +16,7 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: xt0rted/pull-request-comment-branch@v1.4.0
+    - uses: xt0rted/pull-request-comment-branch@v2.0.0
       if: github.event_name == 'issue_comment'
       id: comment-branch
 
