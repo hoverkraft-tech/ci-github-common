@@ -3,38 +3,65 @@
 version: 2
 updates:
   - package-ecosystem: github-actions
+    open-pull-requests-limit: 20
     directory: /
     schedule:
       interval: weekly
+      day: friday
+      time: '04:00'
   - package-ecosystem: github-actions
+    open-pull-requests-limit: 20
     directory: /actions/checkout
     schedule:
       interval: weekly
+      day: friday
+      time: '04:00'
   - package-ecosystem: github-actions
+    open-pull-requests-limit: 20
     directory: /actions/create-and-merge-pull-request
     schedule:
       interval: weekly
+      day: friday
+      time: '04:00'
   - package-ecosystem: github-actions
+    open-pull-requests-limit: 20
     directory: /actions/create-or-update-comment
     schedule:
       interval: weekly
+      day: friday
+      time: '04:00'
   - package-ecosystem: github-actions
+    open-pull-requests-limit: 20
     directory: /actions/get-github-actions-bot-user
     schedule:
       interval: weekly
+      day: friday
+      time: '04:00'
   - package-ecosystem: github-actions
+    open-pull-requests-limit: 20
     directory: /actions/get-issue-number
     schedule:
       interval: weekly
+      day: friday
+      time: '04:00'
   - package-ecosystem: github-actions
+    open-pull-requests-limit: 20
     directory: /actions/get-matrix-outputs
     schedule:
       interval: weekly
+      day: friday
+      time: '04:00'
   - package-ecosystem: github-actions
+    open-pull-requests-limit: 20
     directory: /actions/set-matrix-output
     schedule:
       interval: weekly
+      day: friday
+      time: '04:00'
   - package-ecosystem: github-actions
+    open-pull-requests-limit: 20
     directory: /actions/slugify
     schedule:
       interval: weekly
+      day: friday
+      time: '04:00'
