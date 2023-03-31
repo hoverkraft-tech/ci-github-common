@@ -82,6 +82,30 @@ runs:
     - name: Merge pull request
       if: steps.wait-for-pull-request-mergeable-by-admin.outputs.is-mergeable
       shell: bash
-      run: gh pr merge -R "${{ github.repository }}" --rebase --admin "${{ steps.create-pull-request.outputs.pull-request-number }}"
+      run: |
+        ATTEMPS=0
+        MAX_ATTEMPS=10
+        REQUIRED_WORKFLOWS_ERROR="Required workflow"
+
+        while [ $ATTEMPS -lt $MAX_ATTEMPS ]; do
+          MERGE_RESULT=$(gh pr merge -R "${{ github.repository }}" --rebase --admin "${{ steps.create-pull-request.outputs.pull-request-number }}")
+          MERGE_EXIT_CODE=$?
+
+          if [ "$MERGE_EXIT_CODE" = "0" ]; then
+            exit 0
+          fi
+
+          if [[ "$MERGE_RESULT" != *"$REQUIRED_WORKFLOWS_ERROR"* ]]; then
+            echo "::error::Failed to merge pull request: $MERGE_RESULT"
+            exit 1
+          fi
+
+          echo "::debug::Pull request is not mergeable yet, retrying in 5 seconds..."
+          sleep 5
+          ATTEMPS=$((ATTEMPS+1))
+        done
+
+        echo "::error::Failed to merge pull request"
+        exit 1
       env:
         GH_TOKEN: ${{ inputs.github-token }}
