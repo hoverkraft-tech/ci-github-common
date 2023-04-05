@@ -29,9 +29,9 @@ Action to slugify a given string value
 <!-- end inputs -->
 <!-- start outputs -->
 
-| \***\*Output\*\***  | \***\*Description\*\*** | \***\*Default\*\*** | \***\*Required\*\*** |
-| ------------------- | ----------------------- | ------------------- | -------------------- |
-| <code>result</code> | The slugified value     | undefined           | undefined            |
+| **Output**          | **Description**     | **Default** | **Required** |
+| ------------------- | ------------------- | ----------- | ------------ |
+| <code>result</code> | The slugified value | undefined   | undefined    |
 
 <!-- end outputs -->
 <!-- start [.github/ghadocs/examples/] -->

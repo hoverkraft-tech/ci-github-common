@@ -6,7 +6,7 @@ description: "Download matrix ouputs from artifacts, because GitHub action does 
 author: Hoverkraft
 branding:
   icon: download-cloud
-  color: white
+  color: gray-dark
 
 inputs:
   artifact-name:

@@ -29,9 +29,9 @@ Download matrix ouputs from artifacts, because GitHub action does not handle job
 <!-- end inputs -->
 <!-- start outputs -->
 
-| \***\*Output\*\***  | \***\*Description\*\***           | \***\*Default\*\*** | \***\*Required\*\*** |
-| ------------------- | --------------------------------- | ------------------- | -------------------- |
-| <code>result</code> | The matrix combined JSON outputs. | undefined           | undefined            |
+| **Output**          | **Description**                   | **Default** | **Required** |
+| ------------------- | --------------------------------- | ----------- | ------------ |
+| <code>result</code> | The matrix combined JSON outputs. | undefined   | undefined    |
 
 <!-- end outputs -->
 <!-- start [.github/ghadocs/examples/] -->

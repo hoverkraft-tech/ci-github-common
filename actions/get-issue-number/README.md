@@ -22,9 +22,9 @@ Action to get Pull request or issue number
 <!-- end inputs -->
 <!-- start outputs -->
 
-| \***\*Output\*\***        | \***\*Description\*\*** | \***\*Default\*\*** | \***\*Required\*\*** |
-| ------------------------- | ----------------------- | ------------------- | -------------------- |
-| <code>issue-number</code> | The issue number.       | undefined           | undefined            |
+| **Output**                | **Description**   | **Default** | **Required** |
+| ------------------------- | ----------------- | ----------- | ------------ |
+| <code>issue-number</code> | The issue number. | undefined   | undefined    |
 
 <!-- end outputs -->
 <!-- start [.github/ghadocs/examples/] -->
