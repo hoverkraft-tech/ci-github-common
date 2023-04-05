@@ -39,7 +39,7 @@ runs:
         comment-author: github-actions[bot]
         body-includes: ${{ inputs.title }}
 
-    - uses: peter-evans/create-or-update-comment@v2
+    - uses: peter-evans/create-or-update-comment@v3
       with:
         edit-mode: replace
         comment-id: ${{ steps.find-comment.outputs.comment-id }}
