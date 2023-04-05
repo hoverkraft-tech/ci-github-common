@@ -6,7 +6,7 @@ description: "Set matrix ouput in file to be uploaded as artifacts, because GitH
 author: Hoverkraft
 branding:
   icon: upload-cloud
-  color: white
+  color: gray-dark
 
 inputs:
   value:

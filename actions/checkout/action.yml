@@ -3,7 +3,7 @@ description: "Action to checkout the repository compatible for PRs, issues and p
 author: Hoverkraft
 branding:
   icon: git-branch
-  color: white
+  color: gray-dark
 
 inputs:
   fetch-depth:
