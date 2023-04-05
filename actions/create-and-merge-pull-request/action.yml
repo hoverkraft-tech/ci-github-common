@@ -83,29 +83,34 @@ runs:
       if: steps.wait-for-pull-request-mergeable-by-admin.outputs.is-mergeable
       shell: bash
       run: |
+        set +e
+
         ATTEMPS=0
         MAX_ATTEMPS=10
         REQUIRED_WORKFLOWS_ERROR="Required workflow"
 
         while [ $ATTEMPS -lt $MAX_ATTEMPS ]; do
-          MERGE_RESULT=$(gh pr merge -R "${{ github.repository }}" --rebase --admin "${{ steps.create-pull-request.outputs.pull-request-number }}")
+          echo "::debug::Merging pull request #${{ steps.create-pull-request.outputs.pull-request-number }} for repository ${{ github.repository }}..."
+          MERGE_OUTPUTS=$(gh pr merge -R "${{ github.repository }}" --rebase --admin "${{ steps.create-pull-request.outputs.pull-request-number }}" 2>&1)
           MERGE_EXIT_CODE=$?
+          echo "::debug::Merge outputs: $MERGE_OUTPUTS"
+          echo "::debug::Merge exit code: $MERGE_EXIT_CODE"
 
           if [ "$MERGE_EXIT_CODE" = "0" ]; then
             exit 0
           fi
 
-          if [[ "$MERGE_RESULT" != *"$REQUIRED_WORKFLOWS_ERROR"* ]]; then
-            echo "::error::Failed to merge pull request: $MERGE_RESULT"
+          if [[ "$MERGE_OUTPUTS" != *"$REQUIRED_WORKFLOWS_ERROR"* ]]; then
+            echo "::error::Failed to merge pull request: $MERGE_OUTPUTS"
             exit 1
           fi
 
-          echo "::debug::Pull request is not mergeable yet, retrying in 5 seconds..."
+          echo "::debug::Pull request is not mergeable yet because some of required workflow check issues, retrying in 5 seconds..."
           sleep 5
           ATTEMPS=$((ATTEMPS+1))
         done
 
-        echo "::error::Failed to merge pull request"
+        echo "::error::Failed to merge pull request after $MAX_ATTEMPS attemps: $MERGE_OUTPUTS"
         exit 1
       env:
         GH_TOKEN: ${{ inputs.github-token }}
