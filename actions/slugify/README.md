@@ -13,7 +13,7 @@ Action to slugify a given string value
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/slugify@v0.4.2
+- uses: hoverkraft-tech/ci-github-common/actions/slugify@v0.4.3
   with:
     # The value to slugify
     value: ""
@@ -29,9 +29,9 @@ Action to slugify a given string value
 <!-- end inputs -->
 <!-- start outputs -->
 
-| **Output**          | **Description**     | **Default** | **Required** |
-| ------------------- | ------------------- | ----------- | ------------ |
-| <code>result</code> | The slugified value | undefined   | undefined    |
+| \***\*Output\*\***  | \***\*Description\*\*** | \***\*Default\*\*** | \***\*Required\*\*** |
+| ------------------- | ----------------------- | ------------------- | -------------------- |
+| <code>result</code> | The slugified value     | undefined           | undefined            |
 
 <!-- end outputs -->
 <!-- start [.github/ghadocs/examples/] -->
