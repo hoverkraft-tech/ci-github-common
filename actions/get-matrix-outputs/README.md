@@ -13,7 +13,7 @@ Download matrix ouputs from artifacts, because GitHub action does not handle job
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/get-matrix-outputs@v0.4.2
+- uses: hoverkraft-tech/ci-github-common/actions/get-matrix-outputs@v0.4.3
   with:
     # The name of the artifact to download.
     artifact-name: ""
@@ -29,9 +29,9 @@ Download matrix ouputs from artifacts, because GitHub action does not handle job
 <!-- end inputs -->
 <!-- start outputs -->
 
-| **Output**          | **Description**                   | **Default** | **Required** |
-| ------------------- | --------------------------------- | ----------- | ------------ |
-| <code>result</code> | The matrix combined JSON outputs. | undefined   | undefined    |
+| \***\*Output\*\***  | \***\*Description\*\***           | \***\*Default\*\*** | \***\*Required\*\*** |
+| ------------------- | --------------------------------- | ------------------- | -------------------- |
+| <code>result</code> | The matrix combined JSON outputs. | undefined           | undefined            |
 
 <!-- end outputs -->
 <!-- start [.github/ghadocs/examples/] -->

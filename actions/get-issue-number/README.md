@@ -13,7 +13,7 @@ Action to get Pull request or issue number
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/get-issue-number@v0.4.2
+- uses: hoverkraft-tech/ci-github-common/actions/get-issue-number@v0.4.3
   with:
 ```
 
@@ -22,9 +22,9 @@ Action to get Pull request or issue number
 <!-- end inputs -->
 <!-- start outputs -->
 
-| **Output**                | **Description**   | **Default** | **Required** |
-| ------------------------- | ----------------- | ----------- | ------------ |
-| <code>issue-number</code> | The issue number. | undefined   | undefined    |
+| \***\*Output\*\***        | \***\*Description\*\*** | \***\*Default\*\*** | \***\*Required\*\*** |
+| ------------------------- | ----------------------- | ------------------- | -------------------- |
+| <code>issue-number</code> | The issue number.       | undefined           | undefined            |
 
 <!-- end outputs -->
 <!-- start [.github/ghadocs/examples/] -->
