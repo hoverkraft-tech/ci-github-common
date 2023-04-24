@@ -4,11 +4,24 @@
 # Mainly using [Generate Dependabot Glob Action](https://github.com/marketplace/actions/generate-dependabot-glob), to generate a dependabot config from a glob pattern.
 # Workaround for missing official support of glob directories [https://github.com/dependabot/dependabot-core/issues/2178](https://github.com/dependabot/dependabot-core/issues/2178)
 
+name: Generate Dependabot Config
+
 on:
   workflow_call:
+    inputs:
+      github-app-id:
+        description: "GitHub App ID to generate GitHub token in place of github-token. See https://github.com/tibdex/github-app-token"
+        required: false
+        type: string
+    secrets:
+      github-token:
+        description: "GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See [actions/create-and-merge-pull-request](../../actions/create-and-merge-pull-request)"
+      github-app-key:
+        description: "GitHub App private key to generate GitHub token in place of github-token. See https://github.com/tibdex/github-app-token"
 
 jobs:
-  main:
+  generate-dependabot-config:
+    name: Generate Dependabot Config
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -16,10 +29,20 @@ jobs:
       - name: Generate Dependabot Glob
         uses: Makeshift/generate-dependabot-glob-action@v1.3.3
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v4
+      - uses: tibdex/github-app-token@v1
+        if: inputs.github-app-id
+        id: generate-token
         with:
-          commit-message: "chore: update dependabot config"
+          app_id: ${{ inputs.github-app-id }}
+          private_key: ${{ secrets.github-app-key }}
+
+      - uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@main
+        with:
+          github-token: ${{ steps.generate-token.outputs.token || secrets.github-token || github.token }}
+          branch: chore/dependabot-config
           title: "chore: update dependabot config"
-          body: "Update dependabot config for glob directories"
-          signoff: true
+          body: Update dependabot config for glob directories
+          commit-message: |
+            chore: update dependabot config
+
+            [skip ci]

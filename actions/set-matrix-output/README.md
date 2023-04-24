@@ -13,7 +13,7 @@ Set matrix ouput in file to be uploaded as artifacts, because GitHub action does
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/set-matrix-output@v0.3.4
+- uses: hoverkraft-tech/ci-github-common/actions/set-matrix-output@v0.4.3
   with:
     # The matrix output to set.
     value: ""
@@ -33,9 +33,9 @@ Set matrix ouput in file to be uploaded as artifacts, because GitHub action does
 <!-- end inputs -->
 <!-- start outputs -->
 
-| \***\*Output\*\***  | \***\*Description\*\***           | \***\*Default\*\*** | \***\*Required\*\*** |
-| ------------------- | --------------------------------- | ------------------- | -------------------- |
-| <code>result</code> | The matrix combined JSON outputs. | undefined           | undefined            |
+| **Output**          | **Description**                   | **Default** | **Required** |
+| ------------------- | --------------------------------- | ----------- | ------------ |
+| <code>result</code> | The matrix combined JSON outputs. | undefined   | undefined    |
 
 <!-- end outputs -->
 <!-- start [.github/ghadocs/examples/] -->

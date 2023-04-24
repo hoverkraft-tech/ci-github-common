@@ -16,19 +16,13 @@ on:
   workflow_call:
     secrets:
       github-token:
-        description: 'Token for the repository. Can be passed in using "secrets.GITHUB_TOKEN". See https://github.com/amannn/action-semantic-pull-request#installation'
-        required: true
+        description: 'Token for the repository. See https://github.com/amannn/action-semantic-pull-request#installation'
 
 jobs:
   main:
     name: Validate PR title
     runs-on: ubuntu-latest
     steps:
-      - id: set-variables
-        run: |
-          GITHUB_TOKEN="${{ secrets.github-token }}"
-          echo "REPO_TOKEN=${GITHUB_TOKEN:-"${{ secrets.GITHUB_TOKEN }}"}" >> "$GITHUB_ENV"
-
       - uses: amannn/action-semantic-pull-request@v5
         env:
-          GITHUB_TOKEN: ${{ env.REPO_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.github-token || github.token }}

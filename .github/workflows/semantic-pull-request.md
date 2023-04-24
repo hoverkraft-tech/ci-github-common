@@ -26,19 +26,20 @@ on:
 
 jobs:
   main:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@0.3.4
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@0.4.3
     secrets:
-      # Token for the repository. Can be passed in using "${{ secrets.GITHUB_TOKEN }}".
+      # Token for the repository.
       # See https://github.com/amannn/action-semantic-pull-request#installation
-      github-token: ${{ secrets.GITHUB_TOKEN }}
+      # Default GITHUB_TOKEN
+      github-token: ""
 ```
 
 <!-- end usage -->
 <!-- start secrets -->
 
-| **Secret**                    | **Description**                                                                                                                                                                                               |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **<code>github-token</code>** | Token for the repository. Can be passed in using "${{ secrets.GITHUB_TOKEN }}". See [https://github.com/amannn/action-semantic-pull-request#installation](https://github.com/actions/first-interaction#usage) |
+| **Secret**                    | **Description**                                                                                                                                         |     | **Default**               | **Required** |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------------------------- | ------------ |
+| **<code>github-token</code>** | Token for the repository. See [https://github.com/amannn/action-semantic-pull-request#installation](https://github.com/actions/first-interaction#usage) |     | <code>GITHUB_TOKEN</code> | **false**    |
 
 <!-- end secrets -->
 <!-- start inputs -->

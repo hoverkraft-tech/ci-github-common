@@ -7,3 +7,7 @@ on:
 jobs:
   main:
     uses: ./.github/workflows/generate-dependabot-config.yml
+    with:
+      github-app-id: ${{ vars.CI_BOT_APP_ID }}
+    secrets:
+      github-app-key: ${{ secrets.CI_BOT_APP_PRIVATE_KEY }}

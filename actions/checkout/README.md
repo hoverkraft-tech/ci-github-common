@@ -23,14 +23,14 @@ permissions:
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/checkout@v0.3.4
+- uses: hoverkraft-tech/ci-github-common/actions/checkout@v0.4.3
   with:
     # Number of commits to fetch. 0 indicates all history for all branches and tags.
-    # See https://github.com/actions/checkout#usage
+    # See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)
     # Default: 1
     fetch-depth: ""
 
-    # Whether to download Git-LFS files. See https://github.com/actions/checkout#usage
+    # Whether to download Git-LFS files. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)
     # Default: false
     lfs: ""
 ```

@@ -1,14 +1,17 @@
 version: 2
 updates:
-  # Enable version updates for Github Actions
   - package-ecosystem: github-actions
+    open-pull-requests-limit: 20
     directory: "/"
-    # Check for updates once a week
     schedule:
       interval: weekly
+      day: friday
+      time: "04:00"
 
   - package-ecosystem: github-actions
+    open-pull-requests-limit: 20
     directory: "/actions/**/action.yml"
-    # Check for updates once a week
     schedule:
       interval: weekly
+      day: friday
+      time: "04:00"

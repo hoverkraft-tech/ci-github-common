@@ -3,17 +3,17 @@ description: "Action to create or update comment in pull request or issue"
 author: Hoverkraft
 branding:
   icon: message-square
-  color: white
+  color: gray-dark
 
 inputs:
   title:
     description: "The comment title. Must be static and unique, will be used to retrieve the comment if exists already."
     required: true
   body:
-    description: "The comment body. See https://github.com/peter-evans/create-or-update-comment"
+    description: "The comment body. See [https://github.com/peter-evans/create-or-update-comment](https://github.com/peter-evans/create-or-update-comment)"
     required: false
   reactions:
-    description: "A comma separated list of reactions to add to the comment. See https://github.com/peter-evans/create-or-update-comment"
+    description: "A comma separated list of reactions to add to the comment. See [https://github.com/peter-evans/create-or-update-comment](https://github.com/peter-evans/create-or-update-comment)"
     required: false
 
 runs:
@@ -27,14 +27,19 @@ runs:
     - id: get-issue-number
       uses: ./self-actions/get-issue-number
 
+    - shell: bash
+      # FIXME: workaround until will be merged: https://github.com/actions/runner/pull/1684
+      run: |
+        rm -fr ./self-actions
+
     - uses: peter-evans/find-comment@v2
       id: find-comment
       with:
         issue-number: ${{ steps.get-issue-number.outputs.issue-number }}
-        comment-author: "github-actions[bot]"
+        comment-author: github-actions[bot]
         body-includes: ${{ inputs.title }}
 
-    - uses: peter-evans/create-or-update-comment@v2
+    - uses: peter-evans/create-or-update-comment@v3
       with:
         edit-mode: replace
         comment-id: ${{ steps.find-comment.outputs.comment-id }}

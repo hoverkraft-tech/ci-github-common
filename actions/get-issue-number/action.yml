@@ -3,7 +3,7 @@ description: "Action to get Pull request or issue number"
 author: Hoverkraft
 branding:
   icon: hash
-  color: white
+  color: gray-dark
 
 outputs:
   issue-number:

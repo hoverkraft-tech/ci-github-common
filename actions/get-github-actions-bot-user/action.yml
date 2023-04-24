@@ -1,0 +1,21 @@
+name: "Get GitHub Actions bot user"
+description: "Action to get the GitHub Actions bot user informations. Usefull to commit, comment, etc."
+author: Hoverkraft
+branding:
+  icon: user-check
+  color: gray-dark
+
+outputs:
+  email:
+    description: "The GitHub Actions bot user email."
+    value: "41898282+github-actions[bot]@users.noreply.github.com"
+  name:
+    description: "The GitHub Actions bot username."
+    value: "github-actions[bot]"
+
+runs:
+  using: "composite"
+  steps:
+    - id: get-bot-user
+      shell: bash
+      run: 'echo "Get GitHub Actions bot user informations"'

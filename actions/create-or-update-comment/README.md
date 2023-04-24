@@ -13,17 +13,17 @@ Action to create or update comment in pull request or issue
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@v0.3.4
+- uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@v0.4.3
   with:
     # The comment title. Must be static and unique, will be used to retrieve the
     # comment if exists already.
     title: ""
 
-    # The comment body. See https://github.com/peter-evans/create-or-update-comment
+    # The comment body. See [https://github.com/peter-evans/create-or-update-comment](https://github.com/peter-evans/create-or-update-comment)
     body: ""
 
     # A comma separated list of reactions to add to the comment. See
-    # https://github.com/peter-evans/create-or-update-comment
+    # [https://github.com/peter-evans/create-or-update-comment](https://github.com/peter-evans/create-or-update-comment)
     reactions: ""
 ```
 

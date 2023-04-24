@@ -41,26 +41,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - id: set-variables
-        run: |
-          STALE_ISSUE_MESSAGE="${{ inputs.stale-issue-message }}"
-          echo "stale-issue-message=${STALE_ISSUE_MESSAGE:-"This issue is stale"}" >> "$GITHUB_OUTPUT"
-          STALE_PR_MESSAGE="${{ inputs.stale-pr-message }}"
-          echo "stale-pr-message=${STALE_PR_MESSAGE:-"This PR is stale"}" >> "$GITHUB_OUTPUT"
-          STALE_ISSUE_LABEL="${{ inputs.stale-issue-label }}"
-          echo "stale-issue-label=${STALE_ISSUE_LABEL:-"no-issue-activity"}" >> "$GITHUB_OUTPUT"
-          EXEMPT_ISSUE_LABELS="${{ inputs.exempt-issue-labels }}"
-          echo "exempt-issue-labels=${EXEMPT_ISSUE_LABELS:-"awaiting-approval,work-in-progress"}" >> "$GITHUB_OUTPUT"
-          STALE_PR_LABEL="${{ inputs.stale-pr-label }}"
-          echo "stale-pr-label=${STALE_PR_LABEL:-"no-pr-activity"}" >> "$GITHUB_OUTPUT"
-          EXEMPT_PR_LABELS="${{ inputs.exempt-pr-labels }}"
-          echo "exempt-pr-labels=${EXEMPT_PR_LABELS:-"awaiting-approval,work-in-progress"}" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/stale@v7
+      - uses: actions/stale@v8
         with:
-          stale-issue-message: ${{ steps.set-variables.outputs.stale-issue-message }}
-          stale-pr-message: ${{ steps.set-variables.outputs.stale-pr-message }}
-          stale-issue-label: ${{ steps.set-variables.outputs.stale-issue-label }}
-          exempt-issue-labels: ${{ steps.set-variables.outputs.exempt-issue-labels }}
-          stale-pr-label: ${{ steps.set-variables.outputs.stale-pr-label }}
-          exempt-pr-labels: ${{ steps.set-variables.outputs.exempt-pr-labels }}
+          stale-issue-message: ${{ inputs.stale-issue-message || 'This issue is stale' }}
+          stale-pr-message: ${{ inputs.stale-pr-message || 'This PR is stale' }}
+          stale-issue-label: ${{ inputs.stale-issue-label || 'no-issue-activity' }}
+          exempt-issue-labels: ${{ inputs.exempt-issue-labels || 'awaiting-approval,work-in-progress' }}
+          stale-pr-label: ${{ inputs.stale-pr-label || 'no-pr-activity' }}
+          exempt-pr-labels: ${{ inputs.exempt-pr-labels || 'awaiting-approval,work-in-progress' }}
