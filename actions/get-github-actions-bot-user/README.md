@@ -13,7 +13,7 @@ Action to get the GitHub Actions bot user informations. Usefull to commit, comme
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/get-github-actions-bot-user@v0.4.3
+- uses: hoverkraft-tech/ci-github-common/actions/get-github-actions-bot-user@v0.4.4
   with:
 ```
 
