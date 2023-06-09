@@ -13,7 +13,7 @@ Action to get Pull request or issue number
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/get-issue-number@v0.4.4
+- uses: hoverkraft-tech/ci-github-common/actions/get-issue-number@v0.5.0
   with:
 ```
 
