@@ -25,7 +25,7 @@ on:
 
 jobs:
   release:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/release-actions.yml@0.4.4
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/release-actions.yml@0.5.0
     with:
       # Update all actions and workflows, regardless of changes.
       update-all: false
