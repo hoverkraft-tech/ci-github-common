@@ -10,6 +10,15 @@ Action to create or update comment in pull request or issue
 <!-- end description -->
 <!-- start contents -->
 <!-- end contents -->
+
+Set permissions to wrtie issues and pull-requests. This is required to write the comment on the PR.
+
+```yaml
+permissions:
+  issues: write
+  pull-requests: write
+```
+
 <!-- start usage -->
 
 ```yaml
