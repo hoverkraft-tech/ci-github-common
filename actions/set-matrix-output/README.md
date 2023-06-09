@@ -32,11 +32,6 @@ Set matrix ouput in file to be uploaded as artifacts, because GitHub action does
 
 <!-- end inputs -->
 <!-- start outputs -->
-
-| **Output**          | **Description**                   | **Default** | **Required** |
-| ------------------- | --------------------------------- | ----------- | ------------ |
-| <code>result</code> | The matrix combined JSON outputs. | undefined   | undefined    |
-
 <!-- end outputs -->
 <!-- start [.github/ghadocs/examples/] -->
 <!-- end [.github/ghadocs/examples/] -->
