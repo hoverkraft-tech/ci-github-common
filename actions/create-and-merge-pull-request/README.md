@@ -17,7 +17,7 @@ Allow GitHub Actions to create and approve pull requests](https://docs.github.co
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@v0.5.0
+- uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@v0.6.0
   with:
     # GitHub token for creating and merging pull request (permissions contents: write
     # and pull-requests: write). See [https://github.com/peter-evans/create-pull-request#action-inputs](https://github.com/peter-evans/create-pull-request#action-inputs)
