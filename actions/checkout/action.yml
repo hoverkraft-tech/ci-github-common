@@ -16,14 +16,10 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: xt0rted/pull-request-comment-branch@v2.0.0
-      if: github.event_name == 'issue_comment'
-      id: comment-branch
-
     - uses: actions/checkout@v3
       if: github.event_name == 'issue_comment'
       with:
-        ref: ${{ steps.comment-branch.outputs.head_ref }}
+        ref: refs/pull/${{ github.event.issue.number }}/head
         fetch-depth: ${{ inputs.fetch-depth }}
         lfs: ${{ inputs.lfs }}
 
