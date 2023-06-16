@@ -12,6 +12,10 @@ inputs:
   artifact-name:
     description: "The name of the artifact to download."
     required: true
+  remove-artifact:
+    description: "Define weather to remove the downloaded artifact."
+    required: false
+    default: "true"
 outputs:
   result:
     description: "The matrix combined JSON outputs."
@@ -30,3 +34,7 @@ runs:
       run: |
         RESULT=$(jq -sc "." /tmp/${{ inputs.artifact-name }}/*.json)
         echo "result<<EOF" >> "$GITHUB_OUTPUT" && echo "$RESULT" >> "$GITHUB_OUTPUT" && echo "EOF" >> "$GITHUB_OUTPUT"
+
+    - if: ${{ inputs.remove-artifact == 'true' }}
+      shell: bash
+      run: rm -rf /tmp/${{ inputs.artifact-name }}

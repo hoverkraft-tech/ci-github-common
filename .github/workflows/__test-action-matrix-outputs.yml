@@ -30,3 +30,11 @@ jobs:
             echo "Get matrix outputs result is not valid"
             exit 1
           fi
+
+      - name: Check artifacts have been deleted
+        run: |
+          ARTIFACTS_PATH="/tmp/test-matrix-outputs"
+          if [ -d "$ARTIFACTS_PATH" ]; then
+            echo "Artifacts have not been deleted"
+            exit 1
+          fi        
