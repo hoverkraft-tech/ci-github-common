@@ -17,14 +17,19 @@ Download matrix ouputs from artifacts, because GitHub action does not handle job
   with:
     # The name of the artifact to download.
     artifact-name: ""
+
+    # Define weather to remove the downloaded artifact.
+    # Default: true
+    remove-artifact: ""
 ```
 
 <!-- end usage -->
 <!-- start inputs -->
 
-| **Input**                      | **Description**                       | **Default** | **Required** |
-| ------------------------------ | ------------------------------------- | ----------- | ------------ |
-| **<code>artifact-name</code>** | The name of the artifact to download. |             | **true**     |
+| **Input**                        | **Description**                                   | **Default**       | **Required** |
+| -------------------------------- | ------------------------------------------------- | ----------------- | ------------ |
+| **<code>artifact-name</code>**   | The name of the artifact to download.             |                   | **true**     |
+| **<code>remove-artifact</code>** | Define weather to remove the downloaded artifact. | <code>true</code> | **false**    |
 
 <!-- end inputs -->
 <!-- start outputs -->
