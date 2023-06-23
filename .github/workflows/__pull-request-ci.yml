@@ -2,6 +2,7 @@ name: Internal - Pull request - Continuous Integration
 
 on:
   merge_group:
+    branches: [main]
   pull_request:
     branches: [main]
 
