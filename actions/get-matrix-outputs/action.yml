@@ -24,17 +24,27 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - id: prepare-download
+      shell: bash
+      run: |
+        # Forge the unique artifact name for the current workflow
+        ARTIFACT_NAME="${{ github.run_id }}-${{ github.run_number }}-${{ inputs.artifact-name }}"
+        echo "artifact-name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
+
+        ARTIFACT_PATH="/tmp/$ARTIFACT_NAME"
+        echo "artifact-path=$ARTIFACT_PATH" >> "$GITHUB_OUTPUT"
+
     - uses: actions/download-artifact@v3
       with:
-        name: ${{ inputs.artifact-name }}
-        path: /tmp/${{ inputs.artifact-name }}
+        name: ${{ steps.prepare-download.outputs.artifact-name }}
+        path: ${{ steps.prepare-download.outputs.artifact-path }}
 
     - id: read-artifacts
       shell: bash
       run: |
-        RESULT=$(jq -sc "." /tmp/${{ inputs.artifact-name }}/*.json)
+        RESULT=$(jq -sc "." ${{ steps.prepare-download.outputs.artifact-path }}/*.json)
         echo "result<<EOF" >> "$GITHUB_OUTPUT" && echo "$RESULT" >> "$GITHUB_OUTPUT" && echo "EOF" >> "$GITHUB_OUTPUT"
 
     - if: ${{ inputs.remove-artifact == 'true' }}
       shell: bash
-      run: rm -rf /tmp/${{ inputs.artifact-name }}
+      run: rm -rf ${{ steps.prepare-download.outputs.artifact-path }}

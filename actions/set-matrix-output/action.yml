@@ -15,18 +15,29 @@ inputs:
   artifact-name:
     description: "The name of the artifact to upload."
     required: true
+outputs:
+  artifact-name:
+    description: "The real unique name of the uploaded artifact."
+    value: ${{ steps.prepare-upload.outputs.artifact-name }}
 
 runs:
   using: "composite"
   steps:
-    - shell: bash
+    - id: prepare-upload
+      shell: bash
       run: |
-        mkdir -p "/tmp/${{ inputs.artifact-name }}"
+        # Define a unique artifact name for the current workflow
+        ARTIFACT_NAME="${{ github.run_id }}-${{ github.run_number }}-${{ inputs.artifact-name }}"
+        echo "artifact-name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
+
+        ARTIFACT_PATH="/tmp/$ARTIFACT_NAME"
+        echo "artifact-path=$ARTIFACT_PATH" >> "$GITHUB_OUTPUT"
+        mkdir -p "$ARTIFACT_PATH"
 
         MAX_ATTEMPTS=10
         MATRIX_OUTPUT_FILE=""
         for i in $(seq 1 $MAX_ATTEMPTS); do
-          MATRIX_OUTPUT_FILE="/tmp/${{ inputs.artifact-name }}/${{ inputs.artifact-name }}-$(uuidgen).json"
+          MATRIX_OUTPUT_FILE="$ARTIFACT_PATH/${{ inputs.artifact-name }}-$(uuidgen).json"
           if [ ! -f "$MATRIX_OUTPUT_FILE" ]; then
             break
           fi
@@ -41,5 +52,5 @@ runs:
 
     - uses: actions/upload-artifact@v3
       with:
-        name: ${{ inputs.artifact-name }}
-        path: /tmp/${{ inputs.artifact-name }}
+        name: ${{ steps.prepare-upload.outputs.artifact-name }}
+        path: ${{ steps.prepare-upload.outputs.artifact-path }}
