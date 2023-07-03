@@ -32,6 +32,11 @@ Set matrix ouput in file to be uploaded as artifacts, because GitHub action does
 
 <!-- end inputs -->
 <!-- start outputs -->
+
+| \***\*Output\*\***         | \***\*Description\*\***                        | \***\*Default\*\*** | \***\*Required\*\*** |
+| -------------------------- | ---------------------------------------------- | ------------------- | -------------------- |
+| <code>artifact-name</code> | The real unique name of the uploaded artifact. | undefined           | undefined            |
+
 <!-- end outputs -->
 <!-- start [.github/ghadocs/examples/] -->
 <!-- end [.github/ghadocs/examples/] -->
