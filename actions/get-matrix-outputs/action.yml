@@ -13,7 +13,7 @@ inputs:
     description: "The name of the artifact to download."
     required: true
   remove-artifact:
-    description: "Define weather to remove the downloaded artifact."
+    description: "Define weather to remove the downloaded artifact after reading."
     required: false
     default: "true"
 outputs:
@@ -45,6 +45,43 @@ runs:
         RESULT=$(jq -sc "." ${{ steps.prepare-download.outputs.artifact-path }}/*.json)
         echo "result<<EOF" >> "$GITHUB_OUTPUT" && echo "$RESULT" >> "$GITHUB_OUTPUT" && echo "EOF" >> "$GITHUB_OUTPUT"
 
-    - if: ${{ inputs.remove-artifact == 'true' }}
-      shell: bash
-      run: rm -rf ${{ steps.prepare-download.outputs.artifact-path }}
+    - uses: actions/github-script@v4
+      if: ${{ inputs.remove-artifact == 'true' }}
+      with:
+        github-token: ${{ github.token }}
+        script: |
+          // Delete artifact folder
+          await io.rmRF(`${{ steps.prepare-download.outputs.artifact-path }}`);
+
+          // Remove the artifact from the workflow run
+          const artifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts.endpoint.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: context.runId,
+              })
+          );
+
+          const artifactToDelete = artifacts.filter(
+            ({ name }) => name === "${{ steps.prepare-download.outputs.artifact-name }}"
+          );
+
+          await Promise.all(
+            artifacts.map(
+              async ({ id }) => {
+                try{
+                  await github.rest.actions.deleteArtifact({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    artifact_id: id,
+                  });
+                } catch(error){
+                  if (error.status === 404) {
+                    core.warning(`Artifact ${id} not found`);
+                  } else {
+                    throw error;
+                  }
+                }
+              }
+            )
+          );
