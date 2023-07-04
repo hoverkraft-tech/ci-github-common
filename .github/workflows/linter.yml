@@ -1,7 +1,7 @@
 # Linter
 # ==========================
 # Reusable workflow that performs linting on the code base.
-# Mainly using [Super-Linter](https://github.com/github/super-linter), with some opinionated defaults.
+# Mainly using [Super-Linter](https://github.com/super-linter/super-linter), with some opinionated defaults.
 
 name: Linter
 
@@ -9,7 +9,7 @@ on:
   workflow_call:
     secrets:
       github-token:
-        description: 'Token for marking the status of linter run in the Checks section. See https://github.com/github/super-linter#how-to-use'
+        description: 'Token for marking the status of linter run in the Checks section. See https://github.com/super-linter/super-linter#how-to-use'
 
 jobs:
   checks:
@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0
 
       - name: 👕 Lint Code Base
-        uses: github/super-linter/slim@v5
+        uses: super-linter/super-linter/slim@v5
         env:
           VALIDATE_ALL_CODEBASE: false
           LOG_LEVEL: WARN
