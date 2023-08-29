@@ -47,7 +47,7 @@ jobs:
           files: |
             ./actions/*
             ./.github/workflows/*
-          dir_names_exclude_root: true
+          dir_names_exclude_current_dir: true
 
       - id: changed-variables
         shell: bash
