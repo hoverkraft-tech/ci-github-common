@@ -25,7 +25,7 @@ on:
 
 jobs:
   main:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/greetings.yml@0.7.1
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/greetings.yml@0.7.2
     secrets:
       # Token for the repository.
       # See https://github.com/actions/first-interaction#usage
