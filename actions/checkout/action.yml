@@ -16,14 +16,14 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       if: github.event_name == 'issue_comment'
       with:
         ref: refs/pull/${{ github.event.issue.number }}/head
         fetch-depth: ${{ inputs.fetch-depth }}
         lfs: ${{ inputs.lfs }}
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       if: github.event_name != 'issue_comment'
       with:
         fetch-depth: ${{ inputs.fetch-depth }}
