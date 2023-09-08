@@ -8,7 +8,7 @@ jobs:
     name: Tests for set/get matrix outputs    
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - id: set-matrix-output-1
         uses: ./actions/set-matrix-output
