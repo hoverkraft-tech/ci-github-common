@@ -33,7 +33,7 @@ jobs:
       latest-tag: ${{ steps.get-latest-tag.outputs.tag }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -118,7 +118,7 @@ jobs:
       matrix:
         action: ${{ fromJson(needs.prepare-release.outputs.changed-actions) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: 📖 Generate README
         uses: bitflight-devops/github-action-readme-generator@v1.3.14
@@ -147,7 +147,7 @@ jobs:
       matrix:
         workflow: ${{ fromJson(needs.prepare-release.outputs.changed-workflows) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: 📖 Generate README
         id: generate-readme
@@ -178,7 +178,7 @@ jobs:
       actions: write
 
     steps:
-      - uses: actions/checkout@v3.1.0
+      - uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v3
         with:
