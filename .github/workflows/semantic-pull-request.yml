@@ -1,10 +1,11 @@
 # Semantic pull request
 # ==========================
-# Workflow to ensure "Squash and merge" Pull Request strategy provides a valid commit message.
-# Check that the title follows the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
-# Mainly using [action-semantic-pull-request](https://github.com/amannn/action-semantic-pull-request#installation), with some opinionated defaults.
+# Workflow to ensure Pull Request provides semantic versionning assets:
+# - "Squash and merge" Pull Request strategy provides a valid commit message.
+#   Check that the title follows the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
+#   Mainly using [action-semantic-pull-request](https://github.com/amannn/action-semantic-pull-request#installation), with some opinionated defaults.
 
-name: "Pull Request - Semantic Lint"
+name: "Semantic Pull Request"
 
 on:
   pull_request_target:
@@ -16,12 +17,18 @@ on:
   workflow_call:
     secrets:
       github-token:
-        description: 'Token for the repository. See https://github.com/amannn/action-semantic-pull-request#installation'
+        description: "Token for the repository. Default: GITHUB_TOKEN"
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
-  main:
+  lint:
     name: Validate PR title
     runs-on: ubuntu-latest
+
     steps:
       - uses: amannn/action-semantic-pull-request@v5
         env:
