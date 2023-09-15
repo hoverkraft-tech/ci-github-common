@@ -184,7 +184,7 @@ jobs:
         with:
           name: changed-files
 
-      - uses: tibdex/github-app-token@v1
+      - uses: tibdex/github-app-token@v2
         if: inputs.github-app-id
         id: generate-token
         with:
