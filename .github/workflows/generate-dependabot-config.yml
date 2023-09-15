@@ -29,7 +29,7 @@ jobs:
       - name: Generate Dependabot Glob
         uses: Makeshift/generate-dependabot-glob-action@v1.3.4
 
-      - uses: tibdex/github-app-token@v1
+      - uses: tibdex/github-app-token@v2
         if: inputs.github-app-id
         id: generate-token
         with:
