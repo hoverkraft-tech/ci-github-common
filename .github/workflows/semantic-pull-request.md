@@ -28,7 +28,7 @@ on:
 
 jobs:
   main:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@0.7.2
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@0.7.3
     secrets:
       # Token for the repository.
       # Default GITHUB_TOKEN
