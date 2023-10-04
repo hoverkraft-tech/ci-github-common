@@ -44,6 +44,15 @@ jobs:
 
 <!-- end secrets -->
 <!-- start inputs -->
+
+<!-- start inputs -->
+
+| **Input**                | **Description**                                                                                                                                                                                | **Default**                    | **Required** |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------ |
+| **<code>runs-on</code>** | Json array of runner(s) to use. See [https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job](https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job) | <code>["ubuntu-latest"]</code> | **false**    |
+
+<!-- end inputs -->
+
 <!-- end inputs -->
 
 <!-- start outputs -->

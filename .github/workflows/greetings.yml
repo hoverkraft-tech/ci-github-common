@@ -15,6 +15,11 @@ on:
 
   workflow_call:
     inputs:
+      runs-on:
+        description: "Json array of runner(s) to use. See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job"
+        type: string
+        default: '["ubuntu-latest"]'
+        required: false
       issue-message:
         description: "Comment to post on an individual's first issue. See https://github.com/actions/first-interaction#usage"
         type: string
@@ -29,7 +34,7 @@ on:
 
 jobs:
   greeting:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJson(inputs.runs-on) }}
     steps:
       - uses: actions/first-interaction@v1
         with:

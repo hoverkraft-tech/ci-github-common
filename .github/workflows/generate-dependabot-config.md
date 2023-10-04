@@ -49,9 +49,10 @@ jobs:
 <!-- end secrets -->
 <!-- start inputs -->
 
-| **Inputs**                     | **Description**                                                                                                                                                            | **Default**   | **Required** |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------ |
-| **<code>github-app-id</code>** | GitHub App ID to generate GitHub token in place of <code>github-token</code>. See [https://github.com/tibdex/github-app-token](https://github.com/tibdex/github-app-token) | <code></code> | **false**    |
+| **Inputs**                     | **Description**                                                                                                                                                                                | **Default**                    | **Required** |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------ |
+| **<code>runs-on</code>**       | Json array of runner(s) to use. See [https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job](https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job) | <code>["ubuntu-latest"]</code> | **false**    |
+| **<code>github-app-id</code>** | GitHub App ID to generate GitHub token in place of <code>github-token</code>. See [https://github.com/tibdex/github-app-token](https://github.com/tibdex/github-app-token)                     | <code></code>                  | **false**    |
 
 <!-- end inputs -->
 

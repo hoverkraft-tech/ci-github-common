@@ -7,13 +7,19 @@ name: Linter
 
 on:
   workflow_call:
+    inputs:
+      runs-on:
+        description: "Json array of runner(s) to use. See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job"
+        type: string
+        default: '["ubuntu-latest"]'
+        required: false
     secrets:
       github-token:
         description: 'Token for marking the status of linter run in the Checks section. See https://github.com/super-linter/super-linter#how-to-use'
 
 jobs:
   checks:
-    runs-on: "ubuntu-latest"
+    runs-on: ${{ fromJson(inputs.runs-on) }}
     name: Run checks
     steps:
       - uses: actions/checkout@v4
