@@ -11,6 +11,11 @@ on:
 
   workflow_call:
     inputs:
+      runs-on:
+        description: "Json array of runner(s) to use. See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job"
+        type: string
+        default: '["ubuntu-latest"]'
+        required: false
       stale-issue-message:
         description: "Comment on the staled issues. See https://github.com/actions/stale#stale-issue-message"
         type: string
@@ -38,7 +43,7 @@ on:
 
 jobs:
   stale:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on && fromJson(inputs.runs-on) || 'ubuntu-latest' }}
 
     steps:
       - uses: actions/stale@v8

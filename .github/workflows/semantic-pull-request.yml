@@ -15,6 +15,12 @@ on:
       - synchronize
 
   workflow_call:
+    inputs: 
+      runs-on:
+        description: "The type of machine to run on. Default: ubuntu-latest"
+        required: false
+        type: string
+        default: "ubuntu-latest"
     secrets:
       github-token:
         description: "Token for the repository. Default: GITHUB_TOKEN"
@@ -27,7 +33,7 @@ permissions:
 jobs:
   lint:
     name: Validate PR title
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on && fromJson(inputs.runs-on) || 'ubuntu-latest' }}
 
     steps:
       - uses: amannn/action-semantic-pull-request@v5

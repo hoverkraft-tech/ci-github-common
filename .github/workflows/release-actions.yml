@@ -9,6 +9,11 @@ name: Release Actions
 on:
   workflow_call:
     inputs:
+      runs-on:
+        description: "Json array of runner(s) to use. See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job"
+        type: string
+        default: '["ubuntu-latest"]'
+        required: false
       update-all:
         description: "Update all actions and workflows, regardless of changes."
         required: false
@@ -26,7 +31,7 @@ on:
 
 jobs:
   prepare-release:
-    runs-on: "ubuntu-latest"
+    runs-on: ${{ fromJson(inputs.runs-on) }}
     outputs:
       changed-actions: ${{ steps.get-changed-actions.outputs.result }}
       changed-workflows: ${{ steps.get-changed-workflows.outputs.result }}
@@ -111,7 +116,7 @@ jobs:
 
   generate-actions-readme:
     needs: prepare-release
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJson(inputs.runs-on) }}
     if: ${{ needs.prepare-release.outputs.changed-actions != '[]' }}
     strategy:
       fail-fast: false
@@ -140,7 +145,7 @@ jobs:
 
   generate-workflows-readme:
     needs: prepare-release
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJson(inputs.runs-on) }}
     if: ${{ needs.prepare-release.outputs.changed-workflows != '[]' }}
     strategy:
       fail-fast: false
@@ -170,7 +175,7 @@ jobs:
   publish-actions-readme:
     needs: [prepare-release, generate-actions-readme, generate-workflows-readme]
     if: always() && (needs.prepare-release.outputs.changed-actions != '[]' || needs.prepare-release.outputs.changed-workflows != '[]')
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJson(inputs.runs-on) }}
 
     permissions:
       pull-requests: write
