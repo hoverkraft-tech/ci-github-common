@@ -30,11 +30,11 @@ on:
         required: false
     secrets:
       github-token:
-        description: 'Token for the repository. See https://github.com/actions/first-interaction#usage'
+        description: "Token for the repository. See https://github.com/actions/first-interaction#usage"
 
 jobs:
   greeting:
-    runs-on: ${{ fromJson(inputs.runs-on) }}
+    runs-on: ${{ inputs.runs-on && fromJson(inputs.runs-on) || 'ubuntu-latest' }}
     steps:
       - uses: actions/first-interaction@v1
         with:

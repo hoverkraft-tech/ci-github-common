@@ -5,8 +5,13 @@ on:
 
 jobs:
   tests:
-    name: Tests for set/get matrix outputs    
-    runs-on: ubuntu-latest
+    name: Tests for set/get matrix outputs
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -14,17 +19,18 @@ jobs:
         uses: ./actions/set-matrix-output
         with:
           value: '"test content 1"'
-          artifact-name: "test-matrix-outputs"
+          artifact-name: "test-matrix-outputs-${{ matrix.os }}"
 
       - id: set-matrix-output-2
         uses: ./actions/set-matrix-output
         with:
           value: '"test content 2"'
-          artifact-name: "test-matrix-outputs"
+          artifact-name: "test-matrix-outputs-${{ matrix.os }}"
 
       - name: Check set matrix outputs
+        shell: bash
         run: |
-          EXPECTED_ARTIFACT_NAME="$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER-test-matrix-outputs"
+          EXPECTED_ARTIFACT_NAME="$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER-test-matrix-outputs-${{ matrix.os }}"
 
           if [ "${{ steps.set-matrix-output-1.outputs.artifact-name }}" != "$EXPECTED_ARTIFACT_NAME" ]; then
             echo "Set matrix output 1 result is not valid"
@@ -39,9 +45,10 @@ jobs:
       - id: get-matrix-outputs
         uses: ./actions/get-matrix-outputs
         with:
-          artifact-name: test-matrix-outputs
+          artifact-name: test-matrix-outputs-${{ matrix.os }}
 
       - name: Check matrix outputs
+        shell: bash
         run: |
           if [ "${{ steps.get-matrix-outputs.outputs.result }}" != '["test content 1","test content 2"]' ]; then
             echo "Get matrix outputs result is not valid"
@@ -49,8 +56,9 @@ jobs:
           fi
 
       - name: Check artifacts have been deleted
+        shell: bash
         run: |
-          ARTIFACTS_PATH="/tmp/$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER-test-matrix-outputs"
+          ARTIFACTS_PATH="/tmp/$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER-test-matrix-outputs-${{ matrix.os }}"
           if [ -d "$ARTIFACTS_PATH" ]; then
             echo "Artifacts have not been deleted"
             exit 1
