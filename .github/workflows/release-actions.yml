@@ -126,7 +126,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: 📖 Generate README
-        uses: bitflight-devops/github-action-readme-generator@v1.5.1
+        uses: bitflight-devops/github-action-readme-generator@v1.6.0
         with:
           action: ${{ matrix.action }}/action.yml
           readme: ${{ matrix.action }}/README.md
