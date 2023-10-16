@@ -40,14 +40,25 @@ runs:
         path: ${{ steps.prepare-download.outputs.artifact-path }}
 
     - id: read-artifacts
-      shell: bash
-      run: |
-        RESULT=$(jq -sc "." ${{ steps.prepare-download.outputs.artifact-path }}/*.json)
-        echo "result<<EOF" >> "$GITHUB_OUTPUT" && echo "$RESULT" >> "$GITHUB_OUTPUT" && echo "EOF" >> "$GITHUB_OUTPUT"
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { readFileSync } = require('fs');
 
-    - if: ${{ inputs.remove-artifact == 'true' }}
-      shell: bash
-      run: rm -rf ${{ steps.prepare-download.outputs.artifact-path }}
+          const artifactPath = `${{ steps.prepare-download.outputs.artifact-path }}`;
+          const globber = await glob.create(`${artifactPath}/*.json`, {followSymbolicLinks: false});
+          const artifactFiles = await globber.glob();
+
+          core.debug(`Found ${artifactFiles.length} files in ${artifactPath}`);
+
+          const result = artifactFiles.map(file => readFileSync(file, 'utf8')).join(",");
+
+          const shouldRemoveArtifact = `${{ inputs.remove-artifact }}` === 'true';
+          if(shouldRemoveArtifact) {
+            await io.rmRF(artifactPath);
+          }
+
+          return `[${result}]`;
 
     - if: ${{ inputs.remove-artifact == 'true' }}
       uses: geekyeggo/delete-artifact@v2

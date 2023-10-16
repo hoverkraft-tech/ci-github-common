@@ -24,31 +24,36 @@ runs:
   using: "composite"
   steps:
     - id: prepare-upload
-      shell: bash
-      run: |
-        # Define a unique artifact name for the current workflow
-        ARTIFACT_NAME="${{ github.run_id }}-${{ github.run_number }}-${{ inputs.artifact-name }}"
-        echo "artifact-name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { join } = require('path');
+          const { existsSync, writeFileSync } = require('fs');
+          const { randomUUID } = require('crypto');
 
-        ARTIFACT_PATH="/tmp/$ARTIFACT_NAME"
-        echo "artifact-path=$ARTIFACT_PATH" >> "$GITHUB_OUTPUT"
-        mkdir -p "$ARTIFACT_PATH"
+          const artifactName = `${{ github.run_id }}-${{ github.run_number }}-${{ inputs.artifact-name }}`;
+          core.setOutput("artifact-name", artifactName);
 
-        MAX_ATTEMPTS=10
-        MATRIX_OUTPUT_FILE=""
-        for i in $(seq 1 $MAX_ATTEMPTS); do
-          MATRIX_OUTPUT_FILE="$ARTIFACT_PATH/${{ inputs.artifact-name }}-$(uuidgen).json"
-          if [ ! -f "$MATRIX_OUTPUT_FILE" ]; then
-            break
-          fi
-          MATRIX_OUTPUT_FILE=""
-        done
-        if [ -z "$MATRIX_OUTPUT_FILE" ]; then
-          echo "Failed to find unique file name after $MAX_ATTEMPTS attempts"
-          exit 1
-        fi
+          const artifactPath = join("/tmp",artifactName);
+          core.setOutput("artifact-path", artifactPath);
+          await io.mkdirP(artifactPath);
 
-        echo '${{ inputs.value }}' > "$MATRIX_OUTPUT_FILE"
+          const maxAttempts = 10;
+          let matrixOutputFile = '';
+          for (let i = 1; i <= maxAttempts; i++) {
+            const uniquid = randomUUID();
+            matrixOutputFile = join(artifactPath, `${artifactName}-${uniquid}.json`);
+            if (!existsSync(matrixOutputFile)) {
+              break;
+            }
+            matrixOutputFile = '';
+          }
+
+          if (!matrixOutputFile) {
+            core.setFailed(`Failed to find unique file name after ${maxAttempts} attempts`);
+          }
+
+          writeFileSync(matrixOutputFile, `${{ inputs.value }}`);
 
     - uses: actions/upload-artifact@v3
       with:

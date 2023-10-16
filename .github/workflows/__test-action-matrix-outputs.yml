@@ -5,8 +5,13 @@ on:
 
 jobs:
   tests:
-    name: Tests for set/get matrix outputs    
-    runs-on: ubuntu-latest
+    name: Tests for set/get matrix outputs
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,6 +28,7 @@ jobs:
           artifact-name: "test-matrix-outputs"
 
       - name: Check set matrix outputs
+        shell: bash
         run: |
           EXPECTED_ARTIFACT_NAME="$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER-test-matrix-outputs"
 
@@ -42,6 +48,7 @@ jobs:
           artifact-name: test-matrix-outputs
 
       - name: Check matrix outputs
+        shell: bash
         run: |
           if [ "${{ steps.get-matrix-outputs.outputs.result }}" != '["test content 1","test content 2"]' ]; then
             echo "Get matrix outputs result is not valid"
@@ -49,6 +56,7 @@ jobs:
           fi
 
       - name: Check artifacts have been deleted
+        shell: bash
         run: |
           ARTIFACTS_PATH="/tmp/$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER-test-matrix-outputs"
           if [ -d "$ARTIFACTS_PATH" ]; then
