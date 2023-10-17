@@ -18,13 +18,15 @@ jobs:
       - id: set-matrix-output-1
         uses: ./actions/set-matrix-output
         with:
-          value: '"test content 1"'
+          value: |
+            { "test": "test content 1" }
           artifact-name: "test-matrix-outputs-${{ matrix.os }}"
 
       - id: set-matrix-output-2
         uses: ./actions/set-matrix-output
         with:
-          value: '"test content 2"'
+          value: |
+            { "test": "test content 2" }
           artifact-name: "test-matrix-outputs-${{ matrix.os }}"
 
       - name: Check set matrix outputs
@@ -50,7 +52,9 @@ jobs:
       - name: Check matrix outputs
         shell: bash
         run: |
-          if [ "${{ steps.get-matrix-outputs.outputs.result }}" != '["test content 1","test content 2"]' ]; then
+          OUTPUT_RESULT='${{ steps.get-matrix-outputs.outputs.result }}'
+
+          if [ "$OUTPUT_RESULT"  != '[{ "test": "test content 1" },{ "test": "test content 2" }]' ]; then
             echo "Get matrix outputs result is not valid"
             exit 1
           fi
