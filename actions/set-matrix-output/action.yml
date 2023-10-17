@@ -42,7 +42,10 @@ runs:
           let matrixOutputFile = '';
           for (let i = 1; i <= maxAttempts; i++) {
             const uniquid = randomUUID();
-            matrixOutputFile = join(artifactPath, `${artifactName}-${uniquid}.json`);
+            const timestamp = Date.now();
+            const matrixOutputFileName = `${timestamp}-${artifactName}-${uniquid}.json`;
+
+            matrixOutputFile = join(artifactPath, matrixOutputFileName);
             if (!existsSync(matrixOutputFile)) {
               break;
             }

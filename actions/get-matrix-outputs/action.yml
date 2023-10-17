@@ -19,7 +19,7 @@ inputs:
 outputs:
   result:
     description: "The matrix combined JSON outputs."
-    value: ${{ steps.read-artifacts.outputs.result }}
+    value: ${{ steps.read-artifacts.outputs.artifacts }}
 
 runs:
   using: "composite"
@@ -51,14 +51,14 @@ runs:
 
           core.debug(`Found ${artifactFiles.length} files in ${artifactPath}`);
 
-          const result = artifactFiles.map(file => readFileSync(file, 'utf8')).join(",");
+          const result = artifactFiles.map(file => readFileSync(file, 'utf8').trim()).join(",");
+
+          core.setOutput('artifacts',`[${result}]`);
 
           const shouldRemoveArtifact = `${{ inputs.remove-artifact }}` === 'true';
           if(shouldRemoveArtifact) {
             await io.rmRF(artifactPath);
           }
-
-          return `[${result}]`;
 
     - if: ${{ inputs.remove-artifact == 'true' }}
       uses: geekyeggo/delete-artifact@v2
