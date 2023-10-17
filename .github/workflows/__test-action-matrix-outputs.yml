@@ -25,6 +25,12 @@ jobs:
       - id: set-matrix-output-2
         uses: ./actions/set-matrix-output
         with:
+          value: ""
+          artifact-name: "test-matrix-outputs-${{ matrix.os }}"
+
+      - id: set-matrix-output-3
+        uses: ./actions/set-matrix-output
+        with:
           value: |
             { "test": "test content 2" }
           artifact-name: "test-matrix-outputs-${{ matrix.os }}"
@@ -41,6 +47,11 @@ jobs:
 
           if [ "${{ steps.set-matrix-output-2.outputs.artifact-name }}" != "$EXPECTED_ARTIFACT_NAME" ]; then
             echo "Set matrix output 2 result is not valid"
+            exit 1
+          fi
+
+          if [ "${{ steps.set-matrix-output-3.outputs.artifact-name }}" != "$EXPECTED_ARTIFACT_NAME" ]; then
+            echo "Set matrix output 3 result is not valid"
             exit 1
           fi
 
