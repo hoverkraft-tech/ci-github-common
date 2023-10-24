@@ -1,8 +1,12 @@
+<!-- start branding -->
+<!-- end branding -->
 <!-- start title -->
 
 # GitHub Reusable Workflow: Stale
 
 <!-- end title -->
+<!-- start badges -->
+<!-- end badges -->
 <!-- start description -->
 
 Reusable workflow to manage stale issues and pull requests.

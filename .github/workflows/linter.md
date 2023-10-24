@@ -1,8 +1,12 @@
+<!-- start branding -->
+<!-- end branding -->
 <!-- start title -->
 
 # GitHub Reusable Workflow: Linter
 
 <!-- end title -->
+<!-- start badges -->
+<!-- end badges -->
 <!-- start description -->
 
 Reusable workflow that performs linting on the code base.

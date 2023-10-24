@@ -1,8 +1,9 @@
+<!-- start branding -->
+<!-- end branding -->
 <!-- start title -->
-
-# GitHub Action: Get matrix ouput
-
 <!-- end title -->
+<!-- start badges -->
+<!-- end badges -->
 <!-- start description -->
 
 Download matrix ouputs from artifacts, because GitHub action does not handle job outputs for matrix

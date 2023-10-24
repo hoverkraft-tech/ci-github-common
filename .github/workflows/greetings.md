@@ -1,8 +1,12 @@
+<!-- start branding -->
+<!-- end branding -->
 <!-- start title -->
 
 # GitHub Reusable Workflow: Greetings
 
 <!-- end title -->
+<!-- start badges -->
+<!-- end badges -->
 <!-- start description -->
 
 Workflow to greet new contributors.

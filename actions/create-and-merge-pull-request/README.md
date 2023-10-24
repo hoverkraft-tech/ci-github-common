@@ -1,8 +1,9 @@
+<!-- start branding -->
+<!-- end branding -->
 <!-- start title -->
-
-# GitHub Action: Create and merge Pull Request
-
 <!-- end title -->
+<!-- start badges -->
+<!-- end badges -->
 <!-- start description -->
 
 Action to create and merge Pull Request. Opinionated, set GitHub Actions bot as author, then rebase and merge.
