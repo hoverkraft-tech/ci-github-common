@@ -51,7 +51,10 @@ runs:
 
           core.debug(`Found ${artifactFiles.length} files in ${artifactPath}`);
 
-          const result = artifactFiles.map(file => readFileSync(file, 'utf8').trim()).join(",");
+          const result = artifactFiles
+            .map(file => readFileSync(file, 'utf8').trim())
+            .filter(content => content)
+            .join(",");
 
           core.setOutput('artifacts',`[${result}]`);
 
