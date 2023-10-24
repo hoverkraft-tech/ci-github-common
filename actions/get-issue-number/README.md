@@ -1,8 +1,9 @@
+<!-- start branding -->
+<!-- end branding -->
 <!-- start title -->
-
-# GitHub Action: Get issue number
-
 <!-- end title -->
+<!-- start badges -->
+<!-- end badges -->
 <!-- start description -->
 
 Action to get Pull request or issue number

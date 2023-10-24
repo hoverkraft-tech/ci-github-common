@@ -1,8 +1,9 @@
+<!-- start branding -->
+<!-- end branding -->
 <!-- start title -->
-
-# GitHub Action: Set matrix ouput
-
 <!-- end title -->
+<!-- start badges -->
+<!-- end badges -->
 <!-- start description -->
 
 Set matrix ouput in file to be uploaded as artifacts, because GitHub action does not handle job outputs for matrix

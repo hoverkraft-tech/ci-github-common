@@ -1,8 +1,9 @@
+<!-- start branding -->
+<!-- end branding -->
 <!-- start title -->
-
-# GitHub Action: Checkout
-
 <!-- end title -->
+<!-- start badges -->
+<!-- end badges -->
 <!-- start description -->
 
 Action to checkout the repository compatible for PRs, issues and push events. Workaround for [https://github.com/actions/checkout/issues/331](https://github.com/actions/checkout/issues/331)
