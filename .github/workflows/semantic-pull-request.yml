@@ -20,7 +20,7 @@ on:
         description: "The type of machine to run on. Default: ubuntu-latest"
         required: false
         type: string
-        default: "ubuntu-latest"
+        default: '["ubuntu-latest"]'
     secrets:
       github-token:
         description: "Token for the repository. Default: GITHUB_TOKEN"
