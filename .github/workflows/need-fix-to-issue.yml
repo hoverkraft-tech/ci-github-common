@@ -1,0 +1,50 @@
+# Need fix to Issue
+# ==========================
+# Reusable workflow to convert comments requiring fixes (TODO, FIXME) to issues.
+# Mainly using [TODO to Issue Action](https://github.com/alstr/todo-to-issue-action), with some opinionated defaults.
+
+name: "Need fix to Issue"
+on:
+  push:
+    branches:
+      - "main"
+  workflow_dispatch:
+    inputs:
+      manual-commit-ref:
+        description: "The SHA of the commit to get the diff for"
+        required: true
+      manual-base-ref:
+        description: "By default, the commit entered above is compared to the one directly before it; to go back further, enter an earlier SHA here"
+        required: false
+  workflow_call:
+    inputs:
+      runs-on:
+        description: "Json array of runner(s) to use. See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job"
+        type: string
+        default: '["ubuntu-latest"]'
+        required: false
+      manual-commit-ref:
+        description: "The SHA of the commit to get the diff for"
+        type: string
+        required: false
+      manual-base-ref:
+        description: "By default, the commit entered above is compared to the one directly before it; to go back further, enter an earlier SHA here"
+        type: string
+        required: false
+jobs:
+  need-fix-to-issue:
+    runs-on: ${{ inputs.runs-on && fromJson(inputs.runs-on) || 'ubuntu-latest' }}
+    steps:
+      - uses: "actions/checkout@v4"
+
+      - name: "TODO to Issue"
+        uses: "alstr/todo-to-issue-action@v4.11"
+        with:
+          IDENTIFIERS: |
+            [
+                {"name": "TODO:", "labels": ["help wanted"]},
+                {"name": "FIXME:", "labels": ["bug"]}
+            ]
+        env:
+          MANUAL_COMMIT_REF: ${{ inputs.manual-commit-ref }}
+          MANUAL_BASE_REF: ${{ inputs.manual-base-ref }}
