@@ -36,18 +36,9 @@ on:
 jobs:
   main:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/need-fix-to-issue.yml@0.9.1
-
-    # Optional customizations.
     with:
-      # The SHA of the commit to get the diff for.
-      # Default: ""
-      manual-commit-ref:
-        description: ${{ inputs.manual-commit-ref }}
-      # By default, the commit entered above is compared to the one directly before it;
-      # to go back further, enter an earlier SHA here
-      # Default: ""
-      manual-base-ref:
-        description: ${{ inputs.manual-base-ref }}
+      manual-commit-ref: ${{ inputs.manual-commit-ref }}
+      manual-base-ref: ${{ inputs.manual-base-ref }}
 ```
 
 <!-- end usage -->
