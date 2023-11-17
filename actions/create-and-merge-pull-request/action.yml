@@ -54,7 +54,7 @@ runs:
 
     - id: wait-for-pull-request-mergeable-by-admin
       if: steps.create-pull-request.outputs.pull-request-number && steps.create-pull-request.outputs.pull-request-operation != 'closed'
-      uses: actions/github-script@v6
+      uses: actions/github-script@v7
       with:
         script: |
           let attemps = 0;
