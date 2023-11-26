@@ -20,14 +20,14 @@ on:
         default: false
         type: boolean
       github-app-id:
-        description: "GitHub App ID to generate GitHub token in place of private-access-token. See https://github.com/tibdex/github-app-token"
+        description: "GitHub App ID to generate GitHub token in place of private-access-token. See https://github.com/actions/create-github-app-token"
         required: false
         type: string
     secrets:
       github-token:
         description: "GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write, workflows: write). See [actions/create-and-merge-pull-request](../../actions/create-and-merge-pull-request)"
       github-app-key:
-        description: "GitHub App private key to generate GitHub token in place of github-token. See https://github.com/tibdex/github-app-token"
+        description: "GitHub App private key to generate GitHub token in place of github-token. See https://github.com/actions/create-github-app-token"
 
 jobs:
   prepare-release:
@@ -189,12 +189,12 @@ jobs:
         with:
           name: changed-files
 
-      - uses: tibdex/github-app-token@v2
+      - uses: actions/create-github-app-token@v1
         if: inputs.github-app-id
         id: generate-token
         with:
-          app_id: ${{ inputs.github-app-id }}
-          private_key: ${{ secrets.github-app-key }}
+          app-id: ${{ inputs.github-app-id }}
+          private-key: ${{ secrets.github-app-key }}
 
       - uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@main
         with:

@@ -29,7 +29,7 @@ jobs:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/generate-dependabot-config.yml@0.10.1
     with:
       # GitHub App ID to generate GitHub token in place of github-token.
-      # See https://github.com/tibdex/github-app-token
+      # See https://github.com/actions/create-github-app-token
       github-app-id: ""
 
     secrets:
@@ -38,7 +38,7 @@ jobs:
       github-token: ""
 
       # GitHub App private key to generate GitHub token in place of github-token.
-      # See https://github.com/tibdex/github-app-token
+      # See https://github.com/actions/create-github-app-token
       github-app-key: ""
 ```
 
@@ -48,7 +48,7 @@ jobs:
 | **Secret**                      | **Description**                                                                                                                                                                                     | **Default**               | **Required** |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------ |
 | **<code>github-token</code>**   | GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See [actions/create-and-merge-pull-request](../../actions/create-and-merge-pull-request) | <code>GITHUB_TOKEN</code> | **false**    |
-| **<code>github-app-key</code>** | GitHub App private key to generate GitHub token in place of <code>github-token</code>. See [https://github.com/tibdex/github-app-token](https://github.com/tibdex/github-app-token)                 | <code></code>             | **false**    |
+| **<code>github-app-key</code>** | GitHub App private key to generate GitHub token in place of <code>github-token</code>. See [https://github.com/actions/create-github-app-token](https://github.com/actions/create-github-app-token) | <code></code>             | **false**    |
 
 <!-- end secrets -->
 <!-- start inputs -->
@@ -56,7 +56,7 @@ jobs:
 | **Inputs**                     | **Description**                                                                                                                                                                                | **Default**                    | **Required** |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------ |
 | **<code>runs-on</code>**       | Json array of runner(s) to use. See [https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job](https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job) | <code>["ubuntu-latest"]</code> | **false**    |
-| **<code>github-app-id</code>** | GitHub App ID to generate GitHub token in place of <code>github-token</code>. See [https://github.com/tibdex/github-app-token](https://github.com/tibdex/github-app-token)                     | <code></code>                  | **false**    |
+| **<code>github-app-id</code>** | GitHub App ID to generate GitHub token in place of <code>github-token</code>. See [https://github.com/actions/create-github-app-token](https://github.com/actions/create-github-app-token)     | <code></code>                  | **false**    |
 
 <!-- end inputs -->
 
