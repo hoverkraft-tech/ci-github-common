@@ -21,14 +21,16 @@ Mainly using [First Interaction Action](https://github.com/actions/first-interac
 <!-- start usage -->
 
 ```yaml
-name: Mark stale issues and pull requests
+name: Greetings
 
 on:
-  schedule:
-    - cron: "30 1 * * *"
+  issues:
+    types: [opened]
+  pull_request_target:
+    branches: [main]
 
 jobs:
-  main:
+  greetings:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/greetings.yml@0.10.1
     secrets:
       # Token for the repository.
