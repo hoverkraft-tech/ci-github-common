@@ -35,6 +35,8 @@ Opinionated GitHub actions and workflows for common continuous integration needs
 
 ### - [Linter](.github/workflows/linter.md)
 
+### - [Need fix to Issue](.github/workflows/need-fix-to-issue.md)
+
 ### - [Release actions](.github/workflows/release-actions.md)
 
 ### - [Semantic pull request](.github/workflows/semantic-pull-request.md)
