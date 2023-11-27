@@ -135,6 +135,7 @@ jobs:
           versioning_enabled: true
           version_prefix: ""
           version_override: ${{ needs.prepare-release.outputs.latest-tag }}
+          branding_as_title_prefix: true
         env:
           INPUT_SHOW_LOGO: "true"
 
