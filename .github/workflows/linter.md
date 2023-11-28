@@ -30,7 +30,7 @@ on:
 
 jobs:
   main:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@0.10.1
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@0.11.0
     secrets:
       # Token for marking the status of linter run in the Checks section.
       # See https://github.com/super-linter/super-linter#how-to-use
