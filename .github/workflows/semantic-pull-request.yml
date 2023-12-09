@@ -15,7 +15,7 @@ on:
       - synchronize
 
   workflow_call:
-    inputs: 
+    inputs:
       runs-on:
         description: "The type of machine to run on. Default: ubuntu-latest"
         required: false
@@ -29,6 +29,10 @@ on:
 permissions:
   contents: write
   pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:

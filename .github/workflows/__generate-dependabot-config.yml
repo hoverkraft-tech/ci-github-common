@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+
 jobs:
   main:
     uses: ./.github/workflows/generate-dependabot-config.yml

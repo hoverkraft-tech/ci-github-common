@@ -27,6 +27,10 @@ on:
     branches: [main]
     tags: ["*"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   release:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/release-actions.yml@0.11.1

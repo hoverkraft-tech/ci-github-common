@@ -24,6 +24,10 @@ on:
       github-app-key:
         description: "GitHub App private key to generate GitHub token in place of github-token. See https://github.com/actions/create-github-app-token"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   generate-dependabot-config:
     name: Generate Dependabot Config
