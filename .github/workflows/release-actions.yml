@@ -139,7 +139,7 @@ jobs:
         env:
           INPUT_SHOW_LOGO: "true"
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: changed-files
           path: ${{ github.workspace }}/**/${{ matrix.action }}/README.md
@@ -168,7 +168,7 @@ jobs:
 
           sed -i "s|${WORKFLOW_FULL_PATH}@.*|${WORKFLOW_FULL_PATH}@${{ needs.prepare-release.outputs.latest-tag }}|g" "${README_FILE}"
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: changed-files
           path: ${{ github.workspace }}/**/${{ steps.generate-readme.outputs.readme-file }}
