@@ -7,6 +7,10 @@ updates:
       interval: weekly
       day: friday
       time: "04:00"
+    groups:
+      docker-dependencies:
+        patterns:
+          - "*"
 
   - package-ecosystem: github-actions
     open-pull-requests-limit: 20
@@ -15,6 +19,10 @@ updates:
       interval: weekly
       day: friday
       time: "04:00"
+    groups:
+      github-actions-dependencies:
+        patterns:
+          - "*"
 
   - package-ecosystem: github-actions
     open-pull-requests-limit: 20
@@ -23,3 +31,7 @@ updates:
       interval: weekly
       day: friday
       time: "04:00"
+    groups:
+      github-actions-dependencies:
+        patterns:
+          - "*"
