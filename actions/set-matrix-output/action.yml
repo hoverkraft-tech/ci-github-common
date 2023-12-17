@@ -58,7 +58,7 @@ runs:
 
           writeFileSync(matrixOutputFile, `${{ inputs.value }}`);
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: ${{ steps.prepare-upload.outputs.artifact-name }}
         path: ${{ steps.prepare-upload.outputs.artifact-path }}
