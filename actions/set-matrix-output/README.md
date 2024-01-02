@@ -9,6 +9,9 @@
 Set matrix ouput in file to be uploaded as artifacts, because GitHub action does not handle job outputs for matrix
 
 <!-- end description -->
+
+The GitHub Actions workflow ensures artifact uniqueness by concatenating the workflow's `run_id`, `run_number`, and a user-provided `artifact-name`. Users can enhance this uniqueness by supplying a distinct `artifact-name` for each run, further ensuring that each artifact is uniquely identified across all runs and workflows. This strategy effectively prevents any clashes or overwrites, maintaining the integrity and traceability of artifacts, especially when multiple workflows are executed concurrently or under similar configurations.
+
 <!-- start contents -->
 <!-- end contents -->
 <!-- start usage -->
@@ -34,7 +37,7 @@ Set matrix ouput in file to be uploaded as artifacts, because GitHub action does
 <!-- end inputs -->
 <!-- start outputs -->
 
-| \***\*Output\*\***         | \***\*Description\*\***                        | \***\*Default\*\*** | \***\*Required\*\*** |
+| **Output**         | **Description**                        | **Default** | **Required** |
 | -------------------------- | ---------------------------------------------- | ------------------- | -------------------- |
 | <code>artifact-name</code> | The real unique name of the uploaded artifact. | undefined           | undefined            |
 
