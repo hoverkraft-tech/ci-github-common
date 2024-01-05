@@ -4,8 +4,8 @@ on:
   workflow_call:
 
 jobs:
-  tests:
-    name: Tests for set/get matrix outputs
+  tests-1:
+    name: Arrange - Set first output
     strategy:
       matrix:
         os:
@@ -15,24 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - id: set-matrix-output-1
+      - id: set-matrix-output
         uses: ./actions/set-matrix-output
         with:
           value: |
             { "test": "test content 1" }
-          artifact-name: "test-matrix-outputs-${{ matrix.os }}"
-
-      - id: set-matrix-output-2
-        uses: ./actions/set-matrix-output
-        with:
-          value: ""
-          artifact-name: "test-matrix-outputs-${{ matrix.os }}"
-
-      - id: set-matrix-output-3
-        uses: ./actions/set-matrix-output
-        with:
-          value: |
-            { "test": "test content 2" }
           artifact-name: "test-matrix-outputs-${{ matrix.os }}"
 
       - name: Check set matrix outputs
@@ -40,20 +27,55 @@ jobs:
         run: |
           EXPECTED_ARTIFACT_NAME="$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER-test-matrix-outputs-${{ matrix.os }}"
 
-          if [ "${{ steps.set-matrix-output-1.outputs.artifact-name }}" != "$EXPECTED_ARTIFACT_NAME" ]; then
+          if [ "${{ steps.set-matrix-output.outputs.artifact-name }}" != "$EXPECTED_ARTIFACT_NAME" ]; then
             echo "Set matrix output 1 result is not valid"
             exit 1
           fi
 
-          if [ "${{ steps.set-matrix-output-2.outputs.artifact-name }}" != "$EXPECTED_ARTIFACT_NAME" ]; then
-            echo "Set matrix output 2 result is not valid"
-            exit 1
-          fi
+  tests-2:
+    name: Arrange - Set empty output
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
 
-          if [ "${{ steps.set-matrix-output-3.outputs.artifact-name }}" != "$EXPECTED_ARTIFACT_NAME" ]; then
-            echo "Set matrix output 3 result is not valid"
-            exit 1
-          fi
+      - uses: ./actions/set-matrix-output
+        with:
+          value: ""
+          artifact-name: "test-matrix-outputs-${{ matrix.os }}"
+
+  tests-3:
+    name: Arrange - Set third output
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./actions/set-matrix-output
+        with:
+          value: |
+            { "test": "test content 3" }
+          artifact-name: "test-matrix-outputs-${{ matrix.os }}"
+
+  assert:
+    needs: [tests-1, tests-2, tests-3]
+    name: Assert - Check outputs
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
 
       - id: get-matrix-outputs
         uses: ./actions/get-matrix-outputs
@@ -65,7 +87,14 @@ jobs:
         run: |
           OUTPUT_RESULT='${{ steps.get-matrix-outputs.outputs.result }}'
 
-          if [ "$OUTPUT_RESULT"  != '[{ "test": "test content 1" },{ "test": "test content 2" }]' ]; then
+          # Output result must be a json array of 2 entries
+          if [ "$(echo "$OUTPUT_RESULT" | jq -e '. | length')" != "2" ]; then
+            echo "Get matrix outputs result is not valid"
+            exit 1
+          fi
+
+          # Output result must contain the first and third entries
+          if [ "$(echo "$OUTPUT_RESULT" | jq -e '. | map(.test) | sort')" != '["test content 1","test content 3"]' ]; then
             echo "Get matrix outputs result is not valid"
             exit 1
           fi
