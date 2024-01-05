@@ -34,31 +34,19 @@ runs:
           const artifactName = `${{ github.run_id }}-${{ github.run_number }}-${{ inputs.artifact-name }}`;
           core.setOutput("artifact-name", artifactName);
 
-          const artifactPath = join("/tmp",artifactName);
+          const uniquid = randomUUID();
+          const timestamp = Date.now();
+          const artifactUniqueName = `${artifactName}-${timestamp}-${uniquid}`;
+          core.setOutput("artifact-unique-name", artifactUniqueName);
+
+          const artifactDirPath = join("/tmp",artifactUniqueName);
+          await io.mkdirP(artifactDirPath);
+
+          const artifactPath = join(artifactDirPath, `${artifactUniqueName}.json`);
           core.setOutput("artifact-path", artifactPath);
-          await io.mkdirP(artifactPath);
+          writeFileSync(artifactPath, `${{ inputs.value }}`);
 
-          const maxAttempts = 10;
-          let matrixOutputFile = '';
-          for (let i = 1; i <= maxAttempts; i++) {
-            const uniquid = randomUUID();
-            const timestamp = Date.now();
-            const matrixOutputFileName = `${timestamp}-${artifactName}-${uniquid}.json`;
-
-            matrixOutputFile = join(artifactPath, matrixOutputFileName);
-            if (!existsSync(matrixOutputFile)) {
-              break;
-            }
-            matrixOutputFile = '';
-          }
-
-          if (!matrixOutputFile) {
-            core.setFailed(`Failed to find unique file name after ${maxAttempts} attempts`);
-          }
-
-          writeFileSync(matrixOutputFile, `${{ inputs.value }}`);
-
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
-        name: ${{ steps.prepare-upload.outputs.artifact-name }}
+        name: ${{ steps.prepare-upload.outputs.artifact-unique-name }}
         path: ${{ steps.prepare-upload.outputs.artifact-path }}
