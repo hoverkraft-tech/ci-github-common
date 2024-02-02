@@ -1,0 +1,21 @@
+name: Internal - Tests for repository-owner-is-organization action
+
+on:
+  workflow_call:
+
+jobs:
+  tests:
+    name: Tests for repository-owner-is-organization action
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: repository-owner-is-organization
+        uses: ./actions/repository-owner-is-organization
+
+      - name: Check repository-owner-is-organization outputs
+        run: |
+          if [ "${{ steps.repository-owner-is-organization.outputs.is-organization }}" != 'true' ]; then
+            echo "repository-owner-is-organization outputs result is not valid"
+            exit 1
+          fi

@@ -1,0 +1,31 @@
+name: "Repository owner is organization"
+description: "Action to check if the repository owner is an organization."
+author: Hoverkraft
+branding:
+  icon: users
+  color: gray-dark
+
+inputs:
+  github-token:
+    description: "GitHub token for fetching users API."
+    default: ${{ github.token }}
+    required: false
+
+outputs:
+  is-organization:
+    description: "The boolean value indicating if the repository owner is an organization."
+    value: "${{ steps.check-org.outputs.is-organization }}"
+
+runs:
+  using: "composite"
+  steps:
+    - id: check-org
+      run: |
+        OWNER_TYPE=$(curl -s -H "Authorization: token ${{ inputs.github-token }}" \
+        "https://api.github.com/users/${{ github.repository_owner }}" | jq -r .type)
+
+        if [ "$OWNER_TYPE" = "Organization" ]; then
+          echo "is-organization=true" >> "$GITHUB_OUTPUT"
+        fi
+
+      shell: bash

@@ -11,6 +11,10 @@ jobs:
     needs: linter
     uses: ./.github/workflows/__test-action-matrix-outputs.yml
 
+  test-action-repository-owner-is-organization:
+    needs: linter
+    uses: ./.github/workflows/__test-action-repository-owner-is-organization.yml
+
   test-action-slugify:
     needs: linter
     uses: ./.github/workflows/__test-action-slugify.yml
