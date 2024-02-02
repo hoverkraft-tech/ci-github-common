@@ -92,6 +92,17 @@ updates:
           - '*'
   - package-ecosystem: github-actions
     open-pull-requests-limit: 20
+    directory: /actions/repository-owner-is-organization
+    schedule:
+      interval: weekly
+      day: friday
+      time: '04:00'
+    groups:
+      github-actions-dependencies:
+        patterns:
+          - '*'
+  - package-ecosystem: github-actions
+    open-pull-requests-limit: 20
     directory: /actions/set-matrix-output
     schedule:
       interval: weekly
