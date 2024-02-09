@@ -13,7 +13,7 @@ inputs:
     description: "The name of the artifact to download."
     required: true
   remove-artifact:
-    description: "Define weather to remove the downloaded artifact after reading."
+    description: "Define weather to remove the downloaded artifact after reading. Requires token input."
     required: false
     default: "true"
   token:
