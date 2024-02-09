@@ -94,7 +94,7 @@ jobs:
           fi
 
           # Output result must contain the first and third entries
-          if [ "$(echo "$OUTPUT_RESULT" | jq -e '. | map(.test) | sort')" != '["test content 1","test content 3"]' ]; then
+          if [ "$(echo "$OUTPUT_RESULT" | jq -ce '. | sort')" != '[{"test":"test content 1"},{"test":"test content 3"}]' ]; then
             echo "Get matrix outputs result is not valid"
             exit 1
           fi
