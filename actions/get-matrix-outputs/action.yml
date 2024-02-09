@@ -34,7 +34,7 @@ runs:
         ARTIFACT_PATH="/tmp/$ARTIFACT_NAME"
         echo "artifact-path=$ARTIFACT_PATH" >> "$GITHUB_OUTPUT"
 
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
       with:
         name: ${{ steps.prepare-download.outputs.artifact-name }}
         path: ${{ steps.prepare-download.outputs.artifact-path }}
@@ -64,6 +64,6 @@ runs:
           }
 
     - if: ${{ inputs.remove-artifact == 'true' }}
-      uses: geekyeggo/delete-artifact@v2
+      uses: geekyeggo/delete-artifact@v4
       with:
         name: ${{ steps.prepare-download.outputs.artifact-name }}
