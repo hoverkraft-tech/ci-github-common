@@ -1,6 +1,9 @@
 <!-- start branding -->
 <!-- end branding -->
 <!-- start title -->
+
+# GitHub Action: Get Issue Number
+
 <!-- end title -->
 <!-- start badges -->
 <!-- end badges -->

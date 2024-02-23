@@ -1,6 +1,9 @@
 <!-- start branding -->
 <!-- end branding -->
 <!-- start title -->
+
+# GitHub Action: Slugify
+
 <!-- end title -->
 <!-- start badges -->
 <!-- end badges -->

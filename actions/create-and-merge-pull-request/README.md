@@ -1,6 +1,9 @@
 <!-- start branding -->
 <!-- end branding -->
 <!-- start title -->
+
+# GitHub Action: Create and Merge Pull Request
+
 <!-- end title -->
 <!-- start badges -->
 <!-- end badges -->

@@ -1,6 +1,9 @@
 <!-- start branding -->
 <!-- end branding -->
 <!-- start title -->
+
+# GitHub Action: Create or Update Comment
+
 <!-- end title -->
 <!-- start badges -->
 <!-- end badges -->
