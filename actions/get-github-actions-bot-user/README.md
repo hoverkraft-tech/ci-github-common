@@ -1,6 +1,9 @@
 <!-- start branding -->
 <!-- end branding -->
 <!-- start title -->
+
+# GitHub Action: Get GitHub Actions Bot User
+
 <!-- end title -->
 <!-- start badges -->
 <!-- end badges -->

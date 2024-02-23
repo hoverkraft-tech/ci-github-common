@@ -9,7 +9,7 @@
 <!-- end badges -->
 <!-- start description -->
 
-Reusable workflow that performs linting on the code base.
+Reusable workflow that performs linting on the codebase.
 Mainly using [Super-Linter](https://github.com/super-linter/super-linter), with some opinionated defaults.
 
 <!-- end description -->
