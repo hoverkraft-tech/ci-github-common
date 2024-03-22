@@ -13,13 +13,9 @@ inputs:
     description: "The name of the artifact to download."
     required: true
   remove-artifact:
-    description: "Define weather to remove the downloaded artifact after reading. Requires token input."
+    description: "Define weather to remove the downloaded artifact after reading."
     required: false
     default: "true"
-  token:
-    description: GitHub token with read and write access to actions for the repository.
-    default: ${{ github.token }}
-    required: false
 outputs:
   result:
     description: "The matrix combined JSON outputs."
@@ -69,7 +65,6 @@ runs:
           }
 
     - if: ${{ inputs.remove-artifact == 'true' }}
-      uses: geekyeggo/delete-artifact@v4
+      uses: geekyeggo/delete-artifact@v5
       with:
-        token: ${{ inputs.token }}
         name: ${{ steps.prepare-download.outputs.artifact-name }}-*
