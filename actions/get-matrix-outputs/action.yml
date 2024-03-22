@@ -69,7 +69,7 @@ runs:
           }
 
     - if: ${{ inputs.remove-artifact == 'true' }}
-      uses: geekyeggo/delete-artifact@v4
+      uses: geekyeggo/delete-artifact@v5
       with:
         token: ${{ inputs.token }}
         name: ${{ steps.prepare-download.outputs.artifact-name }}-*
