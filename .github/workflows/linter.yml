@@ -13,9 +13,14 @@ on:
         type: string
         default: '["ubuntu-latest"]'
         required: false
+      linter-env:
+        description: 'Environment variables in multilines format "key=value" to pass to the linter. See https://github.com/super-linter/super-linter.'
+        type: string
+        required: false
+
     secrets:
       github-token:
-        description: 'Token for marking the status of linter run in the Checks section. See https://github.com/super-linter/super-linter#how-to-use'
+        description: "Token for marking the status of linter run in the Checks section. See https://github.com/super-linter/super-linter#how-to-use"
 
 jobs:
   checks:
@@ -25,6 +30,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - if: ${{ inputs.linter-env }}
+        run: |
+          LINTER_ENV=$(cat <<EOF
+          ${{ inputs.linter-env }}
+          EOF
+          )
+
+          echo "$LINTER_ENV" | while IFS= read -r line; do
+            if [ -z "$line" ]; then continue; fi
+            echo "$line" >> "$GITHUB_ENV"
+          done
 
       - name: 👕 Lint Code Base
         uses: super-linter/super-linter/slim@v5
