@@ -3,6 +3,9 @@ name: Internal - Tests for repository-owner-is-organization action
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   tests:
     name: Tests for repository-owner-is-organization action

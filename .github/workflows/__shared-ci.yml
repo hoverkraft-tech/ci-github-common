@@ -3,6 +3,11 @@ name: Internal - Common Continuous Integration tasks
 on:
   workflow_call:
 
+permissions:
+  contents: read
+  packages: read
+  statuses: write
+
 jobs:
   linter:
     uses: ./.github/workflows/linter.yml
