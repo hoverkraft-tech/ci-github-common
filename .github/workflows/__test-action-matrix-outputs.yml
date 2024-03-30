@@ -3,6 +3,9 @@ name: Internal - Tests for set/get matrix outputs
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   tests-1:
     name: Arrange - Set first output

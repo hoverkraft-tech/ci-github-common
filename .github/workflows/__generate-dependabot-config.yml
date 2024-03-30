@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   main:
     uses: ./.github/workflows/generate-dependabot-config.yml

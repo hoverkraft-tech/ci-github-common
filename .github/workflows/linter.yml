@@ -17,6 +17,11 @@ on:
       github-token:
         description: 'Token for marking the status of linter run in the Checks section. See https://github.com/super-linter/super-linter#how-to-use'
 
+permissions:
+  contents: read
+  packages: read
+  statuses: write
+
 jobs:
   checks:
     runs-on: ${{ fromJson(inputs.runs-on) }}
@@ -27,7 +32,7 @@ jobs:
           fetch-depth: 0
 
       - name: 👕 Lint Code Base
-        uses: super-linter/super-linter/slim@v5
+        uses: super-linter/super-linter/slim@v6
         env:
           VALIDATE_ALL_CODEBASE: false
           LOG_LEVEL: WARN

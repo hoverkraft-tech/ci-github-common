@@ -29,6 +29,9 @@ on:
       github-app-key:
         description: "GitHub App private key to generate GitHub token in place of github-token. See https://github.com/actions/create-github-app-token"
 
+permissions:
+  contents: read
+
 jobs:
   prepare-release:
     runs-on: ${{ fromJson(inputs.runs-on) }}
@@ -47,7 +50,7 @@ jobs:
 
       - id: changed-files
         if: ${{ inputs.update-all == false }}
-        uses: tj-actions/changed-files@v42.0.2
+        uses: tj-actions/changed-files@v44.0.0
         with:
           files: |
             ./actions/*

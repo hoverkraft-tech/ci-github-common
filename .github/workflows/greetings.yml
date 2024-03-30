@@ -32,6 +32,11 @@ on:
       github-token:
         description: "Token for the repository. See https://github.com/actions/first-interaction#usage"
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   greeting:
     runs-on: ${{ inputs.runs-on && fromJson(inputs.runs-on) || 'ubuntu-latest' }}

@@ -3,6 +3,9 @@ name: Internal - Tests for slugify action
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   tests:
     name: Tests for slugify action
