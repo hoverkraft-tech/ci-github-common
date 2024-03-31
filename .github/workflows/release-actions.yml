@@ -125,8 +125,35 @@ jobs:
       fail-fast: false
       matrix:
         action: ${{ fromJson(needs.prepare-release.outputs.changed-actions) }}
+    # FIXME: This is a workaround for having workflow ref. See https://github.com/orgs/community/discussions/38659
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
+      
+      # FIXME: This is a workaround for having workflow ref. See https://github.com/orgs/community/discussions/38659
+      # jscpd:ignore-start
+      - id: oidc
+        uses: ChristopherHX/oidc@v3
+      - uses: actions/checkout@v4 # checks out called workflow
+        with:
+          path: ./self-workflow
+          repository: ${{ steps.oidc.outputs.job_workflow_repo_name_and_owner }}
+          ref: ${{ steps.oidc.outputs.job_workflow_repo_ref }}
+      # jscpd:ignore-end
+
+      - id: action-slug
+        uses: ./self-workflow/actions/slugify
+        with:
+          value: ${{ matrix.action }}
+
+      - run: |
+          jq '.paths.action = "${{ matrix.action }}/action.yml"' .ghadocs.json > .ghadocs.json.tmp
+          mv .ghadocs.json.tmp .ghadocs.json
+
+          jq '.paths.readme = "${{ matrix.action }}/README.md"' .ghadocs.json > .ghadocs.json.tmp
+          mv .ghadocs.json.tmp .ghadocs.json
 
       - name: 📖 Generate README
         uses: bitflight-devops/github-action-readme-generator@v1.8.0
@@ -144,7 +171,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: changed-files
+          name: changed-files-${{ steps.action-slug.outputs.result }}
           path: ${{ github.workspace }}/**/${{ matrix.action }}/README.md
 
   generate-workflows-readme:
@@ -155,8 +182,28 @@ jobs:
       fail-fast: false
       matrix:
         workflow: ${{ fromJson(needs.prepare-release.outputs.changed-workflows) }}
+    # FIXME: This is a workaround for having workflow ref. See https://github.com/orgs/community/discussions/38659
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
+
+      # FIXME: This is a workaround for having workflow ref. See https://github.com/orgs/community/discussions/38659
+      # jscpd:ignore-start
+      - id: oidc
+        uses: ChristopherHX/oidc@v3
+      - uses: actions/checkout@v4 # checks out called workflow
+        with:
+          path: ./self-workflow
+          repository: ${{ steps.oidc.outputs.job_workflow_repo_name_and_owner }}
+          ref: ${{ steps.oidc.outputs.job_workflow_repo_ref }}
+      # jscpd:ignore-end
+
+      - id: workflow-slug
+        uses: ./self-workflow/actions/slugify
+        with:
+          value: ${{ matrix.workflow }}
 
       - name: 📖 Generate README
         id: generate-readme
@@ -173,7 +220,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: changed-files
+          name: changed-files-${{ steps.workflow-slug.outputs.result }}
           path: ${{ github.workspace }}/**/${{ steps.generate-readme.outputs.readme-file }}
 
   publish-actions-readme:
@@ -191,7 +238,8 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: changed-files
+          pattern: changed-files-*
+          merge-multiple: true
 
       - uses: actions/create-github-app-token@v1
         if: inputs.github-app-id
