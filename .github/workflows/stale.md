@@ -24,6 +24,10 @@ on:
   schedule:
     - cron: "30 1 * * *"
 
+permissions:
+  issues: write
+  pull-requests: write
+
 jobs:
   main:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/stale.yml@0.13.0

@@ -28,6 +28,11 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  packages: read
+  statuses: write
+
 jobs:
   main:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@0.13.0

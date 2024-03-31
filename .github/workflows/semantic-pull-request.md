@@ -30,6 +30,10 @@ on:
       - edited
       - synchronize
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   main:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@0.13.0

@@ -26,12 +26,17 @@ on:
       - main
   workflow_dispatch:
     inputs:
+      #checkov:skip=CKV_GHA_7: required
       manual-commit-ref:
         description: "The SHA of the commit to get the diff for"
         required: true
       manual-base-ref:
         description: "By default, the commit entered above is compared to the one directly before it; to go back further, enter an earlier SHA here"
         required: false
+
+permissions:
+  contents: read
+  issues: write
 
 jobs:
   main:

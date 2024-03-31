@@ -24,6 +24,10 @@ on:
   push:
     branches:
       - main
+
+permissions:
+  contents: read
+
 jobs:
   main:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/generate-dependabot-config.yml@0.13.0

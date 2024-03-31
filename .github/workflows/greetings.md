@@ -29,6 +29,11 @@ on:
   pull_request_target:
     branches: [main]
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   greetings:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/greetings.yml@0.13.0
