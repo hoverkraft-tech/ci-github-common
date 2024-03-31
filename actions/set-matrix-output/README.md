@@ -1,11 +1,17 @@
 <!-- start branding -->
+
+<img src=".github/ghadocs/branding.svg" width="15%" align="center" alt="branding<icon:upload-cloud color:gray-dark>" />
+
 <!-- end branding -->
 <!-- start title -->
 
-# GitHub Action: Set Matrix Output
+# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:upload-cloud color:gray-dark>" /> GitHub Action: Set matrix ouput
 
 <!-- end title -->
 <!-- start badges -->
+
+<a href="https%3A%2F%2Fgithub.com%2F%2Fci-github-common%2Factions%2Fset-matrix-output%2Freleases%2Flatest"><img src="https://img.shields.io/github/v/release//ci-github-common/actions/set-matrix-output?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20tag" /></a><a href="https%3A%2F%2Fgithub.com%2F%2Fci-github-common%2Factions%2Fset-matrix-output%2Freleases%2Flatest"><img src="https://img.shields.io/github/release-date//ci-github-common/actions/set-matrix-output?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20date" /></a><img src="https://img.shields.io/github/last-commit//ci-github-common/actions/set-matrix-output?logo=github&style=flat-square" alt="Commit" /><a href="https%3A%2F%2Fgithub.com%2F%2Fci-github-common%2Factions%2Fset-matrix-output%2Fissues"><img src="https://img.shields.io/github/issues//ci-github-common/actions/set-matrix-output?logo=github&style=flat-square" alt="Open%20Issues" /></a><img src="https://img.shields.io/github/downloads//ci-github-common/actions/set-matrix-output/total?logo=github&style=flat-square" alt="Downloads" />
+
 <!-- end badges -->
 <!-- start description -->
 
@@ -22,29 +28,31 @@ This strategy effectively prevents any clashes or overwrites, maintaining the in
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/set-matrix-output@v0.7.5
+- uses: /ci-github-common/actions/set-matrix-output@0.12.1
   with:
-    # The matrix output to set.
+    # Description: The matrix output to set.
+    #
     value: ""
 
-    # The name of the artifact to upload.
+    # Description: The name of the artifact to upload.
+    #
     artifact-name: ""
 ```
 
 <!-- end usage -->
 <!-- start inputs -->
 
-| **Input**                      | **Description**                     | **Default** | **Required** |
-| ------------------------------ | ----------------------------------- | ----------- | ------------ |
-| **<code>value</code>**         | The matrix output to set.           |             | **true**     |
-| **<code>artifact-name</code>** | The name of the artifact to upload. |             | **true**     |
+| **Input**                  | **Description**                     | **Default** | **Required** |
+| -------------------------- | ----------------------------------- | ----------- | ------------ |
+| <code>value</code>         | The matrix output to set.           |             | **true**     |
+| <code>artifact-name</code> | The name of the artifact to upload. |             | **true**     |
 
 <!-- end inputs -->
 <!-- start outputs -->
 
-| **Output**                 | **Description**                                | **Default** | **Required** |
-| -------------------------- | ---------------------------------------------- | ----------- | ------------ |
-| <code>artifact-name</code> | The real unique name of the uploaded artifact. | undefined   | undefined    |
+| **Output**                 | **Description**                                |
+| -------------------------- | ---------------------------------------------- |
+| <code>artifact-name</code> | The real unique name of the uploaded artifact. |
 
 <!-- end outputs -->
 <!-- start [.github/ghadocs/examples/] -->

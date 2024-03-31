@@ -1,11 +1,17 @@
 <!-- start branding -->
+
+<img src=".github/ghadocs/branding.svg" width="15%" align="center" alt="branding<icon:git-branch color:gray-dark>" />
+
 <!-- end branding -->
 <!-- start title -->
 
-# GitHub Action: Checkout
+# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:git-branch color:gray-dark>" /> GitHub Action: Checkout
 
 <!-- end title -->
 <!-- start badges -->
+
+<a href="https%3A%2F%2Fgithub.com%2F%2Fci-github-common%2Factions%2Fcheckout%2Freleases%2Flatest"><img src="https://img.shields.io/github/v/release//ci-github-common/actions/checkout?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20tag" /></a><a href="https%3A%2F%2Fgithub.com%2F%2Fci-github-common%2Factions%2Fcheckout%2Freleases%2Flatest"><img src="https://img.shields.io/github/release-date//ci-github-common/actions/checkout?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20date" /></a><img src="https://img.shields.io/github/last-commit//ci-github-common/actions/checkout?logo=github&style=flat-square" alt="Commit" /><a href="https%3A%2F%2Fgithub.com%2F%2Fci-github-common%2Factions%2Fcheckout%2Fissues"><img src="https://img.shields.io/github/issues//ci-github-common/actions/checkout?logo=github&style=flat-square" alt="Open%20Issues" /></a><img src="https://img.shields.io/github/downloads//ci-github-common/actions/checkout/total?logo=github&style=flat-square" alt="Downloads" />
+
 <!-- end badges -->
 <!-- start description -->
 
@@ -27,14 +33,18 @@ permissions:
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/checkout@v0.7.5
+- uses: /ci-github-common/actions/checkout@0.12.1
   with:
-    # Number of commits to fetch. 0 indicates all history for all branches and tags.
-    # See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)
+    # Description: Number of commits to fetch. 0 indicates all history for all
+    # branches and tags. See
+    # [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)
+    #
     # Default: 1
     fetch-depth: ""
 
-    # Whether to download Git-LFS files. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)
+    # Description: Whether to download Git-LFS files. See
+    # [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)
+    #
     # Default: false
     lfs: ""
 ```
@@ -42,10 +52,10 @@ permissions:
 <!-- end usage -->
 <!-- start inputs -->
 
-| **Input**                    | **Description**                                                                                                                                                           | **Default**    | **Required** |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------ |
-| **<code>fetch-depth</code>** | Number of commits to fetch. 0 indicates all history for all branches and tags. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage) | <code>1</code> | **false**    |
-| **<code>lfs</code>**         | Whether to download Git-LFS files. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)                                             |                | **false**    |
+| **Input**                | **Description**                                                                                                                                                           | **Default**    | **Required** |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------ |
+| <code>fetch-depth</code> | Number of commits to fetch. 0 indicates all history for all branches and tags. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage) | <code>1</code> | **false**    |
+| <code>lfs</code>         | Whether to download Git-LFS files. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)                                             |                | **false**    |
 
 <!-- end inputs -->
 <!-- start outputs -->
