@@ -156,7 +156,7 @@ jobs:
           jq '.paths.readme = "${{ matrix.action }}/README.md"' .ghadocs.json > .ghadocs.json.tmp
           mv .ghadocs.json.tmp .ghadocs.json
 
-          WORKSPACE_PATH=$(echo "${{ github.workspace }}" | sed 's/\/\([^/]\+\)/*\1/')
+          WORKSPACE_PATH=$(echo "${{ github.workspace }}" | sed 's/\/\([^/]\+\)/\/*\1/')
           echo "readme-file=${WORKSPACE_PATH}/${{ matrix.action }}/README.md" >> "$GITHUB_OUTPUT"
 
       - name: 📖 Generate README
@@ -164,7 +164,7 @@ jobs:
         with:
           action: ${{ matrix.action }}/action.yml
           readme: ${{ matrix.action }}/README.md
-          owner: ${{ github.event.repository.owner }}
+          owner: ${{ github.repository_owner }}
           repo: ${{ github.event.repository.name }}
           pretty: true
           versioning_enabled: true
