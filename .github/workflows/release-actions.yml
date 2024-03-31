@@ -160,7 +160,8 @@ jobs:
         with:
           action: ${{ matrix.action }}/action.yml
           readme: ${{ matrix.action }}/README.md
-          repo: ${{ github.event.repository.name }}/${{ matrix.action }}
+          owner: ${{ github.event.repository.owner }}
+          repo: ${{ github.event.repository.name }}
           pretty: true
           versioning_enabled: true
           version_prefix: ""
@@ -172,7 +173,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: changed-files-${{ steps.action-slug.outputs.result }}
-          path: ${{ github.workspace }}/**/${{ matrix.action }}/README.md
+          path: ${{ github.workspace }}*/${{ matrix.action }}/README.md
 
   generate-workflows-readme:
     needs: prepare-release
@@ -221,7 +222,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: changed-files-${{ steps.workflow-slug.outputs.result }}
-          path: ${{ github.workspace }}/**/${{ steps.generate-readme.outputs.readme-file }}
+          path: ${{ github.workspace }}*/${{ steps.generate-readme.outputs.readme-file }}
 
   publish-actions-readme:
     needs: [prepare-release, generate-actions-readme, generate-workflows-readme]
