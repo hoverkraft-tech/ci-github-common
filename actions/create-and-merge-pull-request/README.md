@@ -10,7 +10,7 @@
 <!-- end title -->
 <!-- start badges -->
 
-<a href="https%3A%2F%2Fgithub.com%2F%2Fci-github-common%2Factions%2Fcreate-and-merge-pull-request%2Freleases%2Flatest"><img src="https://img.shields.io/github/v/release//ci-github-common/actions/create-and-merge-pull-request?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20tag" /></a><a href="https%3A%2F%2Fgithub.com%2F%2Fci-github-common%2Factions%2Fcreate-and-merge-pull-request%2Freleases%2Flatest"><img src="https://img.shields.io/github/release-date//ci-github-common/actions/create-and-merge-pull-request?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20date" /></a><img src="https://img.shields.io/github/last-commit//ci-github-common/actions/create-and-merge-pull-request?logo=github&style=flat-square" alt="Commit" /><a href="https%3A%2F%2Fgithub.com%2F%2Fci-github-common%2Factions%2Fcreate-and-merge-pull-request%2Fissues"><img src="https://img.shields.io/github/issues//ci-github-common/actions/create-and-merge-pull-request?logo=github&style=flat-square" alt="Open%20Issues" /></a><img src="https://img.shields.io/github/downloads//ci-github-common/actions/create-and-merge-pull-request/total?logo=github&style=flat-square" alt="Downloads" />
+<a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Freleases%2Flatest"><img src="https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20tag" /></a><a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Freleases%2Flatest"><img src="https://img.shields.io/github/release-date/hoverkraft-tech/ci-github-common?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20date" /></a><img src="https://img.shields.io/github/last-commit/hoverkraft-tech/ci-github-common?logo=github&style=flat-square" alt="Commit" /><a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Fissues"><img src="https://img.shields.io/github/issues/hoverkraft-tech/ci-github-common?logo=github&style=flat-square" alt="Open%20Issues" /></a><img src="https://img.shields.io/github/downloads/hoverkraft-tech/ci-github-common/total?logo=github&style=flat-square" alt="Downloads" />
 
 <!-- end badges -->
 <!-- start description -->
@@ -27,7 +27,7 @@ Allow GitHub Actions to create and approve pull requests](https://docs.github.co
 <!-- start usage -->
 
 ```yaml
-- uses: /ci-github-common/actions/create-and-merge-pull-request@0.12.1
+- uses: hoverkraft-tech/ci-github-common@0.13.0
   with:
     # Description: GitHub token for creating and merging pull request (permissions
     # contents: write and pull-requests: write). See

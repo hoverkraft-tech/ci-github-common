@@ -10,7 +10,7 @@
 <!-- end title -->
 <!-- start badges -->
 
-<a href="https%3A%2F%2Fgithub.com%2F%2Fci-github-common%2Factions%2Fset-matrix-output%2Freleases%2Flatest"><img src="https://img.shields.io/github/v/release//ci-github-common/actions/set-matrix-output?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20tag" /></a><a href="https%3A%2F%2Fgithub.com%2F%2Fci-github-common%2Factions%2Fset-matrix-output%2Freleases%2Flatest"><img src="https://img.shields.io/github/release-date//ci-github-common/actions/set-matrix-output?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20date" /></a><img src="https://img.shields.io/github/last-commit//ci-github-common/actions/set-matrix-output?logo=github&style=flat-square" alt="Commit" /><a href="https%3A%2F%2Fgithub.com%2F%2Fci-github-common%2Factions%2Fset-matrix-output%2Fissues"><img src="https://img.shields.io/github/issues//ci-github-common/actions/set-matrix-output?logo=github&style=flat-square" alt="Open%20Issues" /></a><img src="https://img.shields.io/github/downloads//ci-github-common/actions/set-matrix-output/total?logo=github&style=flat-square" alt="Downloads" />
+<a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Freleases%2Flatest"><img src="https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20tag" /></a><a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Freleases%2Flatest"><img src="https://img.shields.io/github/release-date/hoverkraft-tech/ci-github-common?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20date" /></a><img src="https://img.shields.io/github/last-commit/hoverkraft-tech/ci-github-common?logo=github&style=flat-square" alt="Commit" /><a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Fissues"><img src="https://img.shields.io/github/issues/hoverkraft-tech/ci-github-common?logo=github&style=flat-square" alt="Open%20Issues" /></a><img src="https://img.shields.io/github/downloads/hoverkraft-tech/ci-github-common/total?logo=github&style=flat-square" alt="Downloads" />
 
 <!-- end badges -->
 <!-- start description -->
@@ -28,7 +28,7 @@ This strategy effectively prevents any clashes or overwrites, maintaining the in
 <!-- start usage -->
 
 ```yaml
-- uses: /ci-github-common/actions/set-matrix-output@0.12.1
+- uses: hoverkraft-tech/ci-github-common@0.13.0
   with:
     # Description: The matrix output to set.
     #
