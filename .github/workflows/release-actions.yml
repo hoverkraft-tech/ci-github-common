@@ -148,12 +148,16 @@ jobs:
         with:
           value: ${{ matrix.action }}
 
-      - run: |
+      - id: prepare-readme-generator
+        run: |
           jq '.paths.action = "${{ matrix.action }}/action.yml"' .ghadocs.json > .ghadocs.json.tmp
           mv .ghadocs.json.tmp .ghadocs.json
 
           jq '.paths.readme = "${{ matrix.action }}/README.md"' .ghadocs.json > .ghadocs.json.tmp
           mv .ghadocs.json.tmp .ghadocs.json
+
+          WORKSPACE_PATH=$(echo "${{ github.workspace }}" | sed 's/\/\([^/]\+\)/*\1/')
+          echo "readme-file=${WORKSPACE_PATH}/${{ matrix.action }}/README.md" >> "$GITHUB_OUTPUT"
 
       - name: 📖 Generate README
         uses: bitflight-devops/github-action-readme-generator@v1.8.0
@@ -173,7 +177,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: changed-files-${{ steps.action-slug.outputs.result }}
-          path: ${{ github.workspace }}*/${{ matrix.action }}/README.md
+          path: ${{ steps.prepare-readme-generator.outputs.readme-file }}
 
   generate-workflows-readme:
     needs: prepare-release
@@ -208,21 +212,21 @@ jobs:
 
       - name: 📖 Generate README
         id: generate-readme
-        run:
+        run: |
           # Readme file is same name but without yml by .md extension
           WORKFLOW_FILE="${{ matrix.workflow }}"
           README_FILE="${WORKFLOW_FILE%.*}.md"
 
-          echo "readme-file=${README_FILE}" >> "$GITHUB_OUTPUT"
+          WORKSPACE_PATH=$(echo "${{ github.workspace }}" | sed 's/\/\([^/]\+\)/\/*\1/')
+          echo "readme-file=${WORKSPACE_PATH}/${README_FILE}" >> "$GITHUB_OUTPUT"
 
           WORKFLOW_FULL_PATH="${{ github.repository }}/${WORKFLOW_FILE}"
-
           sed -i "s|${WORKFLOW_FULL_PATH}@.*|${WORKFLOW_FULL_PATH}@${{ needs.prepare-release.outputs.latest-tag }}|g" "${README_FILE}"
 
       - uses: actions/upload-artifact@v4
         with:
           name: changed-files-${{ steps.workflow-slug.outputs.result }}
-          path: ${{ github.workspace }}*/${{ steps.generate-readme.outputs.readme-file }}
+          path: ${{ steps.generate-readme.outputs.readme-file }}
 
   publish-actions-readme:
     needs: [prepare-release, generate-actions-readme, generate-workflows-readme]
@@ -241,6 +245,7 @@ jobs:
         with:
           pattern: changed-files-*
           merge-multiple: true
+          path: /
 
       - uses: actions/create-github-app-token@v1
         if: inputs.github-app-id
