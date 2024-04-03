@@ -30,7 +30,9 @@ on:
         description: "GitHub App private key to generate GitHub token in place of github-token. See https://github.com/actions/create-github-app-token"
 
 permissions:
-  contents: read
+  actions: write
+  contents: write
+  pull-requests: write
 
 jobs:
   prepare-release:
