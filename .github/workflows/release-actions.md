@@ -27,6 +27,11 @@ on:
     branches: [main]
     tags: ["*"]
 
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
