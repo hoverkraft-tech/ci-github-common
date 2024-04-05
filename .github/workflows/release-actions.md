@@ -38,7 +38,7 @@ concurrency:
 
 jobs:
   release:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/release-actions.yml@0.13.0
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/release-actions.yml@0.13.1
     with:
       # Update all actions and workflows, regardless of changes.
       update-all: false
