@@ -30,7 +30,6 @@ on:
 
 permissions:
   contents: read
-  packages: read
   statuses: write
 
 jobs:
