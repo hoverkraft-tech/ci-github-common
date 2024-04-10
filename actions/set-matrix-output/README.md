@@ -28,7 +28,7 @@ This strategy effectively prevents any clashes or overwrites, maintaining the in
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.13.1
+- uses: hoverkraft-tech/ci-github-common@0.13.2
   with:
     # Description: The matrix output to set.
     #
