@@ -23,7 +23,7 @@ Action to slugify a given string value
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.13.1
+- uses: hoverkraft-tech/ci-github-common@0.13.2
   with:
     # Description: The value to slugify
     #
