@@ -10,7 +10,7 @@ on:
   workflow_call:
     inputs:
       runs-on:
-        description: "Json array of runner(s) to use. See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job"
+        description: "Json array of runner(s) to use. See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job."
         type: string
         default: '["ubuntu-latest"]'
         required: false
@@ -20,19 +20,19 @@ on:
         default: false
         type: boolean
       github-app-id:
-        description: "GitHub App ID to generate GitHub token in place of private-access-token. See https://github.com/actions/create-github-app-token"
+        description: "GitHub App ID to generate GitHub token in place of private-access-token. See https://github.com/actions/create-github-app-token."
         required: false
         type: string
     secrets:
       github-token:
         description: "GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write, workflows: write). See [actions/create-and-merge-pull-request](../../actions/create-and-merge-pull-request)"
       github-app-key:
-        description: "GitHub App private key to generate GitHub token in place of github-token. See https://github.com/actions/create-github-app-token"
+        description: "GitHub App private key to generate GitHub token in place of github-token. See https://github.com/actions/create-github-app-token."
 
 permissions:
-  actions: write
-  contents: write
-  pull-requests: write
+  contents: read
+  # FIXME: This is a workaround for having workflow ref. See https://github.com/orgs/community/discussions/38659
+  id-token: write
 
 jobs:
   prepare-release:
@@ -127,13 +127,9 @@ jobs:
       fail-fast: false
       matrix:
         action: ${{ fromJson(needs.prepare-release.outputs.changed-actions) }}
-    # FIXME: This is a workaround for having workflow ref. See https://github.com/orgs/community/discussions/38659
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@v4
-      
+
       # FIXME: This is a workaround for having workflow ref. See https://github.com/orgs/community/discussions/38659
       # jscpd:ignore-start
       - id: oidc
@@ -189,10 +185,6 @@ jobs:
       fail-fast: false
       matrix:
         workflow: ${{ fromJson(needs.prepare-release.outputs.changed-workflows) }}
-    # FIXME: This is a workaround for having workflow ref. See https://github.com/orgs/community/discussions/38659
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -234,12 +226,6 @@ jobs:
     needs: [prepare-release, generate-actions-readme, generate-workflows-readme]
     if: always() && (needs.prepare-release.outputs.changed-actions != '[]' || needs.prepare-release.outputs.changed-workflows != '[]')
     runs-on: ${{ fromJson(inputs.runs-on) }}
-
-    permissions:
-      pull-requests: write
-      contents: write
-      actions: write
-
     steps:
       - uses: actions/checkout@v4
 

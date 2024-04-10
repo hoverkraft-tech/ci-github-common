@@ -7,7 +7,7 @@ branding:
 
 inputs:
   github-token:
-    description: "GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See [https://github.com/peter-evans/create-pull-request#action-inputs](https://github.com/peter-evans/create-pull-request#action-inputs)"
+    description: "GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See https://github.com/peter-evans/create-pull-request#action-inputs."
     default: ${{ github.token }}
     required: false
   branch:
@@ -56,6 +56,7 @@ runs:
       if: steps.create-pull-request.outputs.pull-request-number && steps.create-pull-request.outputs.pull-request-operation != 'closed'
       uses: actions/github-script@v7
       with:
+        github-token: ${{ inputs.github-token }}
         script: |
           let attemps = 0;
           const maxAttemps = 10;
@@ -82,6 +83,8 @@ runs:
     - name: Merge pull request
       if: steps.wait-for-pull-request-mergeable-by-admin.outputs.is-mergeable
       shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
       run: |
         set +e
 
@@ -112,5 +115,3 @@ runs:
 
         echo "::error::Failed to merge pull request after $MAX_ATTEMPS attemps: $MERGE_OUTPUTS"
         exit 1
-      env:
-        GH_TOKEN: ${{ inputs.github-token }}
