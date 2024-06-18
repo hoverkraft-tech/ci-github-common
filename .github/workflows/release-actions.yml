@@ -235,6 +235,7 @@ jobs:
           merge-multiple: true
           path: /
 
+      # jscpd:ignore-start
       - uses: actions/create-github-app-token@v1
         if: inputs.github-app-id
         id: generate-token
@@ -252,3 +253,4 @@ jobs:
             docs: update actions and workflows documentation
 
             [skip ci]
+      # jscpd:ignore-end
