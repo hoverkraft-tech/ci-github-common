@@ -30,7 +30,7 @@ permissions:
 
 jobs:
   main:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/generate-dependabot-config.yml@0.13.2
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/generate-dependabot-config.yml@0.13.3
     with:
       # GitHub App ID to generate GitHub token in place of github-token.
       # See https://github.com/actions/create-github-app-token
