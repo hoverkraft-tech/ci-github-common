@@ -29,8 +29,6 @@ Opinionated GitHub actions and workflows for common continuous integration needs
 
 ## Reusable Workflows
 
-### - [Generate dependabot config](.github/workflows/generate-dependabot-config.md)
-
 ### - [Greetings](.github/workflows/greetings.md)
 
 ### - [Linter](.github/workflows/linter.md)
