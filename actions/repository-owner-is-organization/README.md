@@ -24,7 +24,7 @@ Action to check if the repository owner is an organization.
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.13.3
+- uses: hoverkraft-tech/ci-github-common@0.14.0
   with:
     # Description: GitHub token for fetching users API.
     #
