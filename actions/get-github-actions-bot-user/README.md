@@ -24,7 +24,7 @@ Action to get the GitHub Actions bot user informations. Usefull to commit, comme
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.14.0
+- uses: hoverkraft-tech/ci-github-common@0.15.0
   with:
 ```
 
