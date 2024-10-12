@@ -23,6 +23,8 @@ Opinionated GitHub actions and workflows for common continuous integration needs
 
 ### - [Get matrix outputs](actions/get-matrix-outputs/README.md)
 
+### - [Repository owner is organization](actions/repository-owner-is-organization/README.md)
+
 ### - [Set matrix output](actions/set-matrix-output/README.md)
 
 ### - [Slugify](actions/slugify/README.md)
