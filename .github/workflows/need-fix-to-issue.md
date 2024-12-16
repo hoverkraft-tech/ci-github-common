@@ -9,8 +9,8 @@
 <!-- end badges -->
 <!-- start description -->
 
-Reusable workflow to convert comments requiring fixes (TODO, FIXME) to issues.
-Mainly using [TODO to Issue Action](https://github.com/alstr/todo-to-issue-action), with some opinionated defaults.
+Reusable workflow to convert comments requiring fixes (todo, FIXME) to issues.
+Mainly using [Todo to Issue Action](https://github.com/alstr/todo-to-issue-action), with some opinionated defaults.
 
 <!-- end description -->
 <!-- start contents -->
