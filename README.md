@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue)](#license)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-Opinionated GitHub actions and workflows for common continuous integration needs
+Opinionated GitHub Actions and workflows for common continuous integration needs
 
 ---
 
@@ -17,7 +17,7 @@ Opinionated GitHub actions and workflows for common continuous integration needs
 
 ### - [Create or update comment](actions/create-or-update-comment/README.md)
 
-### - [Get GitHub actions bot user](actions/get-github-actions-bot-user/README.md)
+### - [Get GitHub Actions bot user](actions/get-github-actions-bot-user/README.md)
 
 ### - [Get issue number](actions/get-issue-number/README.md)
 
@@ -37,8 +37,6 @@ Opinionated GitHub actions and workflows for common continuous integration needs
 
 ### - [Need fix to Issue](.github/workflows/need-fix-to-issue.md)
 
-### - [Release actions](.github/workflows/release-actions.md)
-
 ### - [Semantic pull request](.github/workflows/semantic-pull-request.md)
 
 ### - [Stale](.github/workflows/stale.md)
@@ -51,8 +49,8 @@ Opinionated GitHub actions and workflows for common continuous integration needs
 
 🏢 **Hoverkraft <contact@hoverkraft.cloud>**
 
-- Website: [https://hoverkraft.cloud](https://hoverkraft.cloud)
-- Github: [@hoverkraft-tech](https://github.com/hoverkraft-tech)
+- Site: [https://hoverkraft.cloud](https://hoverkraft.cloud)
+- GitHub: [@hoverkraft-tech](https://github.com/hoverkraft-tech)
 
 ## License
 
