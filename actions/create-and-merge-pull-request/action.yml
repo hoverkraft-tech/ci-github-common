@@ -38,7 +38,7 @@ runs:
       run: |
         rm -fr ./self-actions
 
-    - uses: peter-evans/create-pull-request@v7.0.5
+    - uses: peter-evans/create-pull-request@v7.0.6
       id: create-pull-request
       with:
         token: ${{ inputs.github-token }}
