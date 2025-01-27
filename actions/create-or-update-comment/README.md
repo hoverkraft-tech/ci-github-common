@@ -33,7 +33,7 @@ permissions:
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.16.0
+- uses: hoverkraft-tech/ci-github-common@0.16.1
   with:
     # Description: The comment title. Must be static and unique, will be used to
     # retrieve the comment if exists already.
