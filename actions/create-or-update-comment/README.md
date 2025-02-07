@@ -49,6 +49,15 @@ permissions:
     # [https://github.com/peter-evans/create-or-update-comment](https://github.com/peter-evans/create-or-update-comment)
     #
     reactions: ""
+
+    # Description: The comment author. Default is github-actions[bot].
+    #
+    comment-author: ""
+
+    # Description: Optional token to interact with GitHub API.
+    # If not defined or empty, the action will use the GITHUB_TOKEN provided by GitHub.
+    #
+    token: ""
 ```
 
 <!-- end usage -->
@@ -59,7 +68,8 @@ permissions:
 | <code>title</code>     | The comment title. Must be static and unique, will be used to retrieve the comment if exists already.                                                                             |             | **true**     |
 | <code>body</code>      | The comment body. See [https://github.com/peter-evans/create-or-update-comment](https://github.com/peter-evans/create-or-update-comment)                                          |             | **false**    |
 | <code>reactions</code> | A comma separated list of reactions to add to the comment. See [https://github.com/peter-evans/create-or-update-comment](https://github.com/peter-evans/create-or-update-comment) |             | **false**    |
-
+| <code>comment-author</code> | The comment author. Default is github-actions[bot]. | github-actions[bot] | **false**    |
+| <code>token</code> | Optional token to interact with GitHub API. If not defined or empty, the action will use the GITHUB_TOKEN provided by GitHub. | | **false**    |
 <!-- end inputs -->
 <!-- start outputs -->
 <!-- end outputs -->
