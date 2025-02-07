@@ -15,6 +15,15 @@ inputs:
   reactions:
     description: "A comma separated list of reactions to add to the comment. See [https://github.com/peter-evans/create-or-update-comment](https://github.com/peter-evans/create-or-update-comment)"
     required: false
+  comment-author:
+    description: "The comment author. Default is github-actions[bot]."
+    required: false
+    default: "github-actions[bot]"
+  token:
+    description: |
+      Optional token to interact with GitHub API.
+      If not defined or empty, the action will use the GITHUB_TOKEN provided by GitHub.
+    required: false
 
 runs:
   using: "composite"
@@ -36,8 +45,10 @@ runs:
       id: find-comment
       with:
         issue-number: ${{ steps.get-issue-number.outputs.issue-number }}
-        comment-author: github-actions[bot]
+        comment-author: ${{ inputs.comment-author }}
         body-includes: ${{ inputs.title }}
+        token: ${{ inputs.token || github.token }}
+
 
     - uses: peter-evans/create-or-update-comment@v4
       with:
@@ -49,3 +60,4 @@ runs:
 
           ${{ inputs.body }}
         reactions: ${{ inputs.reactions }}
+        token: ${{ inputs.token || github.token }}
