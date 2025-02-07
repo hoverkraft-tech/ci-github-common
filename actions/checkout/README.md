@@ -48,6 +48,11 @@ permissions:
     #
     # Default: false
     lfs: ""
+
+    # Description: Token to use for checking out the repository instead of the default GITHUB_TOKEN.
+    # If specified and not empty, persist-credentials in checkout will be false.
+    #
+    token: ""
 ```
 
 <!-- end usage -->
@@ -57,6 +62,7 @@ permissions:
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------ |
 | <code>fetch-depth</code> | Number of commits to fetch. 0 indicates all history for all branches and tags. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage) | <code>1</code> | **false**    |
 | <code>lfs</code>         | Whether to download Git-LFS files. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)                                             |                | **false**    |
+| <code>token</code>         | Token to use for checking out the repository instead of the default GITHUB_TOKEN. If specified and not empty, persist-credentials in checkout will be false.                                             |                | **false**    |
 
 <!-- end inputs -->
 <!-- start outputs -->

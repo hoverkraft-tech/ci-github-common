@@ -12,6 +12,11 @@ inputs:
   lfs:
     description: "Whether to download Git-LFS files. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)"
     default: false
+  token:
+    description: |
+      Token to use for checking out the repository instead of the default GITHUB_TOKEN.
+      If specified and not empty, persist-credentials in checkout will be false.
+    required: false
 
 runs:
   using: "composite"
@@ -22,9 +27,13 @@ runs:
         ref: refs/pull/${{ github.event.issue.number }}/head
         fetch-depth: ${{ inputs.fetch-depth }}
         lfs: ${{ inputs.lfs }}
+        token: ${{ inputs.token || github.token }}
+        persist-credentials: ${{ inputs.token == '' }}
 
     - uses: actions/checkout@v4
       if: github.event_name != 'issue_comment'
       with:
         fetch-depth: ${{ inputs.fetch-depth }}
         lfs: ${{ inputs.lfs }}
+        token: ${{ inputs.token || github.token }}
+        persist-credentials: ${{ inputs.token == '' }}
