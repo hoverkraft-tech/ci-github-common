@@ -49,7 +49,6 @@ runs:
         body-includes: ${{ inputs.title }}
         token: ${{ inputs.token || github.token }}
 
-
     - uses: peter-evans/create-or-update-comment@v4
       with:
         edit-mode: replace
