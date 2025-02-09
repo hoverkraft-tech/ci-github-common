@@ -7,11 +7,9 @@
 // jscpd:ignore-start
 -->
 <!-- start badges -->
-<!-- markdownlint-disable MD013 -->
 
 <a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Freleases%2Flatest"><img src="https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20tag" /></a><a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Freleases%2Flatest"><img src="https://img.shields.io/github/release-date/hoverkraft-tech/ci-github-common?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20date" /></a><img src="https://img.shields.io/github/last-commit/hoverkraft-tech/ci-github-common?logo=github&style=flat-square" alt="Commit" /><a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Fissues"><img src="https://img.shields.io/github/issues/hoverkraft-tech/ci-github-common?logo=github&style=flat-square" alt="Open%20Issues" /></a><img src="https://img.shields.io/github/downloads/hoverkraft-tech/ci-github-common/total?logo=github&style=flat-square" alt="Downloads" />
 
-<!-- markdownlint-enable MD013 -->
 <!-- end badges -->
 <!--
 // jscpd:ignore-end
@@ -51,8 +49,9 @@ permissions:
     # Default: false
     lfs: ""
 
-    # Description: Token to use for checking out the repository instead of the default GITHUB_TOKEN.
-    # If specified and not empty, persist-credentials in checkout will be false.
+    # Description: Token to use for checking out the repository instead of the default
+    # GITHUB_TOKEN. If specified and not empty, persist-credentials in checkout will
+    # be false.
     #
     token: ""
 ```
@@ -64,7 +63,7 @@ permissions:
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------ |
 | <code>fetch-depth</code> | Number of commits to fetch. 0 indicates all history for all branches and tags. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage) | <code>1</code> | **false**    |
 | <code>lfs</code>         | Whether to download Git-LFS files. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)                                             |                | **false**    |
-| <code>token</code>       | Token to use for checking out the repository instead of the default GITHUB_TOKEN. If specified and not empty, persist-credentials in checkout will be false.              |                | **false**    |
+| <code>token</code>       | Token to use for checking out the repository instead of the default GITHUB_TOKEN.<br />If specified and not empty, persist-credentials in checkout will be false.         |                | **false**    |
 
 <!-- end inputs -->
 <!-- start outputs -->
