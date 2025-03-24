@@ -6,10 +6,11 @@ on:
 permissions:
   contents: read
   statuses: write
+  security-events: write
 
 jobs:
   linter:
-    uses: ./.github/workflows/linter.yml
+    uses: ./.github/workflows/linter-actions.yml
 
   test-action-matrix-outputs:
     needs: linter

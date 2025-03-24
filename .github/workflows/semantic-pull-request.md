@@ -18,6 +18,9 @@ Workflow to ensure Pull Request provides semantic versionning assets:
 <!-- end description -->
 <!-- start contents -->
 <!-- end contents -->
+
+## Usage
+
 <!-- start usage -->
 
 ```yaml
@@ -44,20 +47,25 @@ jobs:
 ```
 
 <!-- end usage -->
+
+## Secrets
+
 <!-- start secrets -->
 
-| **Secret**                    | **Description**                                 | **Required** |
-| ----------------------------- | ----------------------------------------------- | ------------ |
-| **<code>github-token</code>** | Token for the repository. Default: GITHUB_TOKEN | **false**    |
+| **Secret**                    | **Description**           | **Required** |
+| ----------------------------- | ------------------------- | ------------ |
+| **<code>github-token</code>** | Token for the repository. | **false**    |
 
 <!-- end secrets -->
 <!-- start inputs -->
 
+## Inputs
+
 <!-- start inputs -->
 
-| **Input**                | **Description**                                                                                                                                                                                | **Default**                    | **Required** |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------ |
-| **<code>runs-on</code>** | Json array of runner(s) to use. See [https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job](https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job) | <code>["ubuntu-latest"]</code> | **false**    |
+| **Input**                | **Description**                                                                                                    | **Default**                   | **Type** | **Required** |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------ | ----------------------------- | -------- | ------------ |
+| **<code>runs-on</code>** | Json array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>. | <code>["ubuntu-latest"]<code> | `string` | **false**    |
 
 <!-- end inputs -->
 

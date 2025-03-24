@@ -15,6 +15,9 @@ Mainly using [Todo to Issue Action](https://github.com/alstr/todo-to-issue-actio
 <!-- end description -->
 <!-- start contents -->
 <!-- end contents -->
+
+## Usage
+
 <!-- start usage -->
 
 ```yaml
@@ -28,10 +31,10 @@ on:
     inputs:
       #checkov:skip=CKV_GHA_7: required
       manual-commit-ref:
-        description: "The SHA of the commit to get the diff for"
+        description: "The SHA of the commit to get the diff for."
         required: true
       manual-base-ref:
-        description: "By default, the commit entered above is compared to the one directly before it; to go back further, enter an earlier SHA here"
+        description: "By default, the commit entered above is compared to the one directly before it; to go back further, enter an earlier SHA here."
         required: false
 
 permissions:
@@ -47,13 +50,16 @@ jobs:
 ```
 
 <!-- end usage -->
+
+## Inputs
+
 <!-- start inputs -->
 
-| **Input**                          | **Description**                                                                                                                                                                                | **Default**                    | **Required** |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------ |
-| **<code>runs-on</code>**           | Json array of runner(s) to use. See [https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job](https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job) | <code>["ubuntu-latest"]</code> | **false**    |
-| **<code>manual-commit-ref</code>** | The SHA of the commit to get the diff for.                                                                                                                                                     | <code></code>                  | **false**    |
-| **<code>manual-base-ref</code>**   | By default, the commit entered above is compared to the one directly before it; to go back further, enter an earlier SHA here for.                                                             | <code></code>                  | **false**    |
+| **Input**                          | **Description**                                                                                                                    | **Default**                   | **Type** | **Required** |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | -------- | ------------ |
+| **<code>runs-on</code>**           | Json array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>.                 | <code>["ubuntu-latest"]<code> | `string` | **false**    |
+| **<code>manual-commit-ref</code>** | The SHA of the commit to get the diff for.                                                                                         | <code></code>                 | `string` | **false**    |
+| **<code>manual-base-ref</code>**   | By default, the commit entered above is compared to the one directly before it; to go back further, enter an earlier SHA here for. | <code></code>                 | `string` | **false**    |
 
 <!-- end inputs -->
 <!-- start outputs -->

@@ -2,7 +2,7 @@
 # Workaround for https://github.com/orgs/community/discussions/26639
 
 name: "Get matrix ouput"
-description: "Download matrix ouputs from artifacts, because GitHub action does not handle job outputs for matrix"
+description: "Download matrix ouputs from artifacts, because GitHub Action does not handle job outputs for matrix"
 author: Hoverkraft
 branding:
   icon: download-cloud
