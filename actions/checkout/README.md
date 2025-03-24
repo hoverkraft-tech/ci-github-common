@@ -36,7 +36,7 @@ permissions:
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.18.0
+- uses: hoverkraft-tech/ci-github-common@0.19.0
   with:
     # Description: Number of commits to fetch. 0 indicates all history for all
     # branches and tags. See
@@ -61,11 +61,11 @@ permissions:
 <!-- end usage -->
 <!-- start inputs -->
 
-| **Input**                | **Description**                                                                                                                                                           | **Default**    | **Required** |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------ |
-| <code>fetch-depth</code> | Number of commits to fetch. 0 indicates all history for all branches and tags. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage) | <code>1</code> | **false**    |
-| <code>lfs</code>         | Whether to download Git-LFS files. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)                                             |                | **false**    |
-| <code>token</code>       | Token to use for checking out the repository instead of the default GITHUB_TOKEN.<br />If specified and not empty, persist-credentials in checkout will be false.         |                | **false**    |
+| **Input**                | **Description**                                                                                                                                                           | **Default**        | **Required** |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------ |
+| <code>fetch-depth</code> | Number of commits to fetch. 0 indicates all history for all branches and tags. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage) | <code>1</code>     | **false**    |
+| <code>lfs</code>         | Whether to download Git-LFS files. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)                                             | <code>false</code> | **false**    |
+| <code>token</code>       | Token to use for checking out the repository instead of the default GITHUB_TOKEN.<br />If specified and not empty, persist-credentials in checkout will be false.         |                    | **false**    |
 
 <!-- end inputs -->
 <!-- start outputs -->
