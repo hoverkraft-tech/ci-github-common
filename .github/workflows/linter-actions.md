@@ -66,10 +66,12 @@ jobs:
 
 <!-- start inputs -->
 
-| **Input**                    | **Description**                                                                                                    | **Default**                             | **Type** | **Required** |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------- | -------- | ------------ |
-| **<code>runs-on</code>**     | Json array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>. | <code>["ubuntu-latest"]<code>           | `string` | **false**    |
-| **<code>directories</code>** | List of directories to lint.                                                                                       | <code>.github/workflows\nactions</code> | `string` | **false**    |
+| **Input**                     | **Description**                                                                                                    | **Default**                                                                       | **Type**  | **Required** |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- | --------- | ------------ |
+| **<code>runs-on</code>**      | Json array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>. | <code>["ubuntu-latest"]<code>                                                     | `string`  | **false**    |
+| **<code>lint-all</code>**     | Run linter on all files, not just the changed ones.                                                                | <code>github.event_name != 'pull_request'</code>                                  | `boolean` | **false**    |
+| **<code>action-files</code>** | List of files or directories where GitHub Actions are defined. Supports glob patterns.                             | <code>./action.yml\n./.github/workflows/\*\*/\*.yml\n./actions/\*\*/\*.yml</code> | `string`  | **false**    |
+| **<code>linter-env</code>**   | Environment variables in multilines format "key=value" to pass to the linter. See [linter](./linter.md).           | <code></code>                                                                     | `string`  | **false**    |
 
 <!-- end inputs -->
 

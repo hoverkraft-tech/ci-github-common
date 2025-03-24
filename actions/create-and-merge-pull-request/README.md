@@ -61,13 +61,13 @@ See [Allow GitHub Actions to create and approve pull requests](https://docs.gith
 
 <!-- start inputs -->
 
-| **Input**                   | **Description**                                                                                                                                                                  | **Default**                      | **Required** |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------ |
-| <code>github-token</code>   | GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See https://github.com/peter-evans/create-pull-request#action-inputs. | <code>${{ github.token }}</code> | **false**    |
-| <code>branch</code>         | The pull request branch name                                                                                                                                                     |                                  | **true**     |
-| <code>title</code>          | The pull request title                                                                                                                                                           |                                  | **true**     |
-| <code>body</code>           | The pull request body                                                                                                                                                            |                                  | **true**     |
-| <code>commit-message</code> | The commit message for the pull request                                                                                                                                          |                                  | **true**     |
+| **Input**                   | **Description**                                                                                                                                                                    | **Default**                      | **Required** |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------ |
+| <code>github-token</code>   | GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). See <https://github.com/peter-evans/create-pull-request#action-inputs>. | <code>${{ github.token }}</code> | **false**    |
+| <code>branch</code>         | The pull request branch name                                                                                                                                                       |                                  | **true**     |
+| <code>title</code>          | The pull request title                                                                                                                                                             |                                  | **true**     |
+| <code>body</code>           | The pull request body                                                                                                                                                              |                                  | **true**     |
+| <code>commit-message</code> | The commit message for the pull request                                                                                                                                            |                                  | **true**     |
 
 <!-- end inputs -->
 <!-- start outputs -->

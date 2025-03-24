@@ -11,7 +11,7 @@ inputs:
     default: "1"
   lfs:
     description: "Whether to download Git-LFS files. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)"
-    default: false
+    default: "false"
   token:
     description: |
       Token to use for checking out the repository instead of the default GITHUB_TOKEN.
