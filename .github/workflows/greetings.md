@@ -18,6 +18,9 @@ Mainly using [First Interaction Action](https://github.com/actions/first-interac
 <!-- end description -->
 <!-- start contents -->
 <!-- end contents -->
+
+## Usage
+
 <!-- start usage -->
 
 ```yaml
@@ -56,20 +59,26 @@ jobs:
 ```
 
 <!-- end usage -->
+
+## Secrets
+
 <!-- start secrets -->
 
-| **Secret**                    | **Description**                                                                                                                        | **Default**               | **Required** |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------ |
-| **<code>github-token</code>** | Token for the repository. See [https://github.com/actions/first-interaction#usage](https://github.com/actions/first-interaction#usage) | <code>GITHUB_TOKEN</code> | **false**    |
+| **Secret**                    | **Description**                                                                     | **Default**               | **Required** |
+| ----------------------------- | ----------------------------------------------------------------------------------- | ------------------------- | ------------ |
+| **<code>github-token</code>** | Token for the repository. See <https://github.com/actions/first-interaction#usage>. | <code>GITHUB_TOKEN</code> | **false**    |
 
 <!-- end secrets -->
+
+## Inputs
+
 <!-- start inputs -->
 
-| **Input**                      | **Description**                                                                                                                                                                                | **Default**                                                                     | **Required** |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------ |
-| **<code>runs-on</code>**       | Json array of runner(s) to use. See [https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job](https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job) | <code>["ubuntu-latest"]</code>                                                  | **false**    |
-| **<code>issue-message</code>** | Comment to post on an individual's first issue. See [https://github.com/actions/first-interaction#usage](https://github.com/actions/first-interaction#usage)                                   | <code>Hi, thank for reporting an issue, we will check it out very soon</code>   | **false**    |
-| **<code>issue-message</code>** | Comment to post on an individual's first pull request. See [https://github.com/actions/first-interaction#usage](https://github.com/actions/first-interaction#usage)                            | <code>Hi, thank you for creating your PR, we will check it out very soon</code> | **false**    |
+| **Input**                      | **Description**                                                                                                    | **Default**                                                                     | **Type** | **Required** |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | -------- | ------------ |
+| **<code>runs-on</code>**       | Json array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>. | <code>["ubuntu-latest"]</code>                                                  | `string` | **false**    |
+| **<code>issue-message</code>** | Comment to post on an individual's first issue. See <https://github.com/actions/first-interaction#usage>.          | <code>Hi, thank for reporting an issue, we will check it out very soon</code>   | `string` | **false**    |
+| **<code>pr-message</code>**    | Comment to post on an individual's first pull request. See <https://github.com/actions/first-interaction#usage>.   | <code>Hi, thank you for creating your PR, we will check it out very soon</code> | `string` | **false**    |
 
 <!-- end inputs -->
 

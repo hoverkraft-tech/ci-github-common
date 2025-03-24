@@ -15,6 +15,9 @@ Mainly using [Super-Linter](https://github.com/super-linter/super-linter), with 
 <!-- end description -->
 <!-- start contents -->
 <!-- end contents -->
+
+## Usage
+
 <!-- start usage -->
 
 ```yaml
@@ -43,15 +46,25 @@ jobs:
 ```
 
 <!-- end usage -->
+
+## Secrets
+
 <!-- start secrets -->
 
-| **Secret**                    | **Description**                                                                                                                                                                                | **Default**                    | **Required** |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------ |
-| **<code>runs-on</code>**      | Json array of runner(s) to use. See [https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job](https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job) | <code>["ubuntu-latest"]</code> | **false**    |
-| **<code>github-token</code>** | Token for marking the status of linter run in the Checks section. See [https://github.com/super-linter/super-linter#how-to-use](https://github.com/super-linter/super-linter#how-to-use)       | <code>GITHUB_TOKEN</code>      | **false**    |
+| **Secret**                    | **Description**                                                                                                                  | **Default**               | **Required** |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------ |
+| **<code>github-token</code>** | Token for marking the status of linter run in the Checks section. See <https://github.com/super-linter/super-linter#how-to-use>. | <code>GITHUB_TOKEN</code> | **false**    |
 
 <!-- end secrets -->
+
+## Inputs
+
 <!-- start inputs -->
+
+| **Input**                   | **Description**                                                                                                                   | **Default**                             | **Type** | **Required** |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | -------- | ------------ |
+| **<code>runs-on</code>**    | Json array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>.                | <code>["ubuntu-latest"]<code>           | `string` | **false**    |
+| **<code>linter-env</code>** | Environment variables in multilines format "key=value" to pass to the linter. See <https://github.com/super-linter/super-linter>. | <code>.github/workflows\nactions</code> | `string` | **false**    |
 
 <!-- end inputs -->
 

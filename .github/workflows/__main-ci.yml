@@ -4,11 +4,16 @@ on:
   push:
     branches: [main]
     tags: ["*"]
+
   workflow_dispatch:
+
+  schedule:
+    - cron: "25 8 * * 1"
 
 permissions:
   contents: write
   statuses: write
+  security-events: write
   actions: write
   pull-requests: write
   # FIXME: This is a workaround for having workflow ref. See https://github.com/orgs/community/discussions/38659
@@ -24,6 +29,7 @@ jobs:
 
   release:
     needs: ci
+    if: github.event_name != 'schedule'
     uses: hoverkraft-tech/ci-github-publish/.github/workflows/release-actions.yml@535e8b9de03e7ceb4c1509ee50f8270456071ed6 # 0.3.2
     with:
       update-all: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch' }}

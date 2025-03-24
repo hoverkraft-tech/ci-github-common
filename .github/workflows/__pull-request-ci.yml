@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   statuses: write
+  security-events: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

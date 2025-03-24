@@ -9,18 +9,20 @@ on:
   workflow_call:
     inputs:
       runs-on:
-        description: "Json array of runner(s) to use. See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job"
+        description: "Json array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>."
         type: string
         default: '["ubuntu-latest"]'
         required: false
       linter-env:
-        description: 'Environment variables in multilines format "key=value" to pass to the linter. See https://github.com/super-linter/super-linter.'
+        description: |
+          Environment variables in multilines format "key=value" to pass to the linter.
+          See <https://github.com/super-linter/super-linter>.
         type: string
         required: false
 
     secrets:
       github-token:
-        description: "Token for marking the status of linter run in the Checks section. See https://github.com/super-linter/super-linter#how-to-use"
+        description: "Token for marking the status of linter run in the Checks section. See <https://github.com/super-linter/super-linter#how-to-use>."
 
 permissions:
   contents: read
@@ -28,8 +30,8 @@ permissions:
 
 jobs:
   checks:
+    name: 🧹 Lint Code Base
     runs-on: ${{ fromJson(inputs.runs-on) }}
-    name: Run checks
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:

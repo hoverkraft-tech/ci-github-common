@@ -1,0 +1,115 @@
+# Linter - Actions
+# ==========================
+# Reusable workflow that performs GitHub Actions linting on the code base.
+# Applys [GitHub security recommendations](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions).
+# Uses:
+# - [Common linter](./linter.md) with some opinionated defaults.
+# - [CodeQL](https://docs.github.com/en/code-security/code-scanning/introduction-to-code-scanning/about-code-scanning-with-codeql) to analyze the code.
+# - [Ratchet](https://github.com/sethvargo/ratchet) to check that all versions are pinned.
+
+name: Linter - Actions
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: "Json array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>."
+        type: string
+        default: '["ubuntu-latest"]'
+        required: false
+      directoriesInput:
+        description: "List of directoriesInput to lint."
+        type: string
+        default: |
+          .github/workflows
+          actions
+
+    secrets:
+      github-token:
+        description: "Token for marking the status of linter run in the Checks section. See [linter](./linter.md)."
+
+permissions:
+  contents: read
+  statuses: write
+  security-events: write
+
+jobs:
+  linter:
+    name: 🧹 Lint Code Base
+    uses: ./.github/workflows/linter.yml
+    with:
+      runs-on: ${{ inputs.runs-on }}
+    secrets:
+      github-token: ${{ secrets.github-token }}
+
+  code-ql:
+    name: 🛡️ CodeQL Analysis
+    permissions:
+      security-events: write
+    runs-on: ${{ fromJson(inputs.runs-on) }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: github/codeql-action/init@5f8171a638ada777af81d42b55959a643bb29017 # v3.28.12
+        with:
+          languages: actions
+
+      - uses: github/codeql-action/analyze@5f8171a638ada777af81d42b55959a643bb29017 # v3.28.12
+
+  check-pinning:
+    name: 📌 Check Pinning
+    runs-on: ${{ fromJson(inputs.runs-on) }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - id: get-files-to-lint
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const fs = require("node:fs");
+            const path = require("node:path");
+
+            const directoriesInput = ${{ toJson(inputs.directoriesInput) }};
+            const directories = [];
+
+            for (const directory of directoriesInput.split("\n")) {
+              let sanitizedDirectory = directory.trim();
+              if (sanitizedDirectory === "") {
+                continue;
+              }
+
+              if (path.isAbsolute(sanitizedDirectory)) {
+                // Ensure directory is within the workspace
+                if (!sanitizedDirectory.startsWith(process.env.GITHUB_WORKSPACE)) {
+                  return core.setFailed(`Directory is not within the workspace: ${sanitizedDirectory}`);
+                }
+              } else {
+                sanitizedDirectory = path.join(process.env.GITHUB_WORKSPACE, sanitizedDirectory);
+              }
+
+              // Ensure directory exists
+              if (!fs.existsSync(sanitizedDirectory)) {
+                core.setFailed(`Directory does not exist: ${sanitizedDirectory}`);
+              }
+
+              directories.push(sanitizedDirectory);
+            }
+
+            if (directories.length === 0) {
+              return core.setFailed("No directories to lint.");
+            }
+
+            async function getActionFiles(directory){
+              const globber = await glob.create(`${directory}/**/*.yml`,{ matchdirectoriesInput: false });
+              const matchingFiles = await globber.glob();
+
+              return matchingFiles.map(matchingFile => path.relative(process.env.GITHUB_WORKSPACE, matchingFile));
+            }
+
+            const files = await Promise.all(directories.map(getActionFiles));
+            core.setOutput("files", files.flat().join(" ").trim());
+
+      - uses: "docker://ghcr.io/sethvargo/ratchet:0.10.2@sha256:78f70ed0c85830a78bd9eeb265f49aa375d71887e4245aebc5da9c641d76b245" # v0.10.2
+        if: ${{ steps.get-files-to-lint.outputs.files }}
+        with:
+          args: "check ${{ steps.get-files-to-lint.outputs.files }}"
