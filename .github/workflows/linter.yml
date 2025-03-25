@@ -1,9 +1,10 @@
 # Linter
 # ==========================
-# Reusable workflow that performs linting on the code base.
-# Mainly using [Super-Linter](https://github.com/super-linter/super-linter), with some opinionated defaults.
-
-name: Linter
+# Reusable workflow that performs linting on the codebase.
+# Executes:
+# - [Super-Linter](https://github.com/super-linter/super-linter), with some opinionated defaults.
+# - [CodeQL](https://docs.github.com/en/code-security/code-scanning/introduction-to-code-scanning/about-code-scanning-with-codeql) to analyze the code.
+# - [Ratchet](https://github.com/sethvargo/ratchet) to check that Github Action versions are pinned.
 
 on:
   workflow_call:
@@ -11,31 +12,58 @@ on:
       runs-on:
         description: "Json array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>."
         type: string
-        default: '["ubuntu-latest"]'
         required: false
+        default: '["ubuntu-latest"]'
       linter-env:
         description: |
           Environment variables in multilines format "key=value" to pass to the linter.
           See <https://github.com/super-linter/super-linter>.
         type: string
         required: false
+      codeql-languages:
+        description: |
+          JSON array of languages to analyze with CodeQL.
+          See <https://codeql.github.com/docs/codeql-overview/supported-languages-and-frameworks/>.
+          Leave empty to disable the check.
+        type: string
+        required: false
+        default: '["actions"]'
+      action-files:
+        description: |
+          List of files or directories where GitHub Actions and workflows are located.
+          Supports glob patterns.
+          Leave empty to disable the check.
+        type: string
+        required: false
+        default: |
+          ./action.yml
+          ./.github/workflows/**/*.yml
+          ./actions/**/*.yml
+      lint-all:
+        description: "Run checks on all files, not just the changed ones."
+        type: boolean
+        required: false
+        default: ${{ github.event_name != 'pull_request' }}
 
     secrets:
       github-token:
-        description: "Token for marking the status of linter run in the Checks section. See <https://github.com/super-linter/super-linter#how-to-use>."
+        description: |
+          Token for marking the status of linter run in the Checks section.
+          See <https://github.com/super-linter/super-linter#how-to-use>.
+          Default GITHUB_TOKEN.
 
 permissions:
   contents: read
   statuses: write
 
 jobs:
-  checks:
+  lint:
     name: 🧹 Lint Code Base
     runs-on: ${{ fromJson(inputs.runs-on) }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          fetch-depth: 0
+          fetch-depth: "${{ inputs.lint-all && 1 || 0 }}"
 
       - if: ${{ inputs.linter-env }}
         run: |
@@ -49,11 +77,165 @@ jobs:
             echo "$line" >> "$GITHUB_ENV"
           done
 
-      - name: 👕 Lint Code Base
-        uses: super-linter/super-linter/slim@4e8a7c2bf106c4c766c816b35ec612638dc9b6b2 # v7.3.0
+      - uses: super-linter/super-linter/slim@4e8a7c2bf106c4c766c816b35ec612638dc9b6b2 # v7.3.0
         env:
-          VALIDATE_ALL_CODEBASE: false
+          VALIDATE_ALL_CODEBASE: ${{ inputs.lint-all }}
           LOG_LEVEL: WARN
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GITHUB_TOKEN: ${{ secrets.github-token || github.token }}
           KUBERNETES_KUBECONFORM_OPTIONS: "--schema-location default --schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'"
+
+  codeql:
+    if: ${{ inputs.codeql-languages }}
+    name: 🛡️ CodeQL Analysis
+    permissions:
+      security-events: write
+    runs-on: ${{ fromJson(inputs.runs-on) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(inputs.codeql-languages) }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: github/codeql-action/init@1b549b9259bda1cb5ddde3b41741a82a2d15a841 # v3.28.13with:
+        with:
+          languages: ${{ matrix.language }}
+
+      - uses: github/codeql-action/analyze@1b549b9259bda1cb5ddde3b41741a82a2d15a841 # v3.28.13
+        with:
+          category: "/language:${{matrix.language}}"
+
+  actions-pinning:
+    name: 📌 Check GitHub Actions Pinning
+    runs-on: ${{ fromJson(inputs.runs-on) }}
+    if: ${{ inputs.action-files }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: "${{ inputs.lint-all && 1 || 0 }}"
+
+      - id: changed-files
+        uses: tj-actions/changed-files@823fcebdb31bb35fdf2229d9f769b400309430d0 # v46.0.3
+        if: ${{ inputs.lint-all == false }}
+        with:
+          files: ${{ inputs.action-files }}
+          dir_names_exclude_current_dir: true
+
+      - id: get-files-to-lint
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const fs = require("node:fs");
+            const path = require("node:path");
+
+            const changedFiles = ${{ toJSON(steps.changed-files.outputs.all_changed_and_modified_files) }};
+
+            let actionFiles = [];
+            if (changedFiles !== null) {
+              actionFiles = changedFiles.split(" ").filter(file => file && fs.existsSync(file));
+            } else {
+              const actionFilesInput = ${{ toJson(inputs.action-files) }};
+
+              for (const actionFile of actionFilesInput.split("\n")) {
+                let sanitizedActionFile = actionFile.trim();
+                if (sanitizedActionFile === "") {
+                  continue;
+                }
+
+                if (path.isAbsolute(sanitizedActionFile)) {
+                  // Ensure actionFile is within the workspace
+                  if (!sanitizedActionFile.startsWith(process.env.GITHUB_WORKSPACE)) {
+                    return core.setFailed(`Action file / directory is not within the workspace: ${sanitizedActionFile}`);
+                  }
+                } else {
+                  sanitizedActionFile = path.join(process.env.GITHUB_WORKSPACE, sanitizedActionFile);
+                }
+                actionFiles.push(sanitizedActionFile);
+              }
+
+              if (actionFiles.length === 0) {
+                return core.setFailed("No action files to lint.");
+              }
+
+              async function getActionFiles(actionFile) {
+                const globber = await glob.create(actionFile,{ matchactionFilesInput: false });
+                return await globber.glob();
+              }
+
+              actionFiles = (await Promise.all(actionFiles.map(getActionFiles)))
+                .flat()
+                .map((file) => path.relative(process.env.GITHUB_WORKSPACE, file));
+
+              if (actionFiles.length === 0) {
+                return core.setFailed("No action files to lint.");
+              }
+            }
+
+            const files = actionFiles.map((file) => path.relative(process.env.GITHUB_WORKSPACE, file));
+
+            const filesOutput = [...new Set(files)].join(" ").trim();
+
+            core.setOutput("files", filesOutput);
+
+      - id: ratchet
+        uses: "docker://ghcr.io/sethvargo/ratchet:0.10.2@sha256:78f70ed0c85830a78bd9eeb265f49aa375d71887e4245aebc5da9c641d76b245" # v0.10.2
+        if: ${{ steps.get-files-to-lint.outputs.files }}
+        with:
+          args: "check ${{ steps.get-files-to-lint.outputs.files }}"
+
+      - if: ${{ failure() && steps.get-files-to-lint.outputs.files }}
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const ratchetOutcome = ${{ toJSON(steps.ratchet.outcome) }};
+
+            if (ratchetOutcome !== "failure") {
+              return;
+            }
+
+            // FIXME: should retrieve ratchet error output. See https://github.com/sethvargo/ratchet/issues/103.
+            const ratchetErrorsOutputs = ${{ toJSON(steps.ratchet.outputs.errors) }};
+            if (!ratchetErrorsOutputs || ratchetErrorsOutputs.length === 0) {
+              return;
+            }
+
+            // Format the ratchet errors: found x unpinned refs: ...
+            const unpinnedRefsError = /found (\d+) unpinned refs: (.*)/g.exec(ratchetErrorsOutputs[0]);
+            if (!unpinnedRefsError) {
+              return;
+            }
+
+            const unpinnedRefs = JSON.parse(unpinnedRefsError[2]);
+
+            async function getFileErrors(file) {
+              const fileContent = await fs.promises.readFile(file, "utf8");
+
+              const errors = [];
+
+              for(const unpinnedRef of unpinnedRefs) {
+                if(fileContent.includes(unpinnedRef)) {
+                  errors.push(file);
+                }
+              }
+
+              return errors;
+            }
+
+            const files = ${{ toJSON(steps.get-files-to-lint.outputs.files) }}.split(" ");
+
+            // Annotate file errors
+            await Promise.all(files.map(async (file) => {
+              const errors = await getFileErrors(file);
+              if (errors.length === 0) {
+                return;
+              }
+
+              core.error(
+                `Found ${errors.length} unpinned refs`,
+                {
+                  title: `Unpinned refs: ${JSON.stringify(errors)}`,
+                  file: file
+                }
+              );
+            }));

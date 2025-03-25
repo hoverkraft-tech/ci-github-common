@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   linter:
-    uses: ./.github/workflows/linter-actions.yml
+    uses: ./.github/workflows/linter.yml
 
   test-action-matrix-outputs:
     needs: linter
