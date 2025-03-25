@@ -45,6 +45,7 @@ runs:
       with:
         token: ${{ inputs.github-token }}
         signoff: true
+        sign-commits: true
         base: ${{ github.event.repository.default_branch }}
         delete-branch: true
         branch: ${{ inputs.branch }}
