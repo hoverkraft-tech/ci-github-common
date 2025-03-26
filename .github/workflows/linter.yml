@@ -173,16 +173,41 @@ jobs:
             }
 
             const files = actionFiles.map((file) => path.relative(process.env.GITHUB_WORKSPACE, file));
-
             const filesOutput = [...new Set(files)].join(" ").trim();
 
+            if (filesOutput.length === 0) {
+              return;
+            }
+
             core.setOutput("files", filesOutput);
+
+            // Add problem matcher for ratchet
+            // FIXME: should retrieve ratchet file and line. See https://github.com/sethvargo/ratchet/issues/103.
+            const problemMatcher = {
+              "problemMatcher": [
+                {
+                  "owner": "ratchet",
+                  "pattern": [
+                    { "regexp": "^found (\\d) unpinned refs: \\[([^\\]]+)\\]$", "message": 0 }
+                  ]
+                }
+              ]
+            };
+
+            fs.writeFileSync("ratchet-problem-matcher.json", JSON.stringify(problemMatcher, null, 2));
+
+      # FIXME: use actions/github-script, needs: https://github.com/actions/toolkit/pull/2001
+      - if: ${{ steps.get-files-to-lint.outputs.files }}
+        run: echo "::add-matcher::ratchet-problem-matcher.json"
 
       - id: ratchet
         uses: "docker://ghcr.io/sethvargo/ratchet:0.10.2@sha256:78f70ed0c85830a78bd9eeb265f49aa375d71887e4245aebc5da9c641d76b245" # v0.10.2
         if: ${{ steps.get-files-to-lint.outputs.files }}
         with:
           args: "check ${{ steps.get-files-to-lint.outputs.files }}"
+
+      - if: ${{ always() && steps.get-files-to-lint.outputs.files }}
+        run: echo "::remove-matcher owner=ratchet::"
 
       - if: ${{ failure() && steps.get-files-to-lint.outputs.files }}
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
