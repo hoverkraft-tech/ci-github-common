@@ -39,7 +39,7 @@ permissions:
 
 jobs:
   main:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@0.14.0
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@0.20.0
     secrets:
       # Token for the repository.
       # Default GITHUB_TOKEN
