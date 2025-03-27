@@ -186,86 +186,9 @@ jobs:
 
             core.setOutput("files", filesOutput);
 
-            // Add problem matcher for ratchet
-            // FIXME: should retrieve ratchet file and line. See https://github.com/sethvargo/ratchet/issues/103.
-            const problemMatcher = {
-              "problemMatcher": [
-                {
-                  "owner": "ratchet",
-                  "pattern": [
-                    { "regexp": "^found (\\d) unpinned refs: \\[([^\\]]+)\\]$", "message": 0 }
-                  ]
-                }
-              ]
-            };
-
-            fs.writeFileSync("ratchet-problem-matcher.json", JSON.stringify(problemMatcher, null, 2));
-
-      # FIXME: use actions/github-script, needs: https://github.com/actions/toolkit/pull/2001
-      - if: ${{ steps.get-files-to-lint.outputs.files }}
-        run: echo "::add-matcher::ratchet-problem-matcher.json"
-
       - id: ratchet
-        uses: "docker://ghcr.io/sethvargo/ratchet:0.10.2@sha256:78f70ed0c85830a78bd9eeb265f49aa375d71887e4245aebc5da9c641d76b245" # v0.10.2
+        # FIXME: should be updated by dependabot. See https://github.com/dependabot/dependabot-core/issues/8362
+        uses: "docker://ghcr.io/sethvargo/ratchet:0.11.0@sha256:f0849ca45ef2bd374633cca5eed5e0f13d825789f90df18f199c3c289002daa2" # 0.11.0
         if: ${{ steps.get-files-to-lint.outputs.files }}
         with:
-          args: "check ${{ steps.get-files-to-lint.outputs.files }}"
-
-      - if: ${{ always() && steps.get-files-to-lint.outputs.files }}
-        run: echo "::remove-matcher owner=ratchet::"
-
-      - if: ${{ failure() && steps.get-files-to-lint.outputs.files }}
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
-        with:
-          script: |
-            const ratchetOutcome = ${{ toJSON(steps.ratchet.outcome) }};
-
-            if (ratchetOutcome !== "failure") {
-              return;
-            }
-
-            // FIXME: should retrieve ratchet error output. See https://github.com/sethvargo/ratchet/issues/103.
-            const ratchetErrorsOutputs = ${{ toJSON(steps.ratchet.outputs.errors) }};
-            if (!ratchetErrorsOutputs || ratchetErrorsOutputs.length === 0) {
-              return;
-            }
-
-            // Format the ratchet errors: found x unpinned refs: ...
-            const unpinnedRefsError = /found (\d+) unpinned refs: (.*)/g.exec(ratchetErrorsOutputs[0]);
-            if (!unpinnedRefsError) {
-              return;
-            }
-
-            const unpinnedRefs = JSON.parse(unpinnedRefsError[2]);
-
-            async function getFileErrors(file) {
-              const fileContent = await fs.promises.readFile(file, "utf8");
-
-              const errors = [];
-
-              for(const unpinnedRef of unpinnedRefs) {
-                if(fileContent.includes(unpinnedRef)) {
-                  errors.push(file);
-                }
-              }
-
-              return errors;
-            }
-
-            const files = ${{ toJSON(steps.get-files-to-lint.outputs.files) }}.split(" ");
-
-            // Annotate file errors
-            await Promise.all(files.map(async (file) => {
-              const errors = await getFileErrors(file);
-              if (errors.length === 0) {
-                return;
-              }
-
-              core.error(
-                `Found ${errors.length} unpinned refs`,
-                {
-                  title: `Unpinned refs: ${JSON.stringify(errors)}`,
-                  file: file
-                }
-              );
-            }));
+          args: "lint --format human --format actions ${{ steps.get-files-to-lint.outputs.files }}"
