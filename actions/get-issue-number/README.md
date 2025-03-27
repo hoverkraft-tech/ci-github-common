@@ -26,7 +26,7 @@ Action to get Pull request or issue number
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.20.0
+- uses: hoverkraft-tech/ci-github-common@0.22.0
   with:
 ```
 

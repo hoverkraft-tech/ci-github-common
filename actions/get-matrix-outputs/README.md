@@ -27,7 +27,7 @@ Download matrix ouputs from artifacts, because GitHub Action does not handle job
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.20.0
+- uses: hoverkraft-tech/ci-github-common@0.22.0
   with:
     # Description: The name of the artifact to download.
     #
