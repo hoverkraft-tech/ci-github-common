@@ -95,6 +95,7 @@ jobs:
     name: 🛡️ CodeQL Analysis
     permissions:
       contents: read
+      actions: read
       security-events: write
     runs-on: ${{ fromJson(inputs.runs-on) }}
     strategy:

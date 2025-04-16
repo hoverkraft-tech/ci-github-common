@@ -38,7 +38,9 @@ on:
 permissions:
   contents: read
   statuses: write
-  security-events: write # If using CodeQL
+  # If using CodeQL
+  actions: read
+  security-events: write
 
 jobs:
   main:
