@@ -44,7 +44,7 @@ permissions:
 
 jobs:
   main:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@0.22.3
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@0.23.0
     with:
       # Json array of runner(s) to use.
       # See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>.
