@@ -190,7 +190,7 @@ jobs:
 
       - id: ratchet
         # FIXME: should be updated by dependabot. See https://github.com/dependabot/dependabot-core/issues/8362
-        uses: "docker://ghcr.io/sethvargo/ratchet:0.11.0@sha256:f0849ca45ef2bd374633cca5eed5e0f13d825789f90df18f199c3c289002daa2" # 0.11.0
+        uses: "docker://ghcr.io/sethvargo/ratchet:0.11.3@sha256:242445a1c55430ad7477e6fcf2027c77d03f5760702537bca4cf622e7338fc81" # 0.11.3
         if: ${{ steps.get-files-to-lint.outputs.files }}
         with:
           args: "lint --format human --format actions ${{ steps.get-files-to-lint.outputs.files }}"
