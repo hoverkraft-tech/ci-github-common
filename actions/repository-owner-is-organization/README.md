@@ -1,6 +1,6 @@
 <!-- start title -->
 
-# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:users color:gray-dark>" /> GitHub Action: Repository owner is organization
+# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:users color:blue>" /> GitHub Action: Repository owner is organization
 
 <!-- end title -->
 <!--
@@ -26,7 +26,7 @@ Action to check if the repository owner is an organization.
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.23.0
+- uses: hoverkraft-tech/ci-github-common@0.23.1
   with:
     # Description: GitHub token for fetching users API.
     #
