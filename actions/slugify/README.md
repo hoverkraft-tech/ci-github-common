@@ -1,6 +1,6 @@
 <!-- start title -->
 
-# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:link-2 color:gray-dark>" /> GitHub Action: Slugify
+# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:link-2 color:blue>" /> GitHub Action: Slugify
 
 <!-- end title -->
 <!--
@@ -26,7 +26,7 @@ Action to slugify a given string value
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.23.0
+- uses: hoverkraft-tech/ci-github-common@0.23.1
   with:
     # Description: The value to slugify
     #

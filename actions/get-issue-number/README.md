@@ -1,6 +1,6 @@
 <!-- start title -->
 
-# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:hash color:gray-dark>" /> GitHub Action: Get issue number
+# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:hash color:blue>" /> GitHub Action: Get issue number
 
 <!-- end title -->
 <!--
@@ -26,7 +26,7 @@ Action to get Pull request or issue number
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.23.0
+- uses: hoverkraft-tech/ci-github-common@0.23.1
   with:
 ```
 

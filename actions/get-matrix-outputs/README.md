@@ -1,6 +1,6 @@
 <!-- start title -->
 
-# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:download-cloud color:gray-dark>" /> GitHub Action: Get matrix ouput
+# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:download-cloud color:blue>" /> GitHub Action: Get matrix ouput
 
 <!-- end title -->
 <!--
@@ -27,7 +27,7 @@ Download matrix ouputs from artifacts, because GitHub Action does not handle job
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.23.0
+- uses: hoverkraft-tech/ci-github-common@0.23.1
   with:
     # Description: The name of the artifact to download.
     #

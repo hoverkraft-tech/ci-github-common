@@ -1,6 +1,6 @@
 <!-- start title -->
 
-# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:git-branch color:gray-dark>" /> GitHub Action: Checkout
+# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:git-branch color:blue>" /> GitHub Action: Checkout
 
 <!-- end title -->
 <!--
@@ -36,7 +36,7 @@ permissions:
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.23.0
+- uses: hoverkraft-tech/ci-github-common@0.23.1
   with:
     # Description: Number of commits to fetch. 0 indicates all history for all
     # branches and tags. See

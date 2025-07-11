@@ -1,6 +1,6 @@
 <!-- start title -->
 
-# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:user-check color:gray-dark>" /> GitHub Action: Get GitHub Actions bot user
+# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:user-check color:blue>" /> GitHub Action: Get GitHub Actions bot user
 
 <!-- end title -->
 <!--
@@ -26,7 +26,7 @@ Action to get the GitHub Actions bot user informations. Usefull to commit, comme
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.23.0
+- uses: hoverkraft-tech/ci-github-common@0.23.1
   with:
 ```
 

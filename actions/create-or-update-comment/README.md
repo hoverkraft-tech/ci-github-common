@@ -1,6 +1,6 @@
 <!-- start title -->
 
-# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:message-square color:gray-dark>" /> GitHub Action: Create or update comment
+# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:message-square color:blue>" /> GitHub Action: Create or update comment
 
 <!-- end title -->
 <!--
@@ -35,7 +35,7 @@ permissions:
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.23.0
+- uses: hoverkraft-tech/ci-github-common@0.23.1
   with:
     # Description: The comment title. Must be static and unique, will be used to
     # retrieve the comment if exists already.
