@@ -1,9 +1,14 @@
-# Continuous Integration - GitHub - Common
+<!-- markdownlint-disable-next-line first-line-heading -->
+<div align="center" width="100%">
+
+# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:anchor color:gray-dark>" /> GitHub Action: Docker Compose Action
 
 [![Continuous Integration](https://github.com/hoverkraft-tech/ci-github-common/actions/workflows/__main-ci.yml/badge.svg)](https://github.com/hoverkraft-tech/ci-github-common/actions/workflows/__main-ci.yml)
 [![GitHub tag](https://img.shields.io/github/tag/hoverkraft-tech/ci-github-common?include_prereleases=&sort=semver&color=blue)](https://github.com/hoverkraft-tech/ci-github-common/releases/)
 [![License](https://img.shields.io/badge/License-MIT-blue)](#license)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+</div>
 
 Opinionated GitHub Actions and workflows for common continuous integration needs
 

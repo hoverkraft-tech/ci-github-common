@@ -1,9 +1,9 @@
 name: "Create and merge Pull Request"
 description: "Action to create and merge Pull Request. Opinionated, set GitHub Actions bot as author, then rebase and merge."
-author: Hoverkraft
+author: hoverkraft
 branding:
   icon: git-pull-request
-  color: gray-dark
+  color: blue
 
 inputs:
   github-token:

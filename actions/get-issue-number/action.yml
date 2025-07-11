@@ -1,9 +1,9 @@
 name: "Get issue number"
 description: "Action to get Pull request or issue number"
-author: Hoverkraft
+author: hoverkraft
 branding:
   icon: hash
-  color: gray-dark
+  color: blue
 
 outputs:
   issue-number:

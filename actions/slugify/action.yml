@@ -1,9 +1,9 @@
 name: "Slugify"
 description: "Action to slugify a given string value"
-author: Hoverkraft
+author: hoverkraft
 branding:
   icon: link-2
-  color: gray-dark
+  color: blue
 
 inputs:
   value:

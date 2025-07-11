@@ -3,10 +3,10 @@
 
 name: "Get matrix ouput"
 description: "Download matrix ouputs from artifacts, because GitHub Action does not handle job outputs for matrix"
-author: Hoverkraft
+author: hoverkraft
 branding:
   icon: download-cloud
-  color: gray-dark
+  color: blue
 
 inputs:
   artifact-name:
