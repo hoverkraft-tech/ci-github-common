@@ -1,9 +1,9 @@
 name: "Repository owner is organization"
 description: "Action to check if the repository owner is an organization."
-author: Hoverkraft
+author: hoverkraft
 branding:
   icon: users
-  color: gray-dark
+  color: blue
 
 inputs:
   github-token:

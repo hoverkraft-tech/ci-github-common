@@ -1,9 +1,9 @@
 name: "Get GitHub Actions bot user"
 description: "Action to get the GitHub Actions bot user informations. Usefull to commit, comment, etc."
-author: Hoverkraft
+author: hoverkraft
 branding:
   icon: user-check
-  color: gray-dark
+  color: blue
 
 outputs:
   email:

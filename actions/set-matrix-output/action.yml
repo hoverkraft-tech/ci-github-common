@@ -28,7 +28,7 @@ runs:
       with:
         script: |
           const { join } = require('path');
-          const { existsSync, writeFileSync } = require('fs');
+          const { writeFileSync } = require('fs');
           const { randomUUID } = require('crypto');
 
           const artifactName = `${{ github.run_id }}-${{ github.run_number }}-${{ inputs.artifact-name }}`;
