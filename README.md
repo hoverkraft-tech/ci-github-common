@@ -1,7 +1,7 @@
 <!-- markdownlint-disable-next-line first-line-heading -->
 <div align="center" width="100%">
 
-# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding" /> Continuous Integration - GitHub - Common
+# <img src=".github/logo.svg" width="60px" align="center" alt="logo" /> Continuous Integration - GitHub - Common
 
 [![Continuous Integration](https://github.com/hoverkraft-tech/ci-github-common/actions/workflows/__main-ci.yml/badge.svg)](https://github.com/hoverkraft-tech/ci-github-common/actions/workflows/__main-ci.yml)
 [![GitHub tag](https://img.shields.io/github/tag/hoverkraft-tech/ci-github-common?include_prereleases=&sort=semver&color=blue)](https://github.com/hoverkraft-tech/ci-github-common/releases/)
