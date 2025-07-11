@@ -16,6 +16,7 @@ permissions:
   statuses: write
   security-events: write
   actions: write
+  pages: write
   pull-requests: write
   # FIXME: This is a workaround for having workflow ref. See https://github.com/orgs/community/discussions/38659
   id-token: write
