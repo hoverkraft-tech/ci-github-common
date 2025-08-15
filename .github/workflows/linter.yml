@@ -61,12 +61,12 @@ jobs:
     name: 🧹 Lint Code Base
     runs-on: ${{ fromJson(inputs.runs-on) }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         if: inputs.lint-all && github.ref_name != github.event.repository.default_branch
         with:
           ref: "${{ github.event.repository.default_branch }}"
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: "${{ inputs.lint-all && 1 || 0 }}"
 
@@ -82,7 +82,7 @@ jobs:
             echo "$line" >> "$GITHUB_ENV"
           done
 
-      - uses: super-linter/super-linter/slim@12150456a73e248bdc94d0794898f94e23127c88 # v7.4.0
+      - uses: super-linter/super-linter/slim@5119dcd8011e92182ce8219d9e9efc82f16fddb6 # v8.0.0
         env:
           VALIDATE_ALL_CODEBASE: ${{ inputs.lint-all }}
           LOG_LEVEL: WARN
@@ -103,13 +103,13 @@ jobs:
       matrix:
         language: ${{ fromJSON(inputs.codeql-languages) }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      - uses: github/codeql-action/init@181d5eefc20863364f96762470ba6f862bdef56b # v3.29.2
+      - uses: github/codeql-action/init@df559355d593797519d70b90fc8edd5db049e7a2 # v3.29.9
         with:
           languages: ${{ matrix.language }}
 
-      - uses: github/codeql-action/analyze@181d5eefc20863364f96762470ba6f862bdef56b # v3.29.2
+      - uses: github/codeql-action/analyze@df559355d593797519d70b90fc8edd5db049e7a2 # v3.29.9
         with:
           category: "/language:${{matrix.language}}"
 
@@ -118,7 +118,7 @@ jobs:
     runs-on: ${{ fromJson(inputs.runs-on) }}
     if: ${{ inputs.action-files }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: "${{ inputs.lint-all && 1 || 0 }}"
 
