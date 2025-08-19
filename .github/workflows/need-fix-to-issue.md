@@ -61,7 +61,7 @@ jobs:
 
 | **Input**                          | **Description**                                                                                                                    | **Default**                   | **Type** | **Required** |
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | -------- | ------------ |
-| **<code>runs-on</code>**           | Json array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>.                 | <code>["ubuntu-latest"]<code> | `string` | **false**    |
+| **<code>runs-on</code>**           | JSON array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>.                 | <code>["ubuntu-latest"]<code> | `string` | **false**    |
 | **<code>manual-commit-ref</code>** | The SHA of the commit to get the diff for.                                                                                         | <code></code>                 | `string` | **false**    |
 | **<code>manual-base-ref</code>**   | By default, the commit entered above is compared to the one directly before it; to go back further, enter an earlier SHA here for. | <code></code>                 | `string` | **false**    |
 

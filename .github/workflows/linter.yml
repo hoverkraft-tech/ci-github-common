@@ -10,7 +10,7 @@ on:
   workflow_call:
     inputs:
       runs-on:
-        description: "Json array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>."
+        description: "JSON array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>."
         type: string
         required: false
         default: '["ubuntu-latest"]'
@@ -88,7 +88,7 @@ jobs:
           LOG_LEVEL: WARN
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GITHUB_TOKEN: ${{ secrets.github-token || github.token }}
-          KUBERNETES_KUBECONFORM_OPTIONS: "--schema-location default --schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'"
+          IGNORE_GITIGNORED_FILES: "true"
 
   codeql:
     if: ${{ inputs.codeql-languages }}
