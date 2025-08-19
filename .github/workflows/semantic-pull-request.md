@@ -65,7 +65,7 @@ jobs:
 
 | **Input**                | **Description**                                                                                                    | **Default**                   | **Type** | **Required** |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------ | ----------------------------- | -------- | ------------ |
-| **<code>runs-on</code>** | Json array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>. | <code>["ubuntu-latest"]<code> | `string` | **false**    |
+| **<code>runs-on</code>** | JSON array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>. | <code>["ubuntu-latest"]<code> | `string` | **false**    |
 
 <!-- end inputs -->
 

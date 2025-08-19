@@ -76,7 +76,7 @@ jobs:
 
 | **Input**                      | **Description**                                                                                                    | **Default**                                                                     | **Type** | **Required** |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | -------- | ------------ |
-| **<code>runs-on</code>**       | Json array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>. | <code>["ubuntu-latest"]</code>                                                  | `string` | **false**    |
+| **<code>runs-on</code>**       | JSON array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>. | <code>["ubuntu-latest"]</code>                                                  | `string` | **false**    |
 | **<code>issue-message</code>** | Comment to post on an individual's first issue. See <https://github.com/actions/first-interaction#usage>.          | <code>Hi, thank for reporting an issue, we will check it out very soon</code>   | `string` | **false**    |
 | **<code>pr-message</code>**    | Comment to post on an individual's first pull request. See <https://github.com/actions/first-interaction#usage>.   | <code>Hi, thank you for creating your PR, we will check it out very soon</code> | `string` | **false**    |
 
