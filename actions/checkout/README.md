@@ -36,7 +36,7 @@ permissions:
 <!-- start usage -->
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.23.1
+- uses: hoverkraft-tech/ci-github-common@0.24.0
   with:
     # Description: Number of commits to fetch. 0 indicates all history for all
     # branches and tags. See
