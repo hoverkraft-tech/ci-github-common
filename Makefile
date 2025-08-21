@@ -8,6 +8,7 @@ lint: ## Execute linting
 
 lint-fix: ## Execute linting and fix
 	$(call run_linter, \
+		-e FIX_GITHUB_ACTIONS_ZIZMOR=true \
 		-e FIX_JSON_PRETTIER=true \
 		-e FIX_JAVASCRIPT_PRETTIER=true \
 		-e FIX_YAML_PRETTIER=true \

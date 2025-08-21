@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
 
       - id: slugify
         uses: ./actions/slugify
@@ -20,7 +22,9 @@ jobs:
 
       - name: Check slugify outputs
         run: |
-          if [ "${{ steps.slugify.outputs.result }}" != 'test-content' ]; then
+          if [ "${STEPS_SLUGIFY_OUTPUTS_RESULT}" != 'test-content' ]; then
             echo "Slugify outputs result is not valid"
             exit 1
           fi
+        env:
+          STEPS_SLUGIFY_OUTPUTS_RESULT: ${{ steps.slugify.outputs.result }}
