@@ -39,7 +39,7 @@ permissions:
 
 jobs:
   greetings:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/greetings.yml@0.24.0
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/greetings.yml@0.25.0
     secrets:
       # Token for the repository.
       # See https://github.com/actions/first-interaction#usage
