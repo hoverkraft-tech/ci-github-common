@@ -30,7 +30,7 @@ permissions:
 
 jobs:
   main:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/stale.yml@0.24.0
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/stale.yml@0.25.0
 
     # Optional customizations.
     with:
