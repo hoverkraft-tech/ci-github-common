@@ -1,12 +1,11 @@
-# Set matrix ouput in file to be uploaded as artifacts, because github action does not handle job outputs for matrix
-# Workaround for https://github.com/orgs/community/discussions/26639
-
 name: "Set matrix ouput"
-description: "Set matrix ouput in file to be uploaded as artifacts, because GitHub Action does not handle job outputs for matrix."
-author: Hoverkraft
+description: |
+  Set matrix ouput in file to be uploaded as artifacts, because GitHub Action does not handle job outputs for matrix.
+  Workaround for https://github.com/orgs/community/discussions/26639.
+author: hoverkraft
 branding:
   icon: upload-cloud
-  color: gray-dark
+  color: blue
 
 inputs:
   value:
@@ -24,7 +23,7 @@ runs:
   using: "composite"
   steps:
     - id: prepare-upload
-      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
       with:
         script: |
           const { join } = require('path');

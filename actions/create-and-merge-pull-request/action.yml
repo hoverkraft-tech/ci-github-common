@@ -1,5 +1,9 @@
+# For this action to work you must explicitly allow GitHub Actions to create pull requests.
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository.
 name: "Create and merge Pull Request"
-description: "Action to create and merge Pull Request. Opinionated, set GitHub Actions bot as author, then rebase and merge."
+description: |
+  Action to create and merge Pull Request.
+  Opinionated, set GitHub Actions bot as author, then rebase and merge.
 author: hoverkraft
 branding:
   icon: git-pull-request
@@ -9,7 +13,7 @@ inputs:
   github-token:
     description: |
       GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write).
-      See <https://github.com/peter-evans/create-pull-request#action-inputs>.
+      See https://github.com/peter-evans/create-pull-request#action-inputs.
     default: ${{ github.token }}
     required: false
   branch:
@@ -57,7 +61,7 @@ runs:
 
     - id: wait-for-pull-request-mergeable-by-admin
       if: steps.create-pull-request.outputs.pull-request-number && steps.create-pull-request.outputs.pull-request-operation != 'closed'
-      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
       with:
         github-token: ${{ inputs.github-token }}
         script: |

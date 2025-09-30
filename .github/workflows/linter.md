@@ -1,13 +1,27 @@
-<!-- start branding -->
-<!-- end branding -->
-<!-- start title -->
+<!-- header:start -->
 
 # GitHub Reusable Workflow: Linter
 
-<!-- end title -->
-<!-- start badges -->
-<!-- end badges -->
-<!-- start description -->
+<div align="center">
+  <img src="../logo.svg" width="60px" align="center" alt="Linter" />
+</div>
+
+---
+
+<!-- header:end -->
+
+<!-- badges:start -->
+
+[![Release](https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common)](https://github.com/hoverkraft-tech/ci-github-common/releases)
+[![License](https://img.shields.io/github/license/hoverkraft-tech/ci-github-common)](http://choosealicense.com/licenses/mit/)
+[![Stars](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md)
+
+<!-- badges:end -->
+
+<!-- overview:start -->
+
+## Overview
 
 Reusable workflow that performs linting on the codebase.
 Executes:
@@ -16,94 +30,148 @@ Executes:
 - [CodeQL](https://docs.github.com/en/code-security/code-scanning/introduction-to-code-scanning/about-code-scanning-with-codeql) to analyze the code.
 - [Ratchet](https://github.com/sethvargo/ratchet) to check that GitHub Action versions are pinned.
 
-<!-- end description -->
-<!-- start contents -->
-<!-- end contents -->
+### Permissions
+
+- **`contents`**: `read`
+- **`statuses`**: `write`
+
+<!-- overview:end -->
+
+<!-- usage:start -->
 
 ## Usage
 
-<!-- start usage -->
-
 ```yaml
-name: "Linter"
-
+name: Linter
 on:
   push:
-    branches: [main]
-    tags: ["*"]
-
-  pull_request:
-    branches: [main]
-
+    branches:
+      - main
 permissions:
   contents: read
   statuses: write
-  # If using CodeQL
-  actions: read
-  security-events: write
-
 jobs:
-  main:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@0.25.0
+  linter:
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@d324c777132734fc988c79a74dff3ee0248835fc # 0.25.0
+    secrets:
+      # Token for marking the status of linter run in the Checks section.
+      # See https://github.com/super-linter/super-linter#how-to-use.
+      # Default GITHUB_TOKEN.
+      github-token: ""
     with:
-      # Json array of runner(s) to use.
-      # See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>.
+      # JSON array of runner(s) to use.
+      # See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job.
+      #
+      # Default: `["ubuntu-latest"]`
       runs-on: '["ubuntu-latest"]'
 
       # Environment variables in multilines format "key=value" to pass to the linter.
-      # See <https://github.com/super-linter/super-linter>.
+      # See https://github.com/super-linter/super-linter.
       linter-env: ""
 
       # JSON array of languages to analyze with CodeQL.
-      # See <https://codeql.github.com/docs/codeql-overview/supported-languages-and-frameworks/>.
+      # See https://codeql.github.com/docs/codeql-overview/supported-languages-and-frameworks/.
       # Leave empty to disable the check.
+      #
+      # Default: `["actions"]`
       codeql-languages: '["actions"]'
 
       # List of files or directories where GitHub Actions and workflows are located.
       # Supports glob patterns.
       # Leave empty to disable the check.
+      #
+      # Default: `./action.yml
+      # ./.github/workflows/**/*.yml
+      # ./actions/**/*.yml
+      # `
       action-files: |
         ./action.yml
         ./.github/workflows/**/*.yml
         ./actions/**/*.yml
 
       # Run checks on all files, not just the changed ones.
-      lint-all: ${{ github.event_name != 'pull_request' }}
-
-    secrets:
-      # Token for marking the status of linter run in the Checks section.
-      # See https://github.com/super-linter/super-linter#how-to-use
-      # Default GITHUB_TOKEN.
-      github-token: ""
+      # Default: `${{ github.event_name != 'pull_request' }}`
+      lint-all: false
 ```
 
-<!-- end usage -->
+<!-- usage:end -->
 
-## Secrets
-
-<!-- start secrets -->
-
-| **Secret**                    | **Description**                                                                                                                  | **Default**               | **Required** |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------ |
-| **<code>github-token</code>** | Token for marking the status of linter run in the Checks section. See <https://github.com/super-linter/super-linter#how-to-use>. | <code>GITHUB_TOKEN</code> | **false**    |
-
-<!-- end secrets -->
+<!-- inputs:start -->
 
 ## Inputs
 
-<!-- start inputs -->
+### Workflow Call Inputs
 
-| **Input**                         | **Description**                                                                                                                                                             | **Default**                                                                       | **Type**  | **Required** |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | --------- | ------------ |
-| **<code>runs-on</code>**          | JSON array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>.                                                          | <code>["ubuntu-latest"]<code>                                                     | `string`  | **false**    |
-| **<code>linter-env</code>**       | Environment variables in multilines format "key=value" to pass to the linter. See <https://github.com/super-linter/super-linter>.                                           | <code>.github/workflows\nactions</code>                                           | `string`  | **false**    |
-| **<code>codeql-languages</code>** | JSON array of languages to analyze with CodeQL. See <https://codeql.github.com/docs/codeql-overview/supported-languages-and-frameworks/>. Leave empty to disable the check. | <code>["actions"]</code>                                                          | `string`  | **false**    |
-| **<code>action-files</code>**     | List of files or directories where GitHub Actions and workflows are located. Supports glob patterns. Leave empty to disable the check.                                      | <code>./action.yml\n./.github/workflows/\*\*/\*.yml\n./actions/\*\*/\*.yml</code> | `string`  | **false**    |
-| **<code>lint-all</code>**         | Run linter on all files, not just the changed ones.                                                                                                                         | <code>github.event_name != 'pull_request'</code>                                  | `boolean` | **false**    |
+| **Input**              | **Description**                                                                           | **Required** | **Type**    | **Default**                                                                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------------------- | ------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`runs-on`**          | JSON array of runner(s) to use.                                                           | **false**    | **string**  | `["ubuntu-latest"]`                                                                                                                         |
+|                        | See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>.        |              |             |                                                                                                                                             |
+| **`linter-env`**       | Environment variables in multilines format "key=value" to pass to the linter.             | **false**    | **string**  | -                                                                                                                                           |
+|                        | See <https://github.com/super-linter/super-linter>.                                       |              |             |                                                                                                                                             |
+| **`codeql-languages`** | JSON array of languages to analyze with CodeQL.                                           | **false**    | **string**  | `["actions"]`                                                                                                                               |
+|                        | See <https://codeql.github.com/docs/codeql-overview/supported-languages-and-frameworks/>. |              |             |                                                                                                                                             |
+|                        | Leave empty to disable the check.                                                         |              |             |                                                                                                                                             |
+| **`action-files`**     | List of files or directories where GitHub Actions and workflows are located.              | **false**    | **string**  | <!-- textlint-disable --><pre>./action.yml&#13;./.github/workflows/\*\*/\*.yml&#13;./actions/\*\*/\*.yml&#13;</pre><!-- textlint-enable --> |
+|                        | Supports glob patterns.                                                                   |              |             |                                                                                                                                             |
+|                        | Leave empty to disable the check.                                                         |              |             |                                                                                                                                             |
+| **`lint-all`**         | Run checks on all files, not just the changed ones.                                       | **false**    | **boolean** | `${{ github.event_name != 'pull_request' }}`                                                                                                |
 
-<!-- end inputs -->
+<!-- inputs:end -->
 
-<!-- start outputs -->
-<!-- end outputs -->
-<!-- start [.github/ghadocs/examples/] -->
-<!-- end [.github/ghadocs/examples/] -->
+<!-- secrets:start -->
+
+## Secrets
+
+| **Secret**         | **Description**                                                   | **Required** |
+| ------------------ | ----------------------------------------------------------------- | ------------ |
+| **`github-token`** | Token for marking the status of linter run in the Checks section. | **false**    |
+|                    | See <https://github.com/super-linter/super-linter#how-to-use>.    |              |
+|                    | Default GITHUB_TOKEN.                                             |              |
+
+<!-- secrets:end -->
+
+<!-- outputs:start -->
+<!-- outputs:end -->
+
+<!-- examples:start -->
+<!-- examples:end -->
+
+<!--
+// jscpd:ignore-start
+-->
+
+<!-- contributing:start -->
+
+## Contributing
+
+Contributions are welcome! Please see the [contributing guidelines](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md) for more details.
+
+<!-- contributing:end -->
+
+<!-- security:start -->
+<!-- security:end -->
+
+<!-- license:start -->
+
+## License
+
+This project is licensed under the MIT License.
+
+SPDX-License-Identifier: MIT
+
+Copyright © 2025 hoverkraft-tech
+
+For more details, see the [license](http://choosealicense.com/licenses/mit/).
+
+<!-- license:end -->
+
+<!-- generated:start -->
+
+---
+
+This documentation was automatically generated by [CI Dokumentor](https://github.com/hoverkraft-tech/ci-dokumentor).
+
+<!-- generated:end -->
+<!--
+// jscpd:ignore-end
+-->

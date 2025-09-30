@@ -1,5 +1,5 @@
 name: "Slugify"
-description: "Action to slugify a given string value"
+description: "Action to slugify a given string value."
 author: hoverkraft
 branding:
   icon: link-2
@@ -7,7 +7,7 @@ branding:
 
 inputs:
   value:
-    description: "The value to slugify"
+    description: "The value to slugify."
     required: true
 
 outputs:

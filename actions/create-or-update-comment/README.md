@@ -1,28 +1,32 @@
-<!-- start title -->
+<!-- header:start -->
 
-# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:message-square color:blue>" /> GitHub Action: Create or update comment
+# ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItbWVzc2FnZS1zcXVhcmUiIGNvbG9yPSJibHVlIj48cGF0aCBkPSJNMjEgMTVhMiAyIDAgMCAxLTIgMkg3bC00IDRWNWEyIDIgMCAwIDEgMi0yaDE0YTIgMiAwIDAgMSAyIDJ6Ij48L3BhdGg+PC9zdmc+) GitHub Action: Create or update comment
 
-<!-- end title -->
-<!--
-// jscpd:ignore-start
--->
-<!-- markdownlint-disable MD013 -->
-<!-- start badges -->
+<div align="center">
+  <img src="../../.github/logo.svg" width="60px" align="center" alt="Create or update comment" />
+</div>
 
-<a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Freleases%2Flatest"><img src="https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20tag" /></a><a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Freleases%2Flatest"><img src="https://img.shields.io/github/release-date/hoverkraft-tech/ci-github-common?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20date" /></a><img src="https://img.shields.io/github/last-commit/hoverkraft-tech/ci-github-common?logo=github&style=flat-square" alt="Commit" /><a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Fissues"><img src="https://img.shields.io/github/issues/hoverkraft-tech/ci-github-common?logo=github&style=flat-square" alt="Open%20Issues" /></a><img src="https://img.shields.io/github/downloads/hoverkraft-tech/ci-github-common/total?logo=github&style=flat-square" alt="Downloads" />
+---
 
-<!-- end badges -->
-<!-- markdownlint-enable MD013 -->
-<!--
-// jscpd:ignore-end
--->
-<!-- start description -->
+<!-- header:end -->
 
-Action to create or update comment in pull request or issue
+<!-- badges:start -->
 
-<!-- end description -->
-<!-- start contents -->
-<!-- end contents -->
+[![Marketplace](https://img.shields.io/badge/Marketplace-create--or--update--comment-blue?logo=github-actions)](https://github.com/marketplace/actions/create-or-update-comment)
+[![Release](https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common)](https://github.com/hoverkraft-tech/ci-github-common/releases)
+[![License](https://img.shields.io/github/license/hoverkraft-tech/ci-github-common)](http://choosealicense.com/licenses/mit/)
+[![Stars](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md)
+
+<!-- badges:end -->
+
+<!-- overview:start -->
+
+## Overview
+
+Action to create or update comment in pull request or issue.
+
+<!-- overview:end -->
 
 Set permissions to write issues and pull-requests. This is required to write the comment on the PR.
 
@@ -32,50 +36,102 @@ permissions:
   pull-requests: write
 ```
 
-<!-- start usage -->
+<!-- usage:start -->
+
+## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.25.0
+- uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@d324c777132734fc988c79a74dff3ee0248835fc # 0.25.0
   with:
-    # Description: The comment title. Must be static and unique, will be used to
-    # retrieve the comment if exists already.
+    # The comment title.
+    # Must be static and unique, will be used to retrieve the comment if exists already.
     #
+    # This input is required.
     title: ""
 
-    # Description: The comment body. See
-    # [https://github.com/peter-evans/create-or-update-comment](https://github.com/peter-evans/create-or-update-comment)
-    #
+    # The comment body.
+    # See https://github.com/peter-evans/create-or-update-comment.
     body: ""
 
-    # Description: A comma separated list of reactions to add to the comment. See
-    # [https://github.com/peter-evans/create-or-update-comment](https://github.com/peter-evans/create-or-update-comment)
-    #
+    # A comma separated list of reactions to add to the comment.
+    # See https://github.com/peter-evans/create-or-update-comment.
     reactions: ""
 
-    # Description: The comment author. Default is github-actions[bot].
-    #
-    # Default: github-actions[bot]
-    comment-author: ""
+    # The comment author.
+    # Default: `github-actions[bot]`
+    comment-author: github-actions[bot]
 
-    # Description: Optional token to interact with GitHub API. If not defined or
-    # empty, the action will use the GITHUB_TOKEN provided by GitHub.
-    #
+    # Optional token to interact with GitHub API.
+    # If not defined or empty, the action will use the GITHUB_TOKEN provided by GitHub.
     token: ""
 ```
 
-<!-- end usage -->
-<!-- start inputs -->
+<!-- usage:end -->
 
-| **Input**                   | **Description**                                                                                                                                                                   | **Default**                      | **Required** |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------ |
-| <code>title</code>          | The comment title. Must be static and unique, will be used to retrieve the comment if exists already.                                                                             |                                  | **true**     |
-| <code>body</code>           | The comment body. See [https://github.com/peter-evans/create-or-update-comment](https://github.com/peter-evans/create-or-update-comment)                                          |                                  | **false**    |
-| <code>reactions</code>      | A comma separated list of reactions to add to the comment. See [https://github.com/peter-evans/create-or-update-comment](https://github.com/peter-evans/create-or-update-comment) |                                  | **false**    |
-| <code>comment-author</code> | The comment author. Default is github-actions[bot].                                                                                                                               | <code>github-actions[bot]</code> | **false**    |
-| <code>token</code>          | Optional token to interact with GitHub API.<br />If not defined or empty, the action will use the GITHUB_TOKEN provided by GitHub.                                                |                                  | **false**    |
+<!-- inputs:start -->
 
-<!-- end inputs -->
-<!-- start outputs -->
-<!-- end outputs -->
-<!-- start [.github/ghadocs/examples/] -->
-<!-- end [.github/ghadocs/examples/] -->
+## Inputs
+
+| **Input**            | **Description**                                                                    | **Required** | **Default**           |
+| -------------------- | ---------------------------------------------------------------------------------- | ------------ | --------------------- |
+| **`title`**          | The comment title.                                                                 | **true**     | -                     |
+|                      | Must be static and unique, will be used to retrieve the comment if exists already. |              |                       |
+| **`body`**           | The comment body.                                                                  | **false**    | -                     |
+|                      | See <https://github.com/peter-evans/create-or-update-comment>.                     |              |                       |
+| **`reactions`**      | A comma separated list of reactions to add to the comment.                         | **false**    | -                     |
+|                      | See <https://github.com/peter-evans/create-or-update-comment>.                     |              |                       |
+| **`comment-author`** | The comment author.                                                                | **false**    | `github-actions[bot]` |
+| **`token`**          | Optional token to interact with GitHub API.                                        | **false**    | -                     |
+|                      | If not defined or empty, the action will use the GITHUB_TOKEN provided by GitHub.  |              |                       |
+
+<!-- inputs:end -->
+
+<!-- secrets:start -->
+<!-- secrets:end -->
+
+<!-- outputs:start -->
+<!-- outputs:end -->
+
+<!-- examples:start -->
+<!-- examples:end -->
+
+<!--
+// jscpd:ignore-start
+-->
+
+<!-- contributing:start -->
+
+## Contributing
+
+Contributions are welcome! Please see the [contributing guidelines](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md) for more details.
+
+<!-- contributing:end -->
+
+<!-- security:start -->
+<!-- security:end -->
+
+<!-- license:start -->
+
+## License
+
+This project is licensed under the MIT License.
+
+SPDX-License-Identifier: MIT
+
+Copyright © 2025 hoverkraft
+
+For more details, see the [license](http://choosealicense.com/licenses/mit/).
+
+<!-- license:end -->
+
+<!-- generated:start -->
+
+---
+
+This documentation was automatically generated by [CI Dokumentor](https://github.com/hoverkraft-tech/ci-dokumentor).
+
+<!-- generated:end -->
+
+<!--
+// jscpd:ignore-end
+-->

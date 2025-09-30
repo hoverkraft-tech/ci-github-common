@@ -1,13 +1,27 @@
-<!-- start branding -->
-<!-- end branding -->
-<!-- start title -->
+<!-- header:start -->
 
 # GitHub Reusable Workflow: Greetings
 
-<!-- end title -->
-<!-- start badges -->
-<!-- end badges -->
-<!-- start description -->
+<div align="center">
+  <img src="../logo.svg" width="60px" align="center" alt="Greetings" />
+</div>
+
+---
+
+<!-- header:end -->
+
+<!-- badges:start -->
+
+[![Release](https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common)](https://github.com/hoverkraft-tech/ci-github-common/releases)
+[![License](https://img.shields.io/github/license/hoverkraft-tech/ci-github-common)](http://choosealicense.com/licenses/mit/)
+[![Stars](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md)
+
+<!-- badges:end -->
+
+<!-- overview:start -->
+
+## Overview
 
 Workflow to greet new contributors.
 Mainly using [First Interaction Action](https://github.com/actions/first-interaction), with some opinionated defaults.
@@ -15,74 +29,128 @@ Mainly using [First Interaction Action](https://github.com/actions/first-interac
 - On issue creation, a comment is added to the issue.
 - On first contribution, a comment is added to the pull request.
 
-<!-- end description -->
-<!-- start contents -->
-<!-- end contents -->
+### Permissions
+
+- **`contents`**: `read`
+- **`issues`**: `write`
+- **`pull-requests`**: `write`
+
+<!-- overview:end -->
+
+<!-- usage:start -->
 
 ## Usage
 
-<!-- start usage -->
-
 ```yaml
 name: Greetings
-
 on:
   issues:
-    types: [opened]
+    types:
+      - opened
   pull_request_target:
-    branches: [main]
-
+    branches:
+      - main
 permissions:
   contents: read
   issues: write
   pull-requests: write
-
 jobs:
   greetings:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/greetings.yml@0.25.0
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/greetings.yml@d324c777132734fc988c79a74dff3ee0248835fc # 0.25.0
     secrets:
       # Token for the repository.
-      # See https://github.com/actions/first-interaction#usage
-      # Default GITHUB_TOKEN
+      # See https://github.com/actions/first-interaction#usage.
+      # Defaults to the GITHUB_TOKEN secret.
       github-token: ""
-
-    # Optional customizations.
     with:
+      # JSON array of runner(s) to use.
+      # See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job.
+      #
+      # Default: `["ubuntu-latest"]`
+      runs-on: '["ubuntu-latest"]'
+
       # Comment to post on an individual's first issue.
-      # See https://github.com/actions/first-interaction#usage
-      # Default: "Hi, thank for reporting an issue, we will check it out very soon"
+      # See https://github.com/actions/first-interaction#usage.
       issue-message: ""
+
       # Comment to post on an individual's first pull request.
-      # See https://github.com/actions/first-interaction#usage
-      # Default: "Hi, thank you for creating your PR, we will check it out very soon"
+      # See https://github.com/actions/first-interaction#usage.
       pr-message: ""
 ```
 
-<!-- end usage -->
+<!-- usage:end -->
 
-## Secrets
-
-<!-- start secrets -->
-
-| **Secret**                    | **Description**                                                                     | **Default**               | **Required** |
-| ----------------------------- | ----------------------------------------------------------------------------------- | ------------------------- | ------------ |
-| **<code>github-token</code>** | Token for the repository. See <https://github.com/actions/first-interaction#usage>. | <code>GITHUB_TOKEN</code> | **false**    |
-
-<!-- end secrets -->
+<!-- inputs:start -->
 
 ## Inputs
 
-<!-- start inputs -->
+### Workflow Call Inputs
 
-| **Input**                      | **Description**                                                                                                    | **Default**                                                                     | **Type** | **Required** |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | -------- | ------------ |
-| **<code>runs-on</code>**       | JSON array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>. | <code>["ubuntu-latest"]</code>                                                  | `string` | **false**    |
-| **<code>issue-message</code>** | Comment to post on an individual's first issue. See <https://github.com/actions/first-interaction#usage>.          | <code>Hi, thank for reporting an issue, we will check it out very soon</code>   | `string` | **false**    |
-| **<code>pr-message</code>**    | Comment to post on an individual's first pull request. See <https://github.com/actions/first-interaction#usage>.   | <code>Hi, thank you for creating your PR, we will check it out very soon</code> | `string` | **false**    |
+| **Input**           | **Description**                                                                    | **Required** | **Type**   | **Default**         |
+| ------------------- | ---------------------------------------------------------------------------------- | ------------ | ---------- | ------------------- |
+| **`runs-on`**       | JSON array of runner(s) to use.                                                    | **false**    | **string** | `["ubuntu-latest"]` |
+|                     | See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>. |              |            |                     |
+| **`issue-message`** | Comment to post on an individual's first issue.                                    | **false**    | **string** | -                   |
+|                     | See <https://github.com/actions/first-interaction#usage>.                          |              |            |                     |
+| **`pr-message`**    | Comment to post on an individual's first pull request.                             | **false**    | **string** | -                   |
+|                     | See <https://github.com/actions/first-interaction#usage>.                          |              |            |                     |
 
-<!-- end inputs -->
+<!-- inputs:end -->
 
-<!-- start outputs -->
-<!-- end outputs -->
-<!-- start [.github/ghadocs/examples/] -->
-<!-- end [.github/ghadocs/examples/] -->
+<!-- secrets:start -->
+
+## Secrets
+
+| **Secret**         | **Description**                                           | **Required** |
+| ------------------ | --------------------------------------------------------- | ------------ |
+| **`github-token`** | Token for the repository.                                 | **false**    |
+|                    | See <https://github.com/actions/first-interaction#usage>. |              |
+|                    | Defaults to the GITHUB_TOKEN secret.                      |              |
+
+<!-- secrets:end -->
+
+<!-- outputs:start -->
+<!-- outputs:end -->
+
+<!-- examples:start -->
+<!-- examples:end -->
+
+<!--
+// jscpd:ignore-start
+-->
+
+<!-- contributing:start -->
+
+## Contributing
+
+Contributions are welcome! Please see the [contributing guidelines](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md) for more details.
+
+<!-- contributing:end -->
+
+<!-- security:start -->
+<!-- security:end -->
+
+<!-- license:start -->
+
+## License
+
+This project is licensed under the MIT License.
+
+SPDX-License-Identifier: MIT
+
+Copyright © 2025 hoverkraft-tech
+
+For more details, see the [license](http://choosealicense.com/licenses/mit/).
+
+<!-- license:end -->
+
+<!-- generated:start -->
+
+---
+
+This documentation was automatically generated by [CI Dokumentor](https://github.com/hoverkraft-tech/ci-dokumentor).
+
+<!-- generated:end -->
+<!--
+// jscpd:ignore-end
+-->
