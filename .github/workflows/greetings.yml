@@ -1,7 +1,6 @@
-# Greetings
-# ==========================
 # Workflow to greet new contributors.
 # Mainly using [First Interaction Action](https://github.com/actions/first-interaction), with some opinionated defaults.
+#
 # - On issue creation, a comment is added to the issue.
 # - On first contribution, a comment is added to the pull request.
 
@@ -16,21 +15,30 @@ on:
   workflow_call:
     inputs:
       runs-on:
-        description: "JSON array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>."
+        description: |
+          JSON array of runner(s) to use.
+          See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job.
         type: string
         default: '["ubuntu-latest"]'
         required: false
       issue-message:
-        description: "Comment to post on an individual's first issue. See <https://github.com/actions/first-interaction#usage>."
+        description: |
+          Comment to post on an individual's first issue.
+          See https://github.com/actions/first-interaction#usage.
         type: string
         required: false
       pr-message:
-        description: "Comment to post on an individual's first pull request. See <https://github.com/actions/first-interaction#usage>."
+        description: |
+          Comment to post on an individual's first pull request.
+          See https://github.com/actions/first-interaction#usage.
         type: string
         required: false
     secrets:
       github-token:
-        description: "Token for the repository. See <https://github.com/actions/first-interaction#usage>."
+        description: |
+          Token for the repository.
+          See https://github.com/actions/first-interaction#usage.
+          Defaults to the GITHUB_TOKEN secret.
 
 permissions:
   contents: read

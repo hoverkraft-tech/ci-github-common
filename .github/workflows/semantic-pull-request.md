@@ -1,13 +1,27 @@
-<!-- start branding -->
-<!-- end branding -->
-<!-- start title -->
+<!-- header:start -->
 
-# GitHub Reusable Workflow: Semantic pull request
+# GitHub Reusable Workflow: Semantic Pull Request
 
-<!-- end title -->
-<!-- start badges -->
-<!-- end badges -->
-<!-- start description -->
+<div align="center">
+  <img src="../logo.svg" width="60px" align="center" alt="Semantic Pull Request" />
+</div>
+
+---
+
+<!-- header:end -->
+
+<!-- badges:start -->
+
+[![Release](https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common)](https://github.com/hoverkraft-tech/ci-github-common/releases)
+[![License](https://img.shields.io/github/license/hoverkraft-tech/ci-github-common)](http://choosealicense.com/licenses/mit/)
+[![Stars](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md)
+
+<!-- badges:end -->
+
+<!-- overview:start -->
+
+## Overview
 
 Workflow to ensure Pull Request provides semantic versionning assets:
 
@@ -15,63 +29,112 @@ Workflow to ensure Pull Request provides semantic versionning assets:
   Check that the title follows the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
   Mainly using [action-semantic-pull-request](https://github.com/amannn/action-semantic-pull-request#installation), with some opinionated defaults.
 
-<!-- end description -->
-<!-- start contents -->
-<!-- end contents -->
+### Permissions
+
+- **`contents`**: `write`
+- **`pull-requests`**: `write`
+
+<!-- overview:end -->
+
+<!-- usage:start -->
 
 ## Usage
 
-<!-- start usage -->
-
 ```yaml
-name: "Pull Request - Semantic Lint"
-
+name: Semantic Pull Request
 on:
   pull_request_target:
     types:
       - opened
       - edited
       - synchronize
-
 permissions:
   contents: write
   pull-requests: write
-
 jobs:
-  main:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@0.25.0
+  semantic-pull-request:
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@d324c777132734fc988c79a74dff3ee0248835fc # 0.25.0
     secrets:
       # Token for the repository.
-      # Default GITHUB_TOKEN
+      # Default: GITHUB_TOKEN.
       github-token: ""
+    with:
+      # JSON array of runner(s) to use.
+      # See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job.
+      #
+      # Default: `["ubuntu-latest"]`
+      runs-on: '["ubuntu-latest"]'
 ```
 
-<!-- end usage -->
+<!-- usage:end -->
 
-## Secrets
-
-<!-- start secrets -->
-
-| **Secret**                    | **Description**           | **Required** |
-| ----------------------------- | ------------------------- | ------------ |
-| **<code>github-token</code>** | Token for the repository. | **false**    |
-
-<!-- end secrets -->
-<!-- start inputs -->
+<!-- inputs:start -->
 
 ## Inputs
 
-<!-- start inputs -->
+### Workflow Call Inputs
 
-| **Input**                | **Description**                                                                                                    | **Default**                   | **Type** | **Required** |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------ | ----------------------------- | -------- | ------------ |
-| **<code>runs-on</code>** | JSON array of runner(s) to use. See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>. | <code>["ubuntu-latest"]<code> | `string` | **false**    |
+| **Input**     | **Description**                                                                    | **Required** | **Type**   | **Default**         |
+| ------------- | ---------------------------------------------------------------------------------- | ------------ | ---------- | ------------------- |
+| **`runs-on`** | JSON array of runner(s) to use.                                                    | **false**    | **string** | `["ubuntu-latest"]` |
+|               | See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>. |              |            |                     |
 
-<!-- end inputs -->
+<!-- inputs:end -->
 
-<!-- end inputs -->
+<!-- secrets:start -->
 
-<!-- start outputs -->
-<!-- end outputs -->
-<!-- start [.github/ghadocs/examples/] -->
-<!-- end [.github/ghadocs/examples/] -->
+## Secrets
+
+| **Secret**         | **Description**           | **Required** |
+| ------------------ | ------------------------- | ------------ |
+| **`github-token`** | Token for the repository. | **false**    |
+|                    | Default: GITHUB_TOKEN.    |              |
+
+<!-- secrets:end -->
+
+<!-- outputs:start -->
+<!-- outputs:end -->
+
+<!-- examples:start -->
+<!-- examples:end -->
+
+<!--
+// jscpd:ignore-start
+-->
+
+<!-- contributing:start -->
+
+## Contributing
+
+Contributions are welcome! Please see the [contributing guidelines](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md) for more details.
+
+<!-- contributing:end -->
+
+<!-- security:start -->
+<!-- security:end -->
+
+<!-- license:start -->
+
+## License
+
+This project is licensed under the MIT License.
+
+SPDX-License-Identifier: MIT
+
+Copyright © 2025 hoverkraft-tech
+
+For more details, see the [license](http://choosealicense.com/licenses/mit/).
+
+<!-- license:end -->
+
+<!-- generated:start -->
+
+---
+
+This documentation was automatically generated by [CI Dokumentor](https://github.com/hoverkraft-tech/ci-dokumentor).
+
+<!-- generated:end -->
+
+<!--
+// jscpd:ignore-end
+-->

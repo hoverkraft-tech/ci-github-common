@@ -1,44 +1,105 @@
-<!-- start title -->
+<!-- header:start -->
 
-# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:hash color:blue>" /> GitHub Action: Get issue number
+# ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItaGFzaCIgY29sb3I9ImJsdWUiPjxsaW5lIHgxPSI0IiB5MT0iOSIgeDI9IjIwIiB5Mj0iOSI+PC9saW5lPjxsaW5lIHgxPSI0IiB5MT0iMTUiIHgyPSIyMCIgeTI9IjE1Ij48L2xpbmU+PGxpbmUgeDE9IjEwIiB5MT0iMyIgeDI9IjgiIHkyPSIyMSI+PC9saW5lPjxsaW5lIHgxPSIxNiIgeTE9IjMiIHgyPSIxNCIgeTI9IjIxIj48L2xpbmU+PC9zdmc+) GitHub Action: Get issue number
 
-<!-- end title -->
-<!--
-// jscpd:ignore-start
--->
-<!-- markdownlint-disable MD013 -->
-<!-- start badges -->
+<div align="center">
+  <img src="../../.github/logo.svg" width="60px" align="center" alt="Get issue number" />
+</div>
 
-<a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Freleases%2Flatest"><img src="https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20tag" /></a><a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Freleases%2Flatest"><img src="https://img.shields.io/github/release-date/hoverkraft-tech/ci-github-common?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20date" /></a><img src="https://img.shields.io/github/last-commit/hoverkraft-tech/ci-github-common?logo=github&style=flat-square" alt="Commit" /><a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Fissues"><img src="https://img.shields.io/github/issues/hoverkraft-tech/ci-github-common?logo=github&style=flat-square" alt="Open%20Issues" /></a><img src="https://img.shields.io/github/downloads/hoverkraft-tech/ci-github-common/total?logo=github&style=flat-square" alt="Downloads" />
+---
 
-<!-- end badges -->
-<!-- markdownlint-enable MD013 -->
-<!--
-// jscpd:ignore-end
--->
-<!-- start description -->
+<!-- header:end -->
+
+<!-- badges:start -->
+
+[![Marketplace](https://img.shields.io/badge/Marketplace-get--issue--number-blue?logo=github-actions)](https://github.com/marketplace/actions/get-issue-number)
+[![Release](https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common)](https://github.com/hoverkraft-tech/ci-github-common/releases)
+[![License](https://img.shields.io/github/license/hoverkraft-tech/ci-github-common)](http://choosealicense.com/licenses/mit/)
+[![Stars](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md)
+
+<!-- badges:end -->
+
+<!-- overview:start -->
+
+## Overview
 
 Action to get Pull request or issue number
 
-<!-- end description -->
-<!-- start contents -->
-<!-- end contents -->
-<!-- start usage -->
+<!-- overview:end -->
+
+<!-- usage:start -->
+
+## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.25.0
-  with:
+- uses: hoverkraft-tech/ci-github-common/actions/get-issue-number@d324c777132734fc988c79a74dff3ee0248835fc # 0.25.0
 ```
 
-<!-- end usage -->
-<!-- start inputs -->
-<!-- end inputs -->
-<!-- start outputs -->
+<!-- usage:end -->
 
-| **Output**                | **Description**   |
-| ------------------------- | ----------------- |
-| <code>issue-number</code> | The issue number. |
+<!-- inputs:start -->
 
-<!-- end outputs -->
-<!-- start [.github/ghadocs/examples/] -->
-<!-- end [.github/ghadocs/examples/] -->
+## Inputs
+
+| **Input** | **Description** | **Required** | **Default** |
+| --------- | --------------- | ------------ | ----------- |
+
+<!-- inputs:end -->
+
+<!-- secrets:start -->
+<!-- secrets:end -->
+
+<!-- outputs:start -->
+
+## Outputs
+
+| **Output**         | **Description**   |
+| ------------------ | ----------------- |
+| **`issue-number`** | The issue number. |
+
+<!-- outputs:end -->
+
+<!-- examples:start -->
+<!-- examples:end -->
+
+<!--
+// jscpd:ignore-start
+-->
+
+<!-- contributing:start -->
+
+## Contributing
+
+Contributions are welcome! Please see the [contributing guidelines](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md) for more details.
+
+<!-- contributing:end -->
+
+<!-- security:start -->
+<!-- security:end -->
+
+<!-- license:start -->
+
+## License
+
+This project is licensed under the MIT License.
+
+SPDX-License-Identifier: MIT
+
+Copyright © 2025 hoverkraft
+
+For more details, see the [license](http://choosealicense.com/licenses/mit/).
+
+<!-- license:end -->
+
+<!-- generated:start -->
+
+---
+
+This documentation was automatically generated by [CI Dokumentor](https://github.com/hoverkraft-tech/ci-dokumentor).
+
+<!-- generated:end -->
+
+<!--
+// jscpd:ignore-end
+-->

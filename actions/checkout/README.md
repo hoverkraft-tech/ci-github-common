@@ -1,28 +1,33 @@
-<!-- start title -->
+<!-- header:start -->
 
-# <img src=".github/ghadocs/branding.svg" width="60px" align="center" alt="branding<icon:git-branch color:blue>" /> GitHub Action: Checkout
+# ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItZ2l0LWJyYW5jaCIgY29sb3I9ImJsdWUiPjxsaW5lIHgxPSI2IiB5MT0iMyIgeDI9IjYiIHkyPSIxNSI+PC9saW5lPjxjaXJjbGUgY3g9IjE4IiBjeT0iNiIgcj0iMyI+PC9jaXJjbGU+PGNpcmNsZSBjeD0iNiIgY3k9IjE4IiByPSIzIj48L2NpcmNsZT48cGF0aCBkPSJNMTggOWE5IDkgMCAwIDEtOSA5Ij48L3BhdGg+PC9zdmc+) GitHub Action: Checkout
 
-<!-- end title -->
-<!--
-// jscpd:ignore-start
--->
-<!-- markdownlint-disable MD013 -->
-<!-- start badges -->
+<div align="center">
+  <img src="../../.github/logo.svg" width="60px" align="center" alt="Checkout" />
+</div>
 
-<a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Freleases%2Flatest"><img src="https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20tag" /></a><a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Freleases%2Flatest"><img src="https://img.shields.io/github/release-date/hoverkraft-tech/ci-github-common?display_name=tag&sort=semver&logo=github&style=flat-square" alt="Release%20by%20date" /></a><img src="https://img.shields.io/github/last-commit/hoverkraft-tech/ci-github-common?logo=github&style=flat-square" alt="Commit" /><a href="https%3A%2F%2Fgithub.com%2Fhoverkraft-tech%2Fci-github-common%2Fissues"><img src="https://img.shields.io/github/issues/hoverkraft-tech/ci-github-common?logo=github&style=flat-square" alt="Open%20Issues" /></a><img src="https://img.shields.io/github/downloads/hoverkraft-tech/ci-github-common/total?logo=github&style=flat-square" alt="Downloads" />
+---
 
-<!-- end badges -->
-<!-- markdownlint-enable MD013 -->
-<!--
-// jscpd:ignore-end
--->
-<!-- start description -->
+<!-- header:end -->
 
-Action to checkout the repository compatible for PRs, issues and push events. Workaround for [https://github.com/actions/checkout/issues/331](https://github.com/actions/checkout/issues/331)
+<!-- badges:start -->
 
-<!-- end description -->
-<!-- start contents -->
-<!-- end contents -->
+[![Marketplace](https://img.shields.io/badge/Marketplace-checkout-blue?logo=github-actions)](https://github.com/marketplace/actions/checkout)
+[![Release](https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common)](https://github.com/hoverkraft-tech/ci-github-common/releases)
+[![License](https://img.shields.io/github/license/hoverkraft-tech/ci-github-common)](http://choosealicense.com/licenses/mit/)
+[![Stars](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md)
+
+<!-- badges:end -->
+
+<!-- overview:start -->
+
+## Overview
+
+Action to checkout the repository compatible for PRs, issues and push events.
+Workaround for <https://github.com/actions/checkout/issues/331>](<https://github.com/actions/checkout/issues/331>.
+
+<!-- overview:end -->
 
 Set permissions to read contents and pull-requests. This is required to get the PR branch.
 
@@ -33,42 +38,93 @@ permissions:
   pull-requests: read
 ```
 
-<!-- start usage -->
+<!-- usage:start -->
+
+## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common@0.25.0
+- uses: hoverkraft-tech/ci-github-common/actions/checkout@d324c777132734fc988c79a74dff3ee0248835fc # 0.25.0
   with:
-    # Description: Number of commits to fetch. 0 indicates all history for all
-    # branches and tags. See
-    # [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)
+    # Number of commits to fetch. 0 indicates all history for all branches and tags.
+    # See https://github.com/actions/checkout#usage
     #
-    # Default: 1
-    fetch-depth: ""
+    # Default: `1`
+    fetch-depth: "1"
 
-    # Description: Whether to download Git-LFS files. See
-    # [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)
+    # Whether to download Git-LFS files.
+    # See https://github.com/actions/checkout#usage
     #
-    # Default: false
-    lfs: ""
+    # Default: `false`
+    lfs: "false"
 
-    # Description: Token to use for checking out the repository instead of the default
-    # GITHUB_TOKEN. If specified and not empty, persist-credentials in checkout will
-    # be false.
-    #
+    # Token to use for checking out the repository instead of the default GITHUB_TOKEN.
+    # If specified and not empty, persist-credentials in checkout will be false.
     token: ""
 ```
 
-<!-- end usage -->
-<!-- start inputs -->
+<!-- usage:end -->
 
-| **Input**                | **Description**                                                                                                                                                           | **Default**        | **Required** |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------ |
-| <code>fetch-depth</code> | Number of commits to fetch. 0 indicates all history for all branches and tags. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage) | <code>1</code>     | **false**    |
-| <code>lfs</code>         | Whether to download Git-LFS files. See [https://github.com/actions/checkout#usage](https://github.com/actions/checkout#usage)                                             | <code>false</code> | **false**    |
-| <code>token</code>       | Token to use for checking out the repository instead of the default GITHUB_TOKEN.<br />If specified and not empty, persist-credentials in checkout will be false.         |                    | **false**    |
+<!-- inputs:start -->
 
-<!-- end inputs -->
-<!-- start outputs -->
-<!-- end outputs -->
-<!-- start [.github/ghadocs/examples/] -->
-<!-- end [.github/ghadocs/examples/] -->
+## Inputs
+
+| **Input**         | **Description**                                                                   | **Required** | **Default** |
+| ----------------- | --------------------------------------------------------------------------------- | ------------ | ----------- |
+| **`fetch-depth`** | Number of commits to fetch. 0 indicates all history for all branches and tags.    | **false**    | `1`         |
+|                   | See <https://github.com/actions/checkout#usage>                                   |              |             |
+| **`lfs`**         | Whether to download Git-LFS files.                                                | **false**    | `false`     |
+|                   | See <https://github.com/actions/checkout#usage>                                   |              |             |
+| **`token`**       | Token to use for checking out the repository instead of the default GITHUB_TOKEN. | **false**    | -           |
+|                   | If specified and not empty, persist-credentials in checkout will be false.        |              |             |
+
+<!-- inputs:end -->
+
+<!-- secrets:start -->
+<!-- secrets:end -->
+
+<!-- outputs:start -->
+<!-- outputs:end -->
+
+<!-- examples:start -->
+<!-- examples:end -->
+
+<!--
+// jscpd:ignore-start
+-->
+
+<!-- contributing:start -->
+
+## Contributing
+
+Contributions are welcome! Please see the [contributing guidelines](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md) for more details.
+
+<!-- contributing:end -->
+
+<!-- security:start -->
+<!-- security:end -->
+
+<!-- license:start -->
+
+## License
+
+This project is licensed under the MIT License.
+
+SPDX-License-Identifier: MIT
+
+Copyright © 2025 hoverkraft
+
+For more details, see the [license](http://choosealicense.com/licenses/mit/).
+
+<!-- license:end -->
+
+<!-- generated:start -->
+
+---
+
+This documentation was automatically generated by [CI Dokumentor](https://github.com/hoverkraft-tech/ci-dokumentor).
+
+<!-- generated:end -->
+
+<!--
+// jscpd:ignore-end
+-->
