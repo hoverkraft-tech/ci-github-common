@@ -47,7 +47,7 @@ permissions:
   pull-requests: write
 jobs:
   stale:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/stale.yml@d324c777132734fc988c79a74dff3ee0248835fc # 0.25.0
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/stale.yml@1c379f7f6e0fc850fe5a7111f74d54e159b4dcd2 # 0.26.0
     with:
       # JSON array of runner(s) to use.
       # See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job.
