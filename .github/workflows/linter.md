@@ -29,6 +29,7 @@ Executes:
 - [Super-Linter](https://github.com/super-linter/super-linter), with some opinionated defaults.
 - [CodeQL](https://docs.github.com/en/code-security/code-scanning/introduction-to-code-scanning/about-code-scanning-with-codeql) to analyze the code.
 - [Ratchet](https://github.com/sethvargo/ratchet) to check that GitHub Action versions are pinned.
+- [Actions Permissions](https://github.com/GitHubSecurityLab/actions-permissions) to analyze and optimize workflow permissions.
 
 ### Permissions
 
