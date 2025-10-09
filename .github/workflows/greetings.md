@@ -71,11 +71,15 @@ jobs:
 
       # Comment to post on an individual's first issue.
       # See https://github.com/actions/first-interaction#usage.
-      issue-message: ""
+      #
+      # Default: `Hi, thank for reporting an issue, we will check it out very soon`
+      issue_message: Hi, thank for reporting an issue, we will check it out very soon
 
       # Comment to post on an individual's first pull request.
       # See https://github.com/actions/first-interaction#usage.
-      pr-message: ""
+      #
+      # Default: `Hi, thank you for creating your PR, we will check it out very soon`
+      pr_message: Hi, thank you for creating your PR, we will check it out very soon
 ```
 
 <!-- usage:end -->
@@ -86,14 +90,14 @@ jobs:
 
 ### Workflow Call Inputs
 
-| **Input**           | **Description**                                                                    | **Required** | **Type**   | **Default**         |
-| ------------------- | ---------------------------------------------------------------------------------- | ------------ | ---------- | ------------------- |
-| **`runs-on`**       | JSON array of runner(s) to use.                                                    | **false**    | **string** | `["ubuntu-latest"]` |
-|                     | See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>. |              |            |                     |
-| **`issue-message`** | Comment to post on an individual's first issue.                                    | **false**    | **string** | -                   |
-|                     | See <https://github.com/actions/first-interaction#usage>.                          |              |            |                     |
-| **`pr-message`**    | Comment to post on an individual's first pull request.                             | **false**    | **string** | -                   |
-|                     | See <https://github.com/actions/first-interaction#usage>.                          |              |            |                     |
+| **Input**           | **Description**                                                                    | **Required** | **Type**   | **Default**                                                          |
+| ------------------- | ---------------------------------------------------------------------------------- | ------------ | ---------- | -------------------------------------------------------------------- |
+| **`runs-on`**       | JSON array of runner(s) to use.                                                    | **false**    | **string** | `["ubuntu-latest"]`                                                  |
+|                     | See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>. |              |            |                                                                      |
+| **`issue_message`** | Comment to post on an individual's first issue.                                    | **false**    | **string** | `Hi, thank for reporting an issue, we will check it out very soon`   |
+|                     | See <https://github.com/actions/first-interaction#usage>.                          |              |            |                                                                      |
+| **`pr_message`**    | Comment to post on an individual's first pull request.                             | **false**    | **string** | `Hi, thank you for creating your PR, we will check it out very soon` |
+|                     | See <https://github.com/actions/first-interaction#usage>.                          |              |            |                                                                      |
 
 <!-- inputs:end -->
 
