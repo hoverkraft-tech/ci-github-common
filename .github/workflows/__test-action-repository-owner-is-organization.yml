@@ -12,13 +12,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
 
       - id: repository-owner-is-organization
         uses: ./actions/repository-owner-is-organization
 
       - name: Check repository-owner-is-organization outputs
         run: |
-          if [ "${{ steps.repository-owner-is-organization.outputs.is-organization }}" != 'true' ]; then
+          if [ "${STEPS_REPOSITORY_OWNER_IS_ORGANIZATION_OUTPUTS_IS_ORGANIZATION}" != 'true' ]; then
             echo "repository-owner-is-organization outputs result is not valid"
             exit 1
           fi
+        env:
+          STEPS_REPOSITORY_OWNER_IS_ORGANIZATION_OUTPUTS_IS_ORGANIZATION: ${{ steps.repository-owner-is-organization.outputs.is-organization }}
