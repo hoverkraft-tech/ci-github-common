@@ -84,6 +84,26 @@ jobs:
             echo "$line" >> "$GITHUB_ENV"
           done
 
+      # FIXME: superlinter should auto iunstall required dependencies. See https://github.com/super-linter/super-linter/issues/6089.
+      - id: has-prettier-plugins
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const { readFileSync } = require("node:fs");
+            const { dirname } = require("node:path");
+            const globber = await glob.create('**/package.json');
+            for await (const file of globber.globGenerator()) {
+              const packageJson = JSON.parse(readFileSync(file, 'utf8'));
+              if (packageJson?.prettier?.plugins?.length > 0) {
+                core.setOutput("package-json-dir", dirname(file));
+                return;
+              }
+            }
+      - uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@1d00c9eb280acbee5df4b4a2087f786e66b13d87 # 0.14.1
+        if: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
+        with:
+          working-directory: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
+
       - uses: super-linter/super-linter/slim@5119dcd8011e92182ce8219d9e9efc82f16fddb6 # v8.0.0
         env:
           VALIDATE_ALL_CODEBASE: ${{ inputs.lint-all }}
