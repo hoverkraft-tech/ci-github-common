@@ -67,24 +67,23 @@ jobs:
         if: inputs.lint-all && github.ref_name != github.event.repository.default_branch
         with:
           ref: "${{ github.event.repository.default_branch }}"
+          persist-credentials: false
 
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: "${{ inputs.lint-all && 1 || 0 }}"
+          persist-credentials: false
 
       - if: ${{ inputs.linter-env }}
+        env:
+          LINTER_ENV: ${{ inputs.linter-env }}
         run: |
-          LINTER_ENV=$(cat <<EOF
-          ${{ inputs.linter-env }}
-          EOF
-          )
-
           echo "$LINTER_ENV" | while IFS= read -r line; do
             if [ -z "$line" ]; then continue; fi
             echo "$line" >> "$GITHUB_ENV"
           done
 
-      # FIXME: superlinter should auto iunstall required dependencies. See https://github.com/super-linter/super-linter/issues/6089.
+      # FIXME: superlinter should auto install required dependencies. See https://github.com/super-linter/super-linter/issues/6089.
       - id: has-prettier-plugins
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
@@ -99,7 +98,7 @@ jobs:
                 return;
               }
             }
-      - uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@1d00c9eb280acbee5df4b4a2087f786e66b13d87 # 0.14.1
+      - uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@4b87508052fc8b08a44a5d2d7d5f0636deb6ea3e # 0.15.0
         if: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
         with:
           working-directory: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
@@ -126,12 +125,14 @@ jobs:
         language: ${{ fromJSON(inputs.codeql-languages) }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
 
-      - uses: github/codeql-action/init@e296a935590eb16afc0c0108289f68c87e2a89a5 # v4.30.7
+      - uses: github/codeql-action/init@f443b600d91635bebf5b0d9ebc620189c0d6fba5 # v4.30.8
         with:
           languages: ${{ matrix.language }}
 
-      - uses: github/codeql-action/analyze@e296a935590eb16afc0c0108289f68c87e2a89a5 # v4.30.7
+      - uses: github/codeql-action/analyze@f443b600d91635bebf5b0d9ebc620189c0d6fba5 # v4.30.8
         with:
           category: "/language:${{matrix.language}}"
 
@@ -143,6 +144,7 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: "${{ inputs.lint-all && 1 || 0 }}"
+          persist-credentials: false
 
       - id: changed-files
         uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62 # v47.0.0
@@ -153,18 +155,21 @@ jobs:
 
       - id: get-files-to-lint
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          CHANGED_FILES: ${{ toJSON(steps.changed-files.outputs.all_changed_and_modified_files) }};
+          ACTION_FILES_INPUT: ${{ toJSON(inputs.action-files) }}
         with:
           script: |
             const fs = require("node:fs");
             const path = require("node:path");
 
-            const changedFiles = ${{ toJSON(steps.changed-files.outputs.all_changed_and_modified_files) }};
+            const changedFiles = process.env.CHANGED_FILES;
 
             let actionFiles = [];
             if (changedFiles !== null) {
               actionFiles = changedFiles.split(" ").filter(file => file && fs.existsSync(file));
             } else {
-              const actionFilesInput = ${{ toJson(inputs.action-files) }};
+              const actionFilesInput = process.env.ACTION_FILES_INPUT;
 
               for (const actionFile of actionFilesInput.split("\n")) {
                 let sanitizedActionFile = actionFile.trim();

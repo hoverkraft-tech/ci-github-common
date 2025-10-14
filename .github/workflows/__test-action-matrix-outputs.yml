@@ -17,6 +17,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
 
       - id: set-matrix-output
         uses: ./actions/set-matrix-output
@@ -30,10 +32,12 @@ jobs:
         run: |
           EXPECTED_ARTIFACT_NAME="$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER-test-matrix-outputs-${{ matrix.os }}"
 
-          if [ "${{ steps.set-matrix-output.outputs.artifact-name }}" != "$EXPECTED_ARTIFACT_NAME" ]; then
+          if [ "${STEPS_SET_MATRIX_OUTPUT_OUTPUTS_ARTIFACT_NAME}" != "$EXPECTED_ARTIFACT_NAME" ]; then
             echo "Set matrix output 1 result is not valid"
             exit 1
           fi
+        env:
+          STEPS_SET_MATRIX_OUTPUT_OUTPUTS_ARTIFACT_NAME: ${{ steps.set-matrix-output.outputs.artifact-name }}
 
   tests-2:
     name: Arrange - Set empty output
@@ -45,6 +49,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
 
       - uses: ./actions/set-matrix-output
         with:
@@ -61,6 +67,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
 
       - uses: ./actions/set-matrix-output
         with:
@@ -79,6 +87,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
 
       - id: get-matrix-outputs
         uses: ./actions/get-matrix-outputs
@@ -88,8 +98,6 @@ jobs:
       - name: Check matrix outputs
         shell: bash
         run: |
-          OUTPUT_RESULT='${{ steps.get-matrix-outputs.outputs.result }}'
-
           # Output result must be a json array of 2 entries
           if [ "$(echo "$OUTPUT_RESULT" | jq -e '. | length')" != "2" ]; then
             echo "Get matrix outputs result is not valid"
@@ -101,6 +109,8 @@ jobs:
             echo "Get matrix outputs result is not valid"
             exit 1
           fi
+        env:
+          OUTPUT_RESULT: ${{ steps.get-matrix-outputs.outputs.result }}
 
       - name: Check artifacts have been deleted
         shell: bash
