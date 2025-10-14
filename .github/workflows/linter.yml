@@ -136,10 +136,11 @@ jobs:
         with:
           category: "/language:${{matrix.language}}"
 
-  actions-pinning:
-    name: 📌 Check GitHub Actions Pinning
+  prepare-actions-linting:
     runs-on: ${{ fromJson(inputs.runs-on) }}
     if: ${{ inputs.action-files }}
+    outputs:
+      action-files: ${{ steps.get-files-to-lint.outputs.action-files }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
@@ -150,74 +151,90 @@ jobs:
         uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62 # v47.0.0
         if: ${{ inputs.lint-all == false }}
         with:
-          files: ${{ inputs.action-files }}
+          files: |
+            ${{ inputs.action-files }}
           dir_names_exclude_current_dir: true
 
       - id: get-files-to-lint
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          CHANGED_FILES: ${{ toJSON(steps.changed-files.outputs.all_changed_and_modified_files) }};
-          ACTION_FILES_INPUT: ${{ toJSON(inputs.action-files) }}
+          CHANGED_FILES_OUTPUT: ${{ steps.changed-files.outputs.all_changed_and_modified_files }}
+          ACTION_FILES_INPUT: ${{ inputs.action-files }}
         with:
           script: |
             const fs = require("node:fs");
             const path = require("node:path");
 
-            const changedFiles = process.env.CHANGED_FILES;
+            const changedFilesOutput = process.env.CHANGED_FILES_OUTPUT.trim();
+            core.debug(`Changed files output: ${changedFilesOutput}`);
 
-            let actionFiles = [];
-            if (changedFiles !== null) {
-              actionFiles = changedFiles.split(" ").filter(file => file && fs.existsSync(file));
-            } else {
-              const actionFilesInput = process.env.ACTION_FILES_INPUT;
+            const actionFilesInput = process.env.ACTION_FILES_INPUT.trim();
+            core.debug(`Action files input: ${actionFilesInput}`);
 
-              for (const actionFile of actionFilesInput.split("\n")) {
-                let sanitizedActionFile = actionFile.trim();
-                if (sanitizedActionFile === "") {
+            function parseFilePatterns(filePatterns) {
+              const patterns = [];
+              for (const filePattern of filePatterns.split("\n")) {
+                let sanitizedFilePattern = filePattern.trim();
+                if (sanitizedFilePattern === "") {
                   continue;
                 }
 
-                if (path.isAbsolute(sanitizedActionFile)) {
-                  // Ensure actionFile is within the workspace
-                  if (!sanitizedActionFile.startsWith(process.env.GITHUB_WORKSPACE)) {
-                    return core.setFailed(`Action file / directory is not within the workspace: ${sanitizedActionFile}`);
+                if (path.isAbsolute(sanitizedFilePattern)) {
+                  // Ensure filePattern is within the workspace
+                  if (!sanitizedFilePattern.startsWith(process.env.GITHUB_WORKSPACE)) {
+                    return core.setFailed(`File / directory is not within the workspace: ${sanitizedFilePattern}`);
                   }
                 } else {
-                  sanitizedActionFile = path.join(process.env.GITHUB_WORKSPACE, sanitizedActionFile);
+                  sanitizedFilePattern = path.join(process.env.GITHUB_WORKSPACE, sanitizedFilePattern);
                 }
-                actionFiles.push(sanitizedActionFile);
+                patterns.push(sanitizedFilePattern);
               }
+              return patterns;
+            }
 
-              if (actionFiles.length === 0) {
-                return core.setFailed("No action files to lint.");
-              }
-
-              async function getActionFiles(actionFile) {
-                const globber = await glob.create(actionFile,{ matchactionFilesInput: false });
-                return await globber.glob();
-              }
-
-              actionFiles = (await Promise.all(actionFiles.map(getActionFiles)))
+            async function findFilesByPatterns(filePatterns) {
+              const foundFiles = (await Promise.all(filePatterns.map(
+                async (filePattern) => {
+                  const globber = await glob.create(filePattern, { excludeHiddenFiles: false });
+                  return await globber.glob();                  
+                }
+              )))
                 .flat()
                 .map((file) => path.relative(process.env.GITHUB_WORKSPACE, file));
 
-              if (actionFiles.length === 0) {
+              return [...new Set(foundFiles)];
+            }
+                        
+            let actionFiles = [];
+            if (changedFilesOutput.length > 0) {
+              actionFiles = changedFilesOutput.split(" ").filter(file => file && fs.existsSync(file));
+              core.debug(`Action files from changed files: ${JSON.stringify(actionFiles)}`);
+            } else {
+              const parsedActionFiles = parseFilePatterns(actionFilesInput);
+              core.debug(`Parsed action files: ${parsedActionFiles}`);
+
+              if (parsedActionFiles.length === 0) {
                 return core.setFailed("No action files to lint.");
               }
+
+              actionFiles = await findFilesByPatterns(parsedActionFiles);
+              core.debug(`Action files from patterns: ${JSON.stringify(actionFiles)}`);
             }
 
-            const files = actionFiles.map((file) => path.relative(process.env.GITHUB_WORKSPACE, file));
-            const filesOutput = [...new Set(files)].join(" ").trim();
-
-            if (filesOutput.length === 0) {
-              return;
+            if (actionFiles.length > 0) {
+              core.setOutput("action-files", [...new Set(actionFiles)].join(" ").trim());
             }
 
-            core.setOutput("files", filesOutput);
+  actions-pinning:
+    name: 📌 Check GitHub Actions Pinning
+    needs: prepare-actions-linting
+    runs-on: ${{ fromJson(inputs.runs-on) }}
+    if: ${{ needs.prepare-actions-linting.outputs.action-files }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      - id: ratchet
-        # FIXME: should be updated by dependabot. See https://github.com/dependabot/dependabot-core/issues/8362
-        uses: "docker://ghcr.io/sethvargo/ratchet:0.11.3@sha256:242445a1c55430ad7477e6fcf2027c77d03f5760702537bca4cf622e7338fc81" # 0.11.3
-        if: ${{ steps.get-files-to-lint.outputs.files }}
+      # FIXME: should be updated by dependabot. See https://github.com/dependabot/dependabot-core/issues/8362
+      - uses: "docker://ghcr.io/sethvargo/ratchet:0.11.3@sha256:242445a1c55430ad7477e6fcf2027c77d03f5760702537bca4cf622e7338fc81" # 0.11.3
+        if: ${{ needs.prepare-actions-linting.outputs.action-files }}
         with:
-          args: "lint --format human --format actions ${{ steps.get-files-to-lint.outputs.files }}"
+          args: "lint --format human --format actions ${{ needs.prepare-actions-linting.outputs.action-files }}"
