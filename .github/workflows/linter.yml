@@ -234,7 +234,7 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       # FIXME: should be updated by dependabot. See https://github.com/dependabot/dependabot-core/issues/8362
-      - uses: "docker://ghcr.io/sethvargo/ratchet:0.11.3@sha256:242445a1c55430ad7477e6fcf2027c77d03f5760702537bca4cf622e7338fc81" # 0.11.3
+      - uses: "docker://ghcr.io/sethvargo/ratchet:0.11.4@sha256:242445a1c55430ad7477e6fcf2027c77d03f5760702537bca4cf622e7338fc81" # 0.11.3
         if: ${{ needs.prepare-actions-linting.outputs.action-files }}
         with:
           args: "lint --format human --format actions ${{ needs.prepare-actions-linting.outputs.action-files }}"
