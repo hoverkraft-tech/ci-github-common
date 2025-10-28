@@ -114,7 +114,7 @@ jobs:
 | **`action-files`**     | List of files or directories where GitHub Actions and workflows are located.              | **false**    | **string**  | <!-- textlint-disable --><pre>./action.yml&#13;./.github/workflows/\*\*/\*.yml&#13;./actions/\*\*/\*.yml&#13;</pre><!-- textlint-enable --> |
 |                        | Supports glob patterns.                                                                   |              |             |                                                                                                                                             |
 |                        | Leave empty to disable the check.                                                         |              |             |                                                                                                                                             |
-| **`lint-all`**         | Run checks on all files, not just the changed ones.                                       | **false**    | **boolean** | `${{ github.event_name != 'pull_request' }}`                                                                                                |
+| **`lint-all`**         | Run checks on all files, not just the changed ones.                                       | **false**    | **boolean** | `$\{\{ github.event_name != 'pull_request' }}`                                                                                              |
 
 <!-- inputs:end -->
 
