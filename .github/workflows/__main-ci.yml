@@ -38,3 +38,15 @@ jobs:
       github-app-id: ${{ vars.CI_BOT_APP_ID }}
     secrets:
       github-app-key: ${{ secrets.CI_BOT_APP_PRIVATE_KEY }}
+
+  sync-docs:
+    needs: ci
+    if: github.event_name != 'schedule'
+    uses: hoverkraft-tech/public-docs/.github/workflows/sync-docs-dispatcher.yml@18facec04f2945f4d66d510e8a06568497b73c54 # 0.1.0
+    with:
+      paths: |
+        actions/**/README.md
+        .github/workflows/*.md
+        README.md
+    secrets:
+      github-token: ${{ secrets.PUBLIC_DOCS_TOKEN }}
