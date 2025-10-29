@@ -68,14 +68,14 @@ See <https://docs.github.com/en/repositories/managing-your-repositorys-settings-
 
 ## Inputs
 
-| **Input**            | **Description**                                                                                            | **Required** | **Default**           |
-| -------------------- | ---------------------------------------------------------------------------------------------------------- | ------------ | --------------------- |
-| **`github-token`**   | GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). | **false**    | `${{ github.token }}` |
-|                      | See <https://github.com/peter-evans/create-pull-request#action-inputs>.                                    |              |                       |
-| **`branch`**         | The pull request branch name                                                                               | **true**     | -                     |
-| **`title`**          | The pull request title                                                                                     | **true**     | -                     |
-| **`body`**           | The pull request body                                                                                      | **true**     | -                     |
-| **`commit-message`** | The commit message for the pull request                                                                    | **true**     | -                     |
+| **Input**            | **Description**                                                                                            | **Required** | **Default**             |
+| -------------------- | ---------------------------------------------------------------------------------------------------------- | ------------ | ----------------------- |
+| **`github-token`**   | GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). | **false**    | `$\{\{ github.token }}` |
+|                      | See <https://github.com/peter-evans/create-pull-request#action-inputs>.                                    |              |                         |
+| **`branch`**         | The pull request branch name                                                                               | **true**     | -                       |
+| **`title`**          | The pull request title                                                                                     | **true**     | -                       |
+| **`body`**           | The pull request body                                                                                      | **true**     | -                       |
+| **`commit-message`** | The commit message for the pull request                                                                    | **true**     | -                       |
 
 <!-- inputs:end -->
 
