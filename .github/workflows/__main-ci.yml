@@ -26,13 +26,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
-    uses: ./.github/workflows/__shared-ci.yml
+  # ci:
+  #   uses: ./.github/workflows/__shared-ci.yml
 
   release:
-    needs: ci
+    # needs: ci
     if: github.event_name != 'schedule'
-    uses: hoverkraft-tech/ci-github-publish/.github/workflows/release-actions.yml@42d50a3461a177557ca3f83b1d927d7c0783c894 # 0.11.2
+    uses: hoverkraft-tech/ci-github-publish/.github/workflows/release-actions.yml@feat/release-actions-rework # 0.11.2
     with:
       update-all: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch' }}
       github-app-id: ${{ vars.CI_BOT_APP_ID }}
@@ -40,13 +40,11 @@ jobs:
       github-app-key: ${{ secrets.CI_BOT_APP_PRIVATE_KEY }}
 
   sync-docs:
-    needs: ci
-    if: github.event_name != 'schedule'
-    uses: hoverkraft-tech/public-docs/.github/workflows/sync-docs-dispatcher.yml@18facec04f2945f4d66d510e8a06568497b73c54 # 0.1.0
+    needs: release
+    if: needs.release.outputs.artifact-id
+    uses: hoverkraft-tech/public-docs/.github/workflows/sync-docs-dispatcher.yml@main # 0.1.0
     with:
-      paths: |
-        actions/**/README.md
-        .github/workflows/*.md
-        README.md
+      artifact-id: ${{ needs.release.outputs.artifact-id }}
+      github-app-id: ${{ vars.CI_BOT_APP_ID }}
     secrets:
-      github-token: ${{ secrets.PUBLIC_DOCS_TOKEN }}
+      github-app-key: ${{ secrets.CI_BOT_APP_PRIVATE_KEY }}

@@ -89,7 +89,7 @@ Makefile                      # Lint helpers
 
 ## Author
 
-🏢 **Hoverkraft <contact@hoverkraft.cloud>**
+🏢 **Hoverkraft**
 
 - Site: [https://hoverkraft.cloud](https://hoverkraft.cloud)
 - GitHub: [@hoverkraft-tech](https://github.com/hoverkraft-tech)
