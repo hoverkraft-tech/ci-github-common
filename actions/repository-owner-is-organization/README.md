@@ -46,9 +46,9 @@ Action to check if the repository owner is an organization.
 
 ## Inputs
 
-| **Input**          | **Description**                      | **Required** | **Default**           |
-| ------------------ | ------------------------------------ | ------------ | --------------------- |
-| **`github-token`** | GitHub token for fetching users API. | **false**    | `${{ github.token }}` |
+| **Input**          | **Description**                      | **Required** | **Default**             |
+| ------------------ | ------------------------------------ | ------------ | ----------------------- |
+| **`github-token`** | GitHub token for fetching users API. | **false**    | `$\{\{ github.token }}` |
 
 <!-- inputs:end -->
 
