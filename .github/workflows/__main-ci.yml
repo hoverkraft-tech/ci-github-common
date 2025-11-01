@@ -26,11 +26,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ci:
-  #   uses: ./.github/workflows/__shared-ci.yml
+  ci:
+    uses: ./.github/workflows/__shared-ci.yml
 
   release:
-    # needs: ci
+    needs: ci
     if: github.event_name != 'schedule'
     uses: hoverkraft-tech/ci-github-publish/.github/workflows/release-actions.yml@b2a6d08d60e0adff6736caf6fdaa5fd3bcdd473a # 0.13.0
     with:

@@ -15,8 +15,7 @@
         "github.copilot-chat",
         "ms-vscode.makefile-tools",
         "esbenp.prettier-vscode"
-      ],
-      "mcpServers": {}
+      ]
     }
   }
 }
