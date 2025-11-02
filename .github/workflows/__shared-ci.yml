@@ -3,24 +3,31 @@ name: Internal - Common Continuous Integration tasks
 on:
   workflow_call:
 
-permissions:
-  actions: read
-  contents: read
-  statuses: write
-  security-events: write
+permissions: {}
 
 jobs:
   linter:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      statuses: write
     uses: ./.github/workflows/linter.yml
 
   test-action-matrix-outputs:
     needs: linter
+    permissions:
+      contents: read
     uses: ./.github/workflows/__test-action-matrix-outputs.yml
 
   test-action-repository-owner-is-organization:
     needs: linter
+    permissions:
+      contents: read
     uses: ./.github/workflows/__test-action-repository-owner-is-organization.yml
 
   test-action-slugify:
     needs: linter
+    permissions:
+      contents: read
     uses: ./.github/workflows/__test-action-slugify.yml
