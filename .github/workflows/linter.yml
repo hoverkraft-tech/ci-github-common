@@ -54,14 +54,15 @@ on:
           See https://github.com/super-linter/super-linter#how-to-use.
           Default GITHUB_TOKEN.
 
-permissions:
-  contents: read
-  statuses: write
+permissions: {}
 
 jobs:
   lint:
     name: 🧹 Lint Code Base
     runs-on: ${{ fromJson(inputs.runs-on) }}
+    permissions:
+      contents: read
+      statuses: write
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         if: inputs.lint-all && github.ref_name != github.event.repository.default_branch
@@ -115,8 +116,8 @@ jobs:
     if: ${{ inputs.codeql-languages }}
     name: 🛡️ CodeQL Analysis
     permissions:
-      contents: read
       actions: read
+      contents: read
       security-events: write
     runs-on: ${{ fromJson(inputs.runs-on) }}
     strategy:
@@ -139,6 +140,8 @@ jobs:
   prepare-actions-linting:
     runs-on: ${{ fromJson(inputs.runs-on) }}
     if: ${{ inputs.action-files }}
+    permissions:
+      contents: read
     outputs:
       action-files: ${{ steps.get-files-to-lint.outputs.action-files }}
     steps:
@@ -230,6 +233,8 @@ jobs:
     needs: prepare-actions-linting
     runs-on: ${{ fromJson(inputs.runs-on) }}
     if: ${{ needs.prepare-actions-linting.outputs.action-files }}
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
