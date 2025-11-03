@@ -32,7 +32,9 @@ Executes:
 
 ### Permissions
 
+- **`actions`**: `read`
 - **`contents`**: `read`
+- **`security-events`**: `write`
 - **`statuses`**: `write`
 
 <!-- overview:end -->
@@ -47,9 +49,7 @@ on:
   push:
     branches:
       - main
-permissions:
-  contents: read
-  statuses: write
+permissions: {}
 jobs:
   linter:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@5f11437c716059f30c635f90055060e4ef8b31a0 # 0.28.0
