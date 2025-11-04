@@ -29,7 +29,7 @@ jobs:
   release:
     needs: ci
     if: github.event_name != 'schedule'
-    uses: hoverkraft-tech/ci-github-publish/.github/workflows/release-actions.yml@b2a6d08d60e0adff6736caf6fdaa5fd3bcdd473a # 0.13.0
+    uses: hoverkraft-tech/ci-github-publish/.github/workflows/release-actions.yml@38963f37ef5be0b6ae84147f542d96d9eb02802b # 0.14.0
     permissions:
       contents: read
     with:
@@ -41,7 +41,7 @@ jobs:
   sync-docs:
     needs: release
     if: needs.release.outputs.artifact-id
-    uses: hoverkraft-tech/public-docs/.github/workflows/sync-docs-dispatcher.yml@cd3f060f4c823de3294a7498b8a8617723b8cf53 # 0.2.0
+    uses: hoverkraft-tech/public-docs/.github/workflows/sync-docs-dispatcher.yml@c40c17f7d6a8090950b3ef4bfc70502707a6bb9f # 0.3.0
     permissions:
       contents: read
     with:
