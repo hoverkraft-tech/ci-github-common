@@ -39,6 +39,18 @@ Executes:
 
 <!-- overview:end -->
 
+### GitHub Actions Pinning
+
+**Tips:** To ensure that all GitHub Actions used in your workflows are pinned to a specific version,
+you can use the [Ratchet](https://github.com/sethvargo/ratchet) tool integrated into this workflow.
+
+```sh
+docker run -it --rm -v "${PWD}:${PWD}" -w "${PWD}" -u $(id -u):$(id -g) \
+  --env GITHUB_TOKEN=$(gh auth token) \
+  ghcr.io/sethvargo/ratchet:latest \
+  lint ".github/workflows/file-to-lint.yml"
+```
+
 <!-- usage:start -->
 
 ## Usage
