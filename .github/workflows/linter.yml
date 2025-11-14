@@ -99,7 +99,7 @@ jobs:
                 return;
               }
             }
-      - uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@23af54bc615d657aa9c13c472ae701445c1811a6 # 0.17.1
+      - uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@32a69b7b8fd5f7ab7bf656e7e88aa90ad235cf8d # 0.18.0
         if: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
         with:
           working-directory: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
@@ -129,11 +129,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: github/codeql-action/init@0499de31b99561a6d14a36a5f662c2a54f91beee # v4.31.2
+      - uses: github/codeql-action/init@014f16e7ab1402f30e7c3329d33797e7948572db # v4.31.3
         with:
           languages: ${{ matrix.language }}
 
-      - uses: github/codeql-action/analyze@0499de31b99561a6d14a36a5f662c2a54f91beee # v4.31.2
+      - uses: github/codeql-action/analyze@014f16e7ab1402f30e7c3329d33797e7948572db # v4.31.3
         with:
           category: "/language:${{matrix.language}}"
 
@@ -237,6 +237,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
 
       # FIXME: should be updated by dependabot. See https://github.com/dependabot/dependabot-core/issues/8362
       - uses: "docker://ghcr.io/sethvargo/ratchet:0.11.4@sha256:242445a1c55430ad7477e6fcf2027c77d03f5760702537bca4cf622e7338fc81" # 0.11.3
