@@ -48,12 +48,13 @@ on:
       - opened
       - edited
       - synchronize
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 jobs:
   semantic-pull-request:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@753288393de1f3d92f687a6761d236ca800f5306 # 0.28.1
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@b9383df8d7fe98beca6aca1b51bce96189d0b93f # 0.28.2
+    permissions:
+      contents: write
+      pull-requests: write
     secrets:
       # Token for the repository.
       # Default: GITHUB_TOKEN.
