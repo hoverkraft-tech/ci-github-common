@@ -43,12 +43,13 @@ on:
   push:
     branches:
       - main
-permissions:
-  contents: read
-  issues: write
+permissions: {}
 jobs:
   need-fix-to-issue:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/need-fix-to-issue.yml@753288393de1f3d92f687a6761d236ca800f5306 # 0.28.1
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/need-fix-to-issue.yml@b9383df8d7fe98beca6aca1b51bce96189d0b93f # 0.28.2
+    permissions:
+      contents: read
+      issues: write
     with:
       # JSON array of runner(s) to use.
       # See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job.
