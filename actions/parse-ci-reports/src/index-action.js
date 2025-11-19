@@ -58,17 +58,7 @@ async function runAction({ core, glob: globModule, inputs }) {
     // Set outputs
     core.setOutput("markdown", markdown);
     core.setOutput("summary", summary);
-    core.setOutput("total-tests", aggregatedData.getTotalTests());
-    core.setOutput("passed-tests", aggregatedData.getPassedCount());
-    core.setOutput("failed-tests", aggregatedData.getFailedCount());
-    core.setOutput("skipped-tests", aggregatedData.getSkippedCount());
-    core.setOutput(
-      "coverage-percentage",
-      aggregatedData.coverage
-        ? aggregatedData.coverage.getOverallPercentage().toFixed(2)
-        : "0",
-    );
-    core.setOutput("has-errors", aggregatedData.hasErrors() ? "true" : "false");
+    core.setOutput("parsed-files", JSON.stringify(uniqueFiles));
 
     // Log summary
     core.info("\n--- Summary ---");

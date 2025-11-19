@@ -36,24 +36,9 @@ outputs:
   summary:
     description: "Generated summary output"
     value: ${{ steps.parse-reports.outputs.summary }}
-  total-tests:
-    description: "Total number of tests"
-    value: ${{ steps.parse-reports.outputs.total-tests }}
-  passed-tests:
-    description: "Number of passed tests"
-    value: ${{ steps.parse-reports.outputs.passed-tests }}
-  failed-tests:
-    description: "Number of failed tests"
-    value: ${{ steps.parse-reports.outputs.failed-tests }}
-  skipped-tests:
-    description: "Number of skipped tests"
-    value: ${{ steps.parse-reports.outputs.skipped-tests }}
-  coverage-percentage:
-    description: "Overall coverage percentage (if available)"
-    value: ${{ steps.parse-reports.outputs.coverage-percentage }}
-  has-errors:
-    description: "Whether any errors were found"
-    value: ${{ steps.parse-reports.outputs.has-errors }}
+  parsed-files:
+    description: "List of parsed report files (JSON array)"
+    value: ${{ steps.parse-reports.outputs.parsed-files }}
 
 runs:
   using: "composite"
