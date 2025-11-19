@@ -1,0 +1,33 @@
+{
+  "name": "parse-ci-reports",
+  "version": "1.0.0",
+  "description": "Parse CI reports (tests, linting, coverage) into GitHub summaries and Markdown",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "node --test src/**/*.test.js",
+    "test:watch": "node --test --watch src/**/*.test.js"
+  },
+  "keywords": [
+    "github-action",
+    "ci-reports",
+    "test-reports",
+    "coverage",
+    "linting",
+    "junit",
+    "tap",
+    "lcov",
+    "cobertura",
+    "eslint",
+    "checkstyle"
+  ],
+  "author": "hoverkraft",
+  "license": "MIT",
+  "dependencies": {
+    "fast-xml-parser": "^4.5.0",
+    "glob": "^10.3.10"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
