@@ -1,0 +1,103 @@
+name: "Parse CI Reports"
+description: "Parse CI reports (tests, linting, coverage) into GitHub summary and Markdown for PR comments"
+author: hoverkraft
+branding:
+  icon: check-circle
+  color: blue
+
+inputs:
+  report-paths:
+    description: |
+      Paths to report files (glob patterns supported, one per line or comma-separated).
+      Examples: '**/junit.xml', 'coverage/lcov.info', 'eslint-report.json'
+    required: true
+  report-name:
+    description: |
+      Name to display in the summary (e.g., "Test Results", "Coverage Report").
+    default: "Report Summary"
+  include-passed:
+    description: |
+      Whether to include passed tests in the summary (default: false for brevity).
+    default: "false"
+  output-format:
+    description: |
+      Output format: 'summary' (GitHub Step Summary), 'markdown' (for PR comments), or 'both'.
+    default: "both"
+  fail-on-error:
+    description: |
+      Whether to fail the action if any test failures are detected.
+    default: "false"
+
+outputs:
+  markdown:
+    description: "Generated markdown output for PR comments"
+    value: ${{ steps.parse-reports.outputs.markdown }}
+  summary:
+    description: "Generated summary output"
+    value: ${{ steps.parse-reports.outputs.summary }}
+  total-tests:
+    description: "Total number of tests"
+    value: ${{ steps.parse-reports.outputs.total-tests }}
+  passed-tests:
+    description: "Number of passed tests"
+    value: ${{ steps.parse-reports.outputs.passed-tests }}
+  failed-tests:
+    description: "Number of failed tests"
+    value: ${{ steps.parse-reports.outputs.failed-tests }}
+  skipped-tests:
+    description: "Number of skipped tests"
+    value: ${{ steps.parse-reports.outputs.skipped-tests }}
+  coverage-percentage:
+    description: "Overall coverage percentage (if available)"
+    value: ${{ steps.parse-reports.outputs.coverage-percentage }}
+  has-errors:
+    description: "Whether any errors were found"
+    value: ${{ steps.parse-reports.outputs.has-errors }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
+      with:
+        node-version: "18"
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        cd ${{ github.action_path }}
+        npm ci --omit=dev
+
+    - name: Parse reports
+      id: parse-reports
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+      env:
+        REPORT_PATHS: ${{ inputs.report-paths }}
+        REPORT_NAME: ${{ inputs.report-name }}
+        INCLUDE_PASSED: ${{ inputs.include-passed }}
+        OUTPUT_FORMAT: ${{ inputs.output-format }}
+        ACTION_PATH: ${{ github.action_path }}
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+
+          // Import the action runner
+          const actionPath = process.env.ACTION_PATH;
+          const { runAction } = require(path.join(actionPath, 'src', 'index-action.js'));
+
+          const inputs = {
+            reportPaths: process.env.REPORT_PATHS,
+            reportName: process.env.REPORT_NAME,
+            includePassed: process.env.INCLUDE_PASSED === 'true',
+            outputFormat: process.env.OUTPUT_FORMAT
+          };
+
+          await runAction({ core, glob, inputs });
+
+    - name: Fail if errors detected
+      if: inputs.fail-on-error == 'true' && steps.parse-reports.outputs.has-errors == 'true'
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+      with:
+        script: |
+          core.setFailed('Test failures or errors detected in reports');
