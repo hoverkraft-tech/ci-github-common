@@ -1,47 +1,123 @@
-# Parse CI Reports
+<!-- header:start -->
+
+# ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItY2hlY2stY2lyY2xlIiBjb2xvcj0iYmx1ZSI+PHBhdGggZD0iTTIyIDExLjA4VjEyYTEwIDEwIDAgMSAxLTUuOTMtOS4xNCI+PC9wYXRoPjxwb2x5bGluZSBwb2ludHM9IjIyIDQgMTIgMTQuMDEgOSAxMS4wMSI+PC9wb2x5bGluZT48L3N2Zz4=) GitHub Action: Parse CI Reports
+
+<div align="center">
+  <img src="../../.github/logo.svg" width="60px" align="center" alt="Parse CI Reports" />
+</div>
+
+---
+
+<!-- header:end -->
+<!-- badges:start -->
+
+[![Marketplace](https://img.shields.io/badge/Marketplace-parse--ci--reports-blue?logo=github-actions)](https://github.com/marketplace/actions/parse-ci-reports)
+[![Release](https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common)](https://github.com/hoverkraft-tech/ci-github-common/releases)
+[![License](https://img.shields.io/github/license/hoverkraft-tech/ci-github-common)](http://choosealicense.com/licenses/mit/)
+[![Stars](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md)
+
+<!-- badges:end -->
+<!-- overview:start -->
+
+## Overview
 
 Parse CI reports (tests, linting, coverage) into GitHub summary and Markdown for PR comments.
-
-## Description
-
 This action parses various report formats from testing, linting, and coverage tools and generates:
 
 - GitHub Step Summaries for workflow runs
 - Markdown output suitable for pull request or issue comments
+- GitHub Annotations for failed tests and linting issues
 
 It supports multiple common report standards out of the box.
 
-## Supported Formats
+<!-- overview:end -->
 
-### Test Reports
+### Supported Formats
+
+#### Test Reports
 
 - **JUnit XML** - Standard format used by many testing frameworks (Java, Python pytest, JavaScript Jest, etc.)
 - **TAP (Test Anything Protocol)** - Popular in Perl and Node.js testing
 
-### Coverage Reports
+#### Coverage Reports
 
 - **Cobertura XML** - Common coverage format (Python coverage, Java JaCoCo, etc.)
 - **LCOV** - Standard coverage format (JavaScript/Node.js, C/C++)
 
-### Lint/Check Reports
+#### Lint/Check Reports
 
 - **ESLint JSON** - JavaScript/TypeScript linting
 - **CheckStyle XML** - Java and other language linting
 
+<!-- usage:start -->
+
 ## Usage
 
-### Basic Example
-
 ```yaml
-- name: Parse test reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+- uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
   with:
-    report-paths: |
-      **/junit.xml
-      coverage/lcov.info
-      eslint-report.json
-    report-name: "CI Results"
+    # Paths to report files (glob patterns supported, one per line or comma-separated).
+    # Set to `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all` for automatic detection.
+    # Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `auto:all`
+    #
+    # Default: `auto:all`
+    report-paths: auto:all
+
+    # Name to display in the summary (e.g., `Test Results`, `Coverage Report`).
+    #
+    # Default: `Report Summary`
+    report-name: Report Summary
+
+    # Whether to include passed tests in the summary.
+    #
+    # Default: `false`
+    include-passed: "false"
+
+    # Output format: comma-separated list of `summary`, `markdown`, `annotations`, or `all` for everything.
+    #
+    # Default: `all`
+    output-format: all
+
+    # Whether to fail the action if any test failures are detected.
+    #
+    # Default: `false`
+    fail-on-error: "false"
 ```
+
+<!-- usage:end -->
+<!-- inputs:start -->
+
+## Inputs
+
+| **Input**            | **Description**                                                                                       | **Required** | **Default**      |
+| -------------------- | ----------------------------------------------------------------------------------------------------- | ------------ | ---------------- |
+| **`report-paths`**   | Paths to report files (glob patterns supported, one per line or comma-separated).                     | **false**    | `auto:all`       |
+|                      | Set to `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all` for automatic detection.              |              |                  |
+|                      | Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `auto:all`                      |              |                  |
+| **`report-name`**    | Name to display in the summary (e.g., `Test Results`, `Coverage Report`).                             | **false**    | `Report Summary` |
+| **`include-passed`** | Whether to include passed tests in the summary.                                                       | **false**    | `false`          |
+| **`output-format`**  | Output format: comma-separated list of `summary`, `markdown`, `annotations`, or `all` for everything. | **false**    | `all`            |
+| **`fail-on-error`**  | Whether to fail the action if any test failures are detected.                                         | **false**    | `false`          |
+
+<!-- inputs:end -->
+<!-- secrets:start -->
+<!-- secrets:end -->
+<!-- outputs:start -->
+
+## Outputs
+
+| **Output**         | **Description**                                 |
+| ------------------ | ----------------------------------------------- |
+| **`markdown`**     | Generated Markdown output for PR comments       |
+| **`summary`**      | Generated summary output                        |
+| **`parsed-files`** | List of parsed report files (JSON array)        |
+| **`has-errors`**   | Whether any errors were detected in the reports |
+
+<!-- outputs:end -->
+<!-- examples:start -->
+
+## Examples
 
 ### Auto-Detection Mode
 
@@ -49,7 +125,7 @@ Let the action automatically find common report files:
 
 ```yaml
 - name: Parse all CI reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
   with:
     report-paths: "auto:all"
     report-name: "CI Results"
@@ -59,7 +135,7 @@ Or target specific report types:
 
 ```yaml
 - name: Parse test reports only
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
   with:
     report-paths: "auto:test"
     report-name: "Test Results"
@@ -68,8 +144,11 @@ Or target specific report types:
 Auto-detection modes:
 
 - `auto:test` - Finds JUnit XML and TAP files
+
 - `auto:coverage` - Finds LCOV and Cobertura coverage files
+
 - `auto:lint` - Finds ESLint JSON and CheckStyle XML files
+
 - `auto:all` - Finds all supported report types
 
 ### Generate PR Comment
@@ -77,7 +156,7 @@ Auto-detection modes:
 ```yaml
 - name: Parse test reports
   id: parse-reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
   with:
     report-paths: "**/test-results/*.xml"
     report-name: "Test Results"
@@ -94,7 +173,7 @@ Auto-detection modes:
 
 ```yaml
 - name: Parse coverage
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
   with:
     report-paths: "coverage/cobertura-coverage.xml"
     report-name: "Coverage Report"
@@ -105,7 +184,7 @@ Auto-detection modes:
 
 ```yaml
 - name: Parse test reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
   with:
     report-paths: "**/junit.xml"
     report-name: "Test Results"
@@ -118,7 +197,7 @@ Generate GitHub annotations for failed tests and linting issues:
 
 ```yaml
 - name: Parse reports with annotations
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
   with:
     report-paths: "auto:all"
     report-name: "CI Results"
@@ -131,7 +210,7 @@ Combine multiple output formats using comma-separated values:
 
 ```yaml
 - name: Parse reports with multiple outputs
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
   with:
     report-paths: "auto:all"
     report-name: "CI Results"
@@ -142,32 +221,12 @@ Or use "all" for all output formats:
 
 ```yaml
 - name: Parse reports with all outputs
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
   with:
     report-paths: "auto:test"
     report-name: "Test Results"
     output-format: "all"
 ```
-
-## Inputs
-
-| Input            | Description                                                                                                                    | Required | Default            |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------- | ------------------ |
-| `report-paths`   | Paths to report files (glob patterns supported) or auto-detection mode ('auto:test', 'auto:coverage', 'auto:lint', 'auto:all') | Yes      | -                  |
-| `report-name`    | Name to display in the summary                                                                                                 | No       | `"Report Summary"` |
-| `include-passed` | Whether to include passed tests in the summary                                                                                 | No       | `false`            |
-| `output-format`  | Output format: comma-separated list of 'summary', 'Markdown', 'annotations', or 'all'                                          | No       | `"all"`            |
-| `fail-on-error`  | Whether to fail the action if any test failures are detected                                                                   | No       | `false`            |
-
-## Outputs
-
-| Output         | Description                               |
-| -------------- | ----------------------------------------- |
-| `markdown`     | Generated Markdown output for PR comments |
-| `summary`      | Generated summary output                  |
-| `parsed-files` | List of parsed report files (JSON array)  |
-
-## Examples
 
 ### Multiple Report Types
 
@@ -181,7 +240,7 @@ Parse test results, coverage, and linting in one action:
   run: npm run lint -- --format json --output-file eslint-report.json
 
 - name: Parse all reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
   with:
     report-paths: |
       test-results/junit.xml
@@ -197,7 +256,7 @@ Only comment on PRs if there are failures:
 ```yaml
 - name: Parse test reports
   id: parse-reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
   with:
     report-paths: "**/test-results/*.xml"
     report-name: "Test Results"
@@ -223,7 +282,7 @@ Only comment on PRs if there are failures:
   run: mvn test
 
 - name: Parse all test reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
   with:
     report-paths: |
       pytest-results.xml
@@ -231,7 +290,16 @@ Only comment on PRs if there are failures:
     report-name: "Multi-language Test Results"
 ```
 
-## Architecture
+<!-- examples:end -->
+<!-- contributing:start -->
+
+## Contributing
+
+Contributions are welcome! Please see the [contributing guidelines](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md) for more details.
+
+<!-- contributing:end -->
+
+### Architecture
 
 This action follows SOLID principles with clear separation of concerns:
 
@@ -250,12 +318,14 @@ src/
 ├── formatters/      # Output formatters
 │   ├── SummaryFormatter.js
 │   └── MarkdownFormatter.js
-└── index.js         # Main orchestration
+├── ReportParserCore.js  # Core parsing logic
+├── ReportPathResolver.js # Path resolution and auto-detection
+└── index-action.js      # GitHub Actions entrypoint
 ```
 
-## Development
+### Development
 
-### Running Tests
+#### Running Tests
 
 ```bash
 cd actions/parse-ci-reports
@@ -263,15 +333,32 @@ npm install
 npm test
 ```
 
-### Adding New Parsers
+#### Adding New Parsers
 
 1. Create a new parser class extending `BaseParser`
 2. Implement `canParse()`, `parse()`, and `getPriority()` methods
 3. Add the parser to `ParserFactory`
 4. Add tests for the new parser
 
+<!-- security:start -->
+<!-- security:end -->
+<!-- license:start -->
+
 ## License
 
-MIT
+This project is licensed under the MIT License.
 
-Copyright © 2025 hoverkraft-tech
+SPDX-License-Identifier: MIT
+
+Copyright © 2025 hoverkraft
+
+For more details, see the [license](http://choosealicense.com/licenses/mit/).
+
+<!-- license:end -->
+<!-- generated:start -->
+
+---
+
+This documentation was automatically generated by [CI Dokumentor](https://github.com/hoverkraft-tech/ci-dokumentor).
+
+<!-- generated:end -->
