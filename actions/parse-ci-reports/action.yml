@@ -1,5 +1,13 @@
 name: "Parse CI Reports"
-description: "Parse CI reports (tests, linting, coverage) into GitHub summary and Markdown for PR comments"
+description: |
+  Parse CI reports (tests, linting, coverage) into GitHub summary and Markdown for PR comments.
+  This action parses various report formats from testing, linting, and coverage tools and generates:
+
+  - GitHub Step Summaries for workflow runs
+  - Markdown output suitable for pull request or issue comments
+  - GitHub Annotations for failed tests and linting issues
+
+  It supports multiple common report standards out of the box.
 author: hoverkraft
 branding:
   icon: check-circle
@@ -9,20 +17,21 @@ inputs:
   report-paths:
     description: |
       Paths to report files (glob patterns supported, one per line or comma-separated).
-      Set to 'auto:test', 'auto:coverage', 'auto:lint', or 'auto:all' for automatic detection.
-      Examples: '**/junit.xml', 'coverage/lcov.info', 'eslint-report.json', 'auto:all'
-    required: true
+      Set to `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all` for automatic detection.
+      Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `auto:all`
+    required: false
+    default: "auto:all"
   report-name:
     description: |
-      Name to display in the summary (e.g., "Test Results", "Coverage Report").
+      Name to display in the summary (e.g., `Test Results`, `Coverage Report`).
     default: "Report Summary"
   include-passed:
     description: |
-      Whether to include passed tests in the summary (default: false for brevity).
+      Whether to include passed tests in the summary.
     default: "false"
   output-format:
     description: |
-      Output format: comma-separated list of 'summary', 'markdown', 'annotations', or 'all' for everything.
+      Output format: comma-separated list of `summary`, `markdown`, `annotations`, or `all` for everything.
     default: "all"
   fail-on-error:
     description: |
@@ -39,6 +48,9 @@ outputs:
   parsed-files:
     description: "List of parsed report files (JSON array)"
     value: ${{ steps.parse-reports.outputs.parsed-files }}
+  has-errors:
+    description: "Whether any errors were detected in the reports"
+    value: ${{ steps.parse-reports.outputs.has-errors }}
 
 runs:
   using: "composite"
@@ -60,12 +72,8 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
       with:
         script: |
-          const fs = require('fs');
           const path = require('path');
-
-          // Import the action runner
-          const actionPath = process.env.ACTION_PATH;
-          const { runAction } = require(path.join(actionPath, 'src', 'index-action.js'));
+          const { run } = require(path.join(process.env.ACTION_PATH, 'src', 'index.js'));
 
           const inputs = {
             reportPaths: process.env.REPORT_PATHS,
@@ -74,7 +82,7 @@ runs:
             outputFormat: process.env.OUTPUT_FORMAT
           };
 
-          await runAction({ core, glob, inputs });
+          await run({ core, glob, inputs });
 
     - name: Fail if errors detected
       if: inputs.fail-on-error == 'true' && steps.parse-reports.outputs.has-errors == 'true'
