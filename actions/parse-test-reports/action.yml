@@ -1,0 +1,83 @@
+name: "Parse Test Reports"
+description: "Parse check, lint, test reports and coverage into GitHub summary and markdown for PR comments"
+author: hoverkraft
+branding:
+  icon: check-circle
+  color: blue
+
+inputs:
+  report-paths:
+    description: |
+      Paths to report files (glob patterns supported, one per line or comma-separated).
+      Examples: '**/junit.xml', 'coverage/lcov.info', 'eslint-report.json'
+    required: true
+  report-name:
+    description: |
+      Name to display in the summary (e.g., "Test Results", "Coverage Report").
+    default: "Report Summary"
+  include-passed:
+    description: |
+      Whether to include passed tests in the summary (default: false for brevity).
+    default: "false"
+  output-format:
+    description: |
+      Output format: 'summary' (GitHub Step Summary), 'markdown' (for PR comments), or 'both'.
+    default: "both"
+  fail-on-error:
+    description: |
+      Whether to fail the action if any test failures are detected.
+    default: "false"
+
+outputs:
+  markdown:
+    description: "Generated markdown output for PR comments"
+    value: ${{ steps.parse-reports.outputs.markdown }}
+  summary:
+    description: "Generated summary output"
+    value: ${{ steps.parse-reports.outputs.summary }}
+  total-tests:
+    description: "Total number of tests"
+    value: ${{ steps.parse-reports.outputs.total-tests }}
+  passed-tests:
+    description: "Number of passed tests"
+    value: ${{ steps.parse-reports.outputs.passed-tests }}
+  failed-tests:
+    description: "Number of failed tests"
+    value: ${{ steps.parse-reports.outputs.failed-tests }}
+  skipped-tests:
+    description: "Number of skipped tests"
+    value: ${{ steps.parse-reports.outputs.skipped-tests }}
+  coverage-percentage:
+    description: "Overall coverage percentage (if available)"
+    value: ${{ steps.parse-reports.outputs.coverage-percentage }}
+  has-errors:
+    description: "Whether any errors were found"
+    value: ${{ steps.parse-reports.outputs.has-errors }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Parse reports
+      id: parse-reports
+      shell: bash
+      run: |
+        node ${{ github.action_path }}/src/index.js \
+          "${{ inputs.report-paths }}" \
+          "${{ inputs.report-name }}" \
+          "${{ inputs.include-passed }}" \
+          "${{ inputs.output-format }}"
+
+    - name: Write to GitHub Step Summary
+      if: inputs.output-format == 'summary' || inputs.output-format == 'both'
+      shell: bash
+      run: |
+        if [ -f /tmp/test-report-summary.md ]; then
+          cat /tmp/test-report-summary.md >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Fail if errors detected
+      if: inputs.fail-on-error == 'true' && steps.parse-reports.outputs.has-errors == 'true'
+      shell: bash
+      run: |
+        echo "::error::Test failures or errors detected in reports"
+        exit 1
