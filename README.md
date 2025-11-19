@@ -32,6 +32,7 @@ Opinionated GitHub Actions and reusable workflows for foundational continuous-in
 
 ### Repository insights & utilities
 
+- [Parse test reports](actions/parse-test-reports/README.md) — parses check, lint, test reports, and coverage into GitHub summaries and Markdown for PR comments.
 - [Repository owner is organization](actions/repository-owner-is-organization/README.md) — checks whether the repository owner is an organization.
 - [Slugify](actions/slugify/README.md) — converts free-form strings into GitHub-friendly slugs.
 
