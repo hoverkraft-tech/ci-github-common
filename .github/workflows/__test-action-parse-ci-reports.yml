@@ -15,14 +15,80 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Arrange - Create test report files
+        run: |
+          mkdir -p test-reports
+
+          # Create JUnit XML test report
+          cat > test-reports/junit.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <testsuite name="Test Suite" tests="3" failures="0" errors="0" skipped="0" time="1.234">
+            <testcase name="test_example_1" classname="TestClass" time="0.123"/>
+            <testcase name="test_example_2" classname="TestClass" time="0.456"/>
+            <testcase name="test_example_3" classname="TestClass" time="0.655"/>
+          </testsuite>
+          EOF
+
+          # Create LCOV coverage report
+          cat > test-reports/lcov.info << 'EOF'
+          TN:
+          SF:src/example.js
+          FN:1,exampleFunction
+          FNDA:5,exampleFunction
+          FNF:1
+          FNH:1
+          DA:1,5
+          DA:2,5
+          DA:3,5
+          LF:3
+          LH:3
+          end_of_record
+          EOF
+
+          # Create ESLint JSON report
+          cat > test-reports/eslint.json << 'EOF'
+          [
+            {
+              "filePath": "src/example.js",
+              "messages": [],
+              "errorCount": 0,
+              "warningCount": 0
+            }
+          ]
+          EOF
+
       - id: parse-ci-reports
         uses: ./actions/parse-ci-reports
+        with:
+          report-paths: |
+            test-reports/junit.xml
+            test-reports/lcov.info
+            test-reports/eslint.json
+          report-name: "Test Reports"
+          output-format: "summary,markdown"
 
       - name: Check parse-ci-reports outputs
         run: |
-          if [ "${STEPS_PARSE_CI_REPORTS_OUTPUTS_HAS_ERRORS}" != 'false' ]; then
-            echo "parse-ci-reports outputs result is not valid"
+          # Check that markdown output exists
+          if [ -z "${STEPS_PARSE_CI_REPORTS_OUTPUTS_MARKDOWN}" ]; then
+            echo "parse-ci-reports markdown output is empty"
             exit 1
           fi
+
+          # Check that summary output exists
+          if [ -z "${STEPS_PARSE_CI_REPORTS_OUTPUTS_SUMMARY}" ]; then
+            echo "parse-ci-reports summary output is empty"
+            exit 1
+          fi
+
+          # Check that parsed-files output exists and is valid JSON
+          if [ -z "${STEPS_PARSE_CI_REPORTS_OUTPUTS_PARSED_FILES}" ]; then
+            echo "parse-ci-reports parsed-files output is empty"
+            exit 1
+          fi
+
+          echo "All outputs are valid"
         env:
-          STEPS_PARSE_CI_REPORTS_OUTPUTS_HAS_ERRORS: ${{ steps.parse-ci-reports.outputs.has-errors }}
+          STEPS_PARSE_CI_REPORTS_OUTPUTS_MARKDOWN: ${{ steps.parse-ci-reports.outputs.markdown }}
+          STEPS_PARSE_CI_REPORTS_OUTPUTS_SUMMARY: ${{ steps.parse-ci-reports.outputs.summary }}
+          STEPS_PARSE_CI_REPORTS_OUTPUTS_PARSED_FILES: ${{ steps.parse-ci-reports.outputs.parsed-files }}
