@@ -22,8 +22,8 @@ inputs:
     default: "false"
   output-format:
     description: |
-      Output format: 'summary' (GitHub Step Summary), 'markdown' (for PR comments), 'annotations' (GitHub annotations), or 'both'.
-    default: "both"
+      Output format: comma-separated list of 'summary', 'markdown', 'annotations', or 'all' for everything.
+    default: "all"
   fail-on-error:
     description: |
       Whether to fail the action if any test failures are detected.
