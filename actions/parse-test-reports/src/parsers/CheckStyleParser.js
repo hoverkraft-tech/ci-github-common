@@ -1,6 +1,6 @@
-import { XMLParser } from 'fast-xml-parser';
-import { BaseParser } from './BaseParser.js';
-import { ReportData, LintIssue } from '../models/ReportData.js';
+import { XMLParser } from "fast-xml-parser";
+import { BaseParser } from "./BaseParser.js";
+import { ReportData, LintIssue } from "../models/ReportData.js";
 
 /**
  * Parser for CheckStyle XML format
@@ -11,15 +11,16 @@ export class CheckStyleParser extends BaseParser {
     super();
     this.xmlParser = new XMLParser({
       ignoreAttributes: false,
-      attributeNamePrefix: '@_'
+      attributeNamePrefix: "@_",
     });
   }
 
   canParse(filePath, content) {
     return (
-      (filePath.toLowerCase().includes('checkstyle') || filePath.endsWith('.xml')) &&
-      content.includes('<checkstyle') &&
-      content.includes('<file')
+      (filePath.toLowerCase().includes("checkstyle") ||
+        filePath.endsWith(".xml")) &&
+      content.includes("<checkstyle") &&
+      content.includes("<file")
     );
   }
 
@@ -27,9 +28,9 @@ export class CheckStyleParser extends BaseParser {
     return 8;
   }
 
-  parse(content, filePath) {
+  parse(content) {
     const reportData = new ReportData();
-    reportData.reportType = 'lint';
+    reportData.reportType = "lint";
 
     try {
       const parsed = this.xmlParser.parse(content);
@@ -54,7 +55,7 @@ export class CheckStyleParser extends BaseParser {
   }
 
   _parseFile(file, reportData) {
-    const fileName = file['@_name'] || 'unknown';
+    const fileName = file["@_name"] || "unknown";
 
     if (!file.error) {
       return;
@@ -65,11 +66,11 @@ export class CheckStyleParser extends BaseParser {
     for (const error of errors) {
       const issue = new LintIssue({
         file: fileName,
-        line: parseInt(error['@_line'] || 0),
-        column: parseInt(error['@_column'] || 0),
-        severity: this._mapSeverity(error['@_severity']),
-        rule: error['@_source'] || 'unknown',
-        message: error['@_message'] || ''
+        line: parseInt(error["@_line"] || 0),
+        column: parseInt(error["@_column"] || 0),
+        severity: this._mapSeverity(error["@_severity"]),
+        rule: error["@_source"] || "unknown",
+        message: error["@_message"] || "",
       });
 
       reportData.addLintIssue(issue);
@@ -77,12 +78,12 @@ export class CheckStyleParser extends BaseParser {
   }
 
   _mapSeverity(severity) {
-    if (!severity) return 'info';
+    if (!severity) return "info";
 
     const severityStr = String(severity).toLowerCase();
-    if (severityStr === 'error') return 'error';
-    if (severityStr === 'warning' || severityStr === 'warn') return 'warning';
-    if (severityStr === 'info' || severityStr === 'information') return 'info';
-    return 'info';
+    if (severityStr === "error") return "error";
+    if (severityStr === "warning" || severityStr === "warn") return "warning";
+    if (severityStr === "info" || severityStr === "information") return "info";
+    return "info";
   }
 }

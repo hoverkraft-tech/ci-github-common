@@ -1,0 +1,7 @@
+{
+  "threshold": 1,
+  "reporters": ["console"],
+  "ignore": ["**/node_modules/**", "**/*.test.js"],
+  "absolute": true,
+  "minLines": 10
+}

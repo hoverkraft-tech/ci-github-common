@@ -1,13 +1,13 @@
 # Parse Test Reports
 
-Parse check, lint, test reports, and coverage into GitHub summary and markdown for PR comments.
+Parse check, lint, test reports, and coverage into GitHub summary and Markdown for PR comments.
 
 ## Description
 
 This action parses various report formats from testing, linting, and coverage tools and generates:
 
 - GitHub Step Summaries for workflow runs
-- Markdown output suitable for PR/issue comments
+- Markdown output suitable for pull request or issue comments
 
 It supports multiple common report standards out of the box.
 
@@ -85,26 +85,26 @@ It supports multiple common report standards out of the box.
 
 ## Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `report-paths` | Paths to report files (glob patterns supported, one per line or comma-separated) | Yes | - |
-| `report-name` | Name to display in the summary | No | `"Report Summary"` |
-| `include-passed` | Whether to include passed tests in the summary | No | `false` |
-| `output-format` | Output format: 'summary', 'markdown', or 'both' | No | `"both"` |
-| `fail-on-error` | Whether to fail the action if any test failures are detected | No | `false` |
+| Input            | Description                                                                      | Required | Default            |
+| ---------------- | -------------------------------------------------------------------------------- | -------- | ------------------ |
+| `report-paths`   | Paths to report files (glob patterns supported, one per line or comma-separated) | Yes      | -                  |
+| `report-name`    | Name to display in the summary                                                   | No       | `"Report Summary"` |
+| `include-passed` | Whether to include passed tests in the summary                                   | No       | `false`            |
+| `output-format`  | Output format: 'summary', 'Markdown', or 'both'                                  | No       | `"both"`           |
+| `fail-on-error`  | Whether to fail the action if any test failures are detected                     | No       | `false`            |
 
 ## Outputs
 
-| Output | Description |
-|--------|-------------|
-| `markdown` | Generated markdown output for PR comments |
-| `summary` | Generated summary output |
-| `total-tests` | Total number of tests |
-| `passed-tests` | Number of passed tests |
-| `failed-tests` | Number of failed tests |
-| `skipped-tests` | Number of skipped tests |
-| `coverage-percentage` | Overall coverage percentage (if available) |
-| `has-errors` | Whether any errors were found (`true` or `false`) |
+| Output                | Description                                       |
+| --------------------- | ------------------------------------------------- |
+| `markdown`            | Generated Markdown output for PR comments         |
+| `summary`             | Generated summary output                          |
+| `total-tests`         | Total number of tests                             |
+| `passed-tests`        | Number of passed tests                            |
+| `failed-tests`        | Number of failed tests                            |
+| `skipped-tests`       | Number of skipped tests                           |
+| `coverage-percentage` | Overall coverage percentage (if available)        |
+| `has-errors`          | Whether any errors were found (`true` or `false`) |
 
 ## Examples
 
@@ -148,7 +148,7 @@ Only comment on PRs if there are failures:
     issue-number: ${{ github.event.pull_request.number }}
     body: |
       ## ⚠️ Test Failures Detected
-      
+
       ${{ steps.parse-reports.outputs.markdown }}
 ```
 
@@ -174,7 +174,7 @@ Only comment on PRs if there are failures:
 
 This action follows SOLID principles with clear separation of concerns:
 
-```
+```text
 src/
 ├── models/          # Data models (ReportData, TestResult, LintIssue, Coverage)
 ├── parsers/         # Parser implementations (Strategy pattern)

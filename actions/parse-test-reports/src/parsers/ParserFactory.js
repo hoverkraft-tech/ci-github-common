@@ -1,9 +1,9 @@
-import { JUnitParser } from './JUnitParser.js';
-import { TAPParser } from './TAPParser.js';
-import { CoberturaParser } from './CoberturaParser.js';
-import { LCOVParser } from './LCOVParser.js';
-import { ESLintParser } from './ESLintParser.js';
-import { CheckStyleParser } from './CheckStyleParser.js';
+import { JUnitParser } from "./JUnitParser.js";
+import { TAPParser } from "./TAPParser.js";
+import { CoberturaParser } from "./CoberturaParser.js";
+import { LCOVParser } from "./LCOVParser.js";
+import { ESLintParser } from "./ESLintParser.js";
+import { CheckStyleParser } from "./CheckStyleParser.js";
 
 /**
  * Factory class for creating and managing parsers
@@ -17,7 +17,7 @@ export class ParserFactory {
       new CoberturaParser(),
       new LCOVParser(),
       new ESLintParser(),
-      new CheckStyleParser()
+      new CheckStyleParser(),
     ];
 
     // Sort parsers by priority (highest first)
@@ -47,7 +47,7 @@ export class ParserFactory {
    */
   parse(filePath, content) {
     const parser = this.getParser(filePath, content);
-    
+
     if (!parser) {
       throw new Error(`No parser found for file: ${filePath}`);
     }

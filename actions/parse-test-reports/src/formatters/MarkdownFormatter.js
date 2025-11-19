@@ -1,8 +1,10 @@
+import { BaseFormatter } from "./BaseFormatter.js";
+
 /**
  * Formatter for markdown output suitable for PR/issue comments
  * Generates more concise output than SummaryFormatter
  */
-export class MarkdownFormatter {
+export class MarkdownFormatter extends BaseFormatter {
   /**
    * Format report data as markdown for PR comments
    * @param {ReportData} reportData - The report data
@@ -10,26 +12,9 @@ export class MarkdownFormatter {
    * @returns {string} Formatted markdown
    */
   format(reportData, reportName) {
-    const sections = [];
-
-    sections.push(`### ${reportName}\n`);
-
-    // Add test results section
-    if (reportData.getTotalTests() > 0) {
-      sections.push(this._formatTestResults(reportData));
-    }
-
-    // Add lint issues section
-    if (reportData.lintIssues.length > 0) {
-      sections.push(this._formatLintIssues(reportData));
-    }
-
-    // Add coverage section
-    if (reportData.coverage) {
-      sections.push(this._formatCoverage(reportData.coverage));
-    }
-
-    return sections.join('\n');
+    const sections = [`### ${reportName}\n`];
+    sections.push(...this.buildSections(reportData, {}));
+    return sections.join("\n");
   }
 
   _formatTestResults(reportData) {
@@ -38,22 +23,22 @@ export class MarkdownFormatter {
     const failed = reportData.getFailedCount();
     const skipped = reportData.getSkippedCount();
 
-    let output = '';
+    let output = "";
 
     // Compact summary
-    const status = failed > 0 ? '❌' : '✅';
+    const status = failed > 0 ? "❌" : "✅";
     output += `${status} **Tests:** ${passed} passed, ${failed} failed, ${skipped} skipped (${total} total)\n\n`;
 
     // Failed tests (limit to 5 for PR comments)
     if (failed > 0) {
-      output += '<details>\n<summary>Failed Tests</summary>\n\n';
-      
+      output += "<details>\n<summary>Failed Tests</summary>\n\n";
+
       const failedTests = reportData.getFailedTests().slice(0, 5);
       for (const test of failedTests) {
         output += `- **${test.name}**\n`;
         if (test.message) {
           const shortMessage = test.message.substring(0, 200);
-          output += `  \`\`\`\n  ${shortMessage}${test.message.length > 200 ? '...' : ''}\n  \`\`\`\n`;
+          output += `  \`\`\`\n  ${shortMessage}${test.message.length > 200 ? "..." : ""}\n  \`\`\`\n`;
         }
       }
 
@@ -61,7 +46,7 @@ export class MarkdownFormatter {
         output += `\n_... and ${reportData.getFailedTests().length - 5} more failures_\n`;
       }
 
-      output += '</details>\n\n';
+      output += "</details>\n\n";
     }
 
     return output;
@@ -71,16 +56,16 @@ export class MarkdownFormatter {
     const errors = reportData.getErrors();
     const warnings = reportData.getWarnings();
 
-    let output = '';
+    let output = "";
 
     // Compact summary
-    const status = errors.length > 0 ? '❌' : warnings.length > 0 ? '⚠️' : '✅';
+    const status = errors.length > 0 ? "❌" : warnings.length > 0 ? "⚠️" : "✅";
     output += `${status} **Lint:** ${errors.length} errors, ${warnings.length} warnings\n\n`;
 
     // Error details (limit to 5 for PR comments)
     if (errors.length > 0) {
-      output += '<details>\n<summary>Lint Errors</summary>\n\n';
-      
+      output += "<details>\n<summary>Lint Errors</summary>\n\n";
+
       for (const issue of errors.slice(0, 5)) {
         output += `- \`${issue.file}:${issue.line}\` - ${issue.message}\n`;
       }
@@ -89,7 +74,7 @@ export class MarkdownFormatter {
         output += `\n_... and ${errors.length - 5} more errors_\n`;
       }
 
-      output += '</details>\n\n';
+      output += "</details>\n\n";
     }
 
     return output;
@@ -98,7 +83,7 @@ export class MarkdownFormatter {
   _formatCoverage(coverage) {
     const percentage = coverage.getOverallPercentage();
     const emoji = this._getCoverageEmoji(percentage);
-    
+
     let output = `${emoji} **Coverage:** ${percentage.toFixed(2)}%\n`;
 
     // Add breakdown if available
@@ -114,16 +99,16 @@ export class MarkdownFormatter {
     }
 
     if (details.length > 0) {
-      output += `  - ${details.join(' | ')}\n`;
+      output += `  - ${details.join(" | ")}\n`;
     }
 
-    output += '\n';
+    output += "\n";
     return output;
   }
 
   _getCoverageEmoji(percentage) {
-    if (percentage >= 80) return '🟢';
-    if (percentage >= 60) return '🟡';
-    return '🔴';
+    if (percentage >= 80) return "🟢";
+    if (percentage >= 60) return "🟡";
+    return "🔴";
   }
 }

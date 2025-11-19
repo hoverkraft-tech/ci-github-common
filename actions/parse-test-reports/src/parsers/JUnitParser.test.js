@@ -1,21 +1,21 @@
-import { describe, it } from 'node:test';
-import assert from 'node:assert';
-import { JUnitParser } from './JUnitParser.js';
+import { describe, it } from "node:test";
+import assert from "node:assert";
+import { JUnitParser } from "./JUnitParser.js";
 
-describe('JUnitParser', () => {
+describe("JUnitParser", () => {
   const parser = new JUnitParser();
 
-  it('should identify JUnit XML files', () => {
+  it("should identify JUnit XML files", () => {
     const content = `<?xml version="1.0"?>
       <testsuite name="Test Suite">
         <testcase name="test1" />
       </testsuite>`;
-    
-    assert.strictEqual(parser.canParse('junit.xml', content), true);
-    assert.strictEqual(parser.canParse('test-results.xml', content), true);
+
+    assert.strictEqual(parser.canParse("junit.xml", content), true);
+    assert.strictEqual(parser.canParse("test-results.xml", content), true);
   });
 
-  it('should parse simple JUnit XML', () => {
+  it("should parse simple JUnit XML", () => {
     const content = `<?xml version="1.0"?>
       <testsuite name="Test Suite" tests="3" failures="1" skipped="1">
         <testcase name="test1" classname="TestClass" time="0.5" />
@@ -27,7 +27,7 @@ describe('JUnitParser', () => {
         </testcase>
       </testsuite>`;
 
-    const result = parser.parse(content, 'test.xml');
+    const result = parser.parse(content, "test.xml");
 
     assert.strictEqual(result.getTotalTests(), 3);
     assert.strictEqual(result.getPassedCount(), 1);
@@ -35,12 +35,12 @@ describe('JUnitParser', () => {
     assert.strictEqual(result.getSkippedCount(), 1);
 
     const failedTest = result.getFailedTests()[0];
-    assert.strictEqual(failedTest.name, 'test2');
-    assert.strictEqual(failedTest.status, 'failed');
-    assert.strictEqual(failedTest.message, 'Assertion failed');
+    assert.strictEqual(failedTest.name, "test2");
+    assert.strictEqual(failedTest.status, "failed");
+    assert.strictEqual(failedTest.message, "Assertion failed");
   });
 
-  it('should parse JUnit XML with errors', () => {
+  it("should parse JUnit XML with errors", () => {
     const content = `<?xml version="1.0"?>
       <testsuite name="Test Suite">
         <testcase name="test1" classname="TestClass">
@@ -50,17 +50,17 @@ describe('JUnitParser', () => {
         </testcase>
       </testsuite>`;
 
-    const result = parser.parse(content, 'test.xml');
+    const result = parser.parse(content, "test.xml");
 
     assert.strictEqual(result.getTotalTests(), 1);
     assert.strictEqual(result.getFailedCount(), 1);
 
     const errorTest = result.getFailedTests()[0];
-    assert.strictEqual(errorTest.status, 'error');
-    assert.strictEqual(errorTest.errorType, 'java.lang.NullPointerException');
+    assert.strictEqual(errorTest.status, "error");
+    assert.strictEqual(errorTest.errorType, "java.lang.NullPointerException");
   });
 
-  it('should parse multiple test suites', () => {
+  it("should parse multiple test suites", () => {
     const content = `<?xml version="1.0"?>
       <testsuites>
         <testsuite name="Suite1">
@@ -71,7 +71,7 @@ describe('JUnitParser', () => {
         </testsuite>
       </testsuites>`;
 
-    const result = parser.parse(content, 'test.xml');
+    const result = parser.parse(content, "test.xml");
 
     assert.strictEqual(result.getTotalTests(), 2);
     assert.strictEqual(result.getPassedCount(), 2);
