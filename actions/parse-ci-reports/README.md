@@ -43,6 +43,35 @@ It supports multiple common report standards out of the box.
     report-name: "CI Results"
 ```
 
+### Auto-Detection Mode
+
+Let the action automatically find common report files:
+
+```yaml
+- name: Parse all CI reports
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  with:
+    report-paths: "auto:all"
+    report-name: "CI Results"
+```
+
+Or target specific report types:
+
+```yaml
+- name: Parse test reports only
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  with:
+    report-paths: "auto:test"
+    report-name: "Test Results"
+```
+
+Auto-detection modes:
+
+- `auto:test` - Finds JUnit XML and TAP files
+- `auto:coverage` - Finds LCOV and Cobertura coverage files
+- `auto:lint` - Finds ESLint JSON and CheckStyle XML files
+- `auto:all` - Finds all supported report types
+
 ### Generate PR Comment
 
 ```yaml
@@ -83,15 +112,28 @@ It supports multiple common report standards out of the box.
     fail-on-error: "true"
 ```
 
+### GitHub Annotations
+
+Generate GitHub annotations for failed tests and linting issues:
+
+```yaml
+- name: Parse reports with annotations
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  with:
+    report-paths: "auto:all"
+    report-name: "CI Results"
+    output-format: "annotations"
+```
+
 ## Inputs
 
-| Input            | Description                                                                      | Required | Default            |
-| ---------------- | -------------------------------------------------------------------------------- | -------- | ------------------ |
-| `report-paths`   | Paths to report files (glob patterns supported, one per line or comma-separated) | Yes      | -                  |
-| `report-name`    | Name to display in the summary                                                   | No       | `"Report Summary"` |
-| `include-passed` | Whether to include passed tests in the summary                                   | No       | `false`            |
-| `output-format`  | Output format: 'summary', 'Markdown', or 'both'                                  | No       | `"both"`           |
-| `fail-on-error`  | Whether to fail the action if any test failures are detected                     | No       | `false`            |
+| Input            | Description                                                                                                                    | Required | Default            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------- | ------------------ |
+| `report-paths`   | Paths to report files (glob patterns supported) or auto-detection mode ('auto:test', 'auto:coverage', 'auto:lint', 'auto:all') | Yes      | -                  |
+| `report-name`    | Name to display in the summary                                                                                                 | No       | `"Report Summary"` |
+| `include-passed` | Whether to include passed tests in the summary                                                                                 | No       | `false`            |
+| `output-format`  | Output format: 'summary', 'Markdown', 'annotations', or 'both'                                                                 | No       | `"both"`           |
+| `fail-on-error`  | Whether to fail the action if any test failures are detected                                                                   | No       | `false`            |
 
 ## Outputs
 
