@@ -161,16 +161,11 @@ Or use "all" for all output formats:
 
 ## Outputs
 
-| Output                | Description                                       |
-| --------------------- | ------------------------------------------------- |
-| `markdown`            | Generated Markdown output for PR comments         |
-| `summary`             | Generated summary output                          |
-| `total-tests`         | Total number of tests                             |
-| `passed-tests`        | Number of passed tests                            |
-| `failed-tests`        | Number of failed tests                            |
-| `skipped-tests`       | Number of skipped tests                           |
-| `coverage-percentage` | Overall coverage percentage (if available)        |
-| `has-errors`          | Whether any errors were found (`true` or `false`) |
+| Output         | Description                               |
+| -------------- | ----------------------------------------- |
+| `markdown`     | Generated Markdown output for PR comments |
+| `summary`      | Generated summary output                  |
+| `parsed-files` | List of parsed report files (JSON array)  |
 
 ## Examples
 
