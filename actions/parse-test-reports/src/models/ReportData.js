@@ -6,11 +6,11 @@ export class TestResult {
     name,
     status,
     duration = 0,
-    message = '',
-    errorType = '',
-    stackTrace = '',
-    file = '',
-    suite = ''
+    message = "",
+    errorType = "",
+    stackTrace = "",
+    file = "",
+    suite = "",
   }) {
     this.name = name;
     this.status = status; // 'passed', 'failed', 'skipped', 'error'
@@ -23,15 +23,15 @@ export class TestResult {
   }
 
   isPassed() {
-    return this.status === 'passed';
+    return this.status === "passed";
   }
 
   isFailed() {
-    return this.status === 'failed' || this.status === 'error';
+    return this.status === "failed" || this.status === "error";
   }
 
   isSkipped() {
-    return this.status === 'skipped';
+    return this.status === "skipped";
   }
 }
 
@@ -39,15 +39,7 @@ export class TestResult {
  * Represents a lint/check issue
  */
 export class LintIssue {
-  constructor({
-    file,
-    line,
-    column,
-    severity,
-    rule,
-    message,
-    source = ''
-  }) {
+  constructor({ file, line, column, severity, rule, message, source = "" }) {
     this.file = file;
     this.line = line;
     this.column = column;
@@ -58,11 +50,11 @@ export class LintIssue {
   }
 
   isError() {
-    return this.severity === 'error';
+    return this.severity === "error";
   }
 
   isWarning() {
-    return this.severity === 'warning';
+    return this.severity === "warning";
   }
 }
 
@@ -74,7 +66,7 @@ export class Coverage {
     lines = { total: 0, covered: 0, percentage: 0 },
     branches = { total: 0, covered: 0, percentage: 0 },
     functions = { total: 0, covered: 0, percentage: 0 },
-    statements = { total: 0, covered: 0, percentage: 0 }
+    statements = { total: 0, covered: 0, percentage: 0 },
   }) {
     this.lines = lines;
     this.branches = branches;
@@ -96,7 +88,7 @@ export class ReportData {
     this.tests = [];
     this.lintIssues = [];
     this.coverage = null;
-    this.reportType = 'unknown'; // 'test', 'lint', 'coverage', 'mixed'
+    this.reportType = "unknown"; // 'test', 'lint', 'coverage', 'mixed'
   }
 
   addTest(test) {
@@ -112,23 +104,23 @@ export class ReportData {
   }
 
   getPassedTests() {
-    return this.tests.filter(t => t.isPassed());
+    return this.tests.filter((t) => t.isPassed());
   }
 
   getFailedTests() {
-    return this.tests.filter(t => t.isFailed());
+    return this.tests.filter((t) => t.isFailed());
   }
 
   getSkippedTests() {
-    return this.tests.filter(t => t.isSkipped());
+    return this.tests.filter((t) => t.isSkipped());
   }
 
   getErrors() {
-    return this.lintIssues.filter(i => i.isError());
+    return this.lintIssues.filter((i) => i.isError());
   }
 
   getWarnings() {
-    return this.lintIssues.filter(i => i.isWarning());
+    return this.lintIssues.filter((i) => i.isWarning());
   }
 
   hasErrors() {

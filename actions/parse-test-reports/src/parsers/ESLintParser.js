@@ -1,5 +1,5 @@
-import { BaseParser } from './BaseParser.js';
-import { ReportData, LintIssue } from '../models/ReportData.js';
+import { BaseParser } from "./BaseParser.js";
+import { ReportData, LintIssue } from "../models/ReportData.js";
 
 /**
  * Parser for ESLint JSON format
@@ -13,8 +13,8 @@ export class ESLintParser extends BaseParser {
       return (
         Array.isArray(data) &&
         data.length > 0 &&
-        data[0].hasOwnProperty('filePath') &&
-        data[0].hasOwnProperty('messages')
+        Object.prototype.hasOwnProperty.call(data[0], "filePath") &&
+        Object.prototype.hasOwnProperty.call(data[0], "messages")
       );
     } catch {
       return false;
@@ -25,15 +25,15 @@ export class ESLintParser extends BaseParser {
     return 10;
   }
 
-  parse(content, filePath) {
+  parse(content) {
     const reportData = new ReportData();
-    reportData.reportType = 'lint';
+    reportData.reportType = "lint";
 
     try {
       const data = JSON.parse(content);
 
       for (const fileResult of data) {
-        const file = fileResult.filePath || fileResult.fileName || 'unknown';
+        const file = fileResult.filePath || fileResult.fileName || "unknown";
 
         if (!fileResult.messages || fileResult.messages.length === 0) {
           continue;
@@ -45,9 +45,9 @@ export class ESLintParser extends BaseParser {
             line: message.line || 0,
             column: message.column || 0,
             severity: this._mapSeverity(message.severity),
-            rule: message.ruleId || 'unknown',
-            message: message.message || '',
-            source: message.source || ''
+            rule: message.ruleId || "unknown",
+            message: message.message || "",
+            source: message.source || "",
           });
 
           reportData.addLintIssue(issue);
@@ -62,16 +62,21 @@ export class ESLintParser extends BaseParser {
 
   _mapSeverity(severity) {
     // ESLint severity: 0 = off, 1 = warning, 2 = error
-    if (typeof severity === 'number') {
-      if (severity === 2) return 'error';
-      if (severity === 1) return 'warning';
-      return 'info';
+    if (typeof severity === "number") {
+      if (severity === 2) return "error";
+      if (severity === 1) return "warning";
+      return "info";
     }
 
     // Handle string severity
     const severityStr = String(severity).toLowerCase();
-    if (severityStr === 'error' || severityStr === '2') return 'error';
-    if (severityStr === 'warning' || severityStr === 'warn' || severityStr === '1') return 'warning';
-    return 'info';
+    if (severityStr === "error" || severityStr === "2") return "error";
+    if (
+      severityStr === "warning" ||
+      severityStr === "warn" ||
+      severityStr === "1"
+    )
+      return "warning";
+    return "info";
   }
 }

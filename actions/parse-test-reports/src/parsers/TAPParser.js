@@ -1,5 +1,5 @@
-import { BaseParser } from './BaseParser.js';
-import { ReportData, TestResult } from '../models/ReportData.js';
+import { BaseParser } from "./BaseParser.js";
+import { ReportData, TestResult } from "../models/ReportData.js";
 
 /**
  * Parser for TAP (Test Anything Protocol) format
@@ -7,12 +7,13 @@ import { ReportData, TestResult } from '../models/ReportData.js';
  */
 export class TAPParser extends BaseParser {
   canParse(filePath, content) {
-    const lines = content.split('\n');
+    const lines = content.split("\n");
     // TAP files typically start with TAP version or test plan
-    return lines.some(line => 
-      line.trim().match(/^TAP version \d+/) ||
-      line.trim().match(/^\d+\.\.\d+/) ||
-      line.trim().match(/^(ok|not ok) \d+/)
+    return lines.some(
+      (line) =>
+        line.trim().match(/^TAP version \d+/) ||
+        line.trim().match(/^\d+\.\.\d+/) ||
+        line.trim().match(/^(ok|not ok) \d+/),
     );
   }
 
@@ -22,17 +23,22 @@ export class TAPParser extends BaseParser {
 
   parse(content, filePath) {
     const reportData = new ReportData();
-    reportData.reportType = 'test';
+    reportData.reportType = "test";
 
-    const lines = content.split('\n');
+    const lines = content.split("\n");
     let testNumber = 0;
     let currentSuite = filePath;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      
+
       // Skip empty lines and comments (except directives)
-      if (!line || (line.startsWith('#') && !line.includes('SKIP') && !line.includes('TODO'))) {
+      if (
+        !line ||
+        (line.startsWith("#") &&
+          !line.includes("SKIP") &&
+          !line.includes("TODO"))
+      ) {
         continue;
       }
 
@@ -42,12 +48,17 @@ export class TAPParser extends BaseParser {
         const [, status, number, description] = match;
         testNumber = number ? parseInt(number) : testNumber + 1;
 
-        const test = this._parseTestLine(status, description, testNumber, currentSuite);
+        const test = this._parseTestLine(
+          status,
+          description,
+          testNumber,
+          currentSuite,
+        );
         reportData.addTest(test);
       }
       // Parse suite name from comments
-      else if (line.startsWith('# Subtest:')) {
-        currentSuite = line.substring('# Subtest:'.length).trim();
+      else if (line.startsWith("# Subtest:")) {
+        currentSuite = line.substring("# Subtest:".length).trim();
       }
     }
 
@@ -55,30 +66,30 @@ export class TAPParser extends BaseParser {
   }
 
   _parseTestLine(status, description, testNumber, suite) {
-    let testStatus = status === 'ok' ? 'passed' : 'failed';
-    let message = '';
+    let testStatus = status === "ok" ? "passed" : "failed";
+    let message = "";
     let name = description || `Test ${testNumber}`;
 
     // Check for SKIP directive
-    if (description.includes('# SKIP')) {
-      testStatus = 'skipped';
-      const parts = description.split('# SKIP');
+    if (description.includes("# SKIP")) {
+      testStatus = "skipped";
+      const parts = description.split("# SKIP");
       name = parts[0].trim();
-      message = parts[1] ? parts[1].trim() : 'Skipped';
+      message = parts[1] ? parts[1].trim() : "Skipped";
     }
     // Check for TODO directive
-    else if (description.includes('# TODO')) {
-      testStatus = 'skipped';
-      const parts = description.split('# TODO');
+    else if (description.includes("# TODO")) {
+      testStatus = "skipped";
+      const parts = description.split("# TODO");
       name = parts[0].trim();
-      message = parts[1] ? `TODO: ${parts[1].trim()}` : 'TODO';
+      message = parts[1] ? `TODO: ${parts[1].trim()}` : "TODO";
     }
     // Extract failure message
-    else if (testStatus === 'failed') {
-      const parts = description.split('-');
+    else if (testStatus === "failed") {
+      const parts = description.split("-");
       if (parts.length > 1) {
         name = parts[0].trim();
-        message = parts.slice(1).join('-').trim();
+        message = parts.slice(1).join("-").trim();
       }
     }
 
@@ -86,7 +97,7 @@ export class TAPParser extends BaseParser {
       name,
       status: testStatus,
       message,
-      suite
+      suite,
     });
   }
 }

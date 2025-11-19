@@ -1,6 +1,6 @@
-import { XMLParser } from 'fast-xml-parser';
-import { BaseParser } from './BaseParser.js';
-import { ReportData, Coverage } from '../models/ReportData.js';
+import { XMLParser } from "fast-xml-parser";
+import { BaseParser } from "./BaseParser.js";
+import { ReportData, Coverage } from "../models/ReportData.js";
 
 /**
  * Parser for Cobertura XML coverage format
@@ -11,16 +11,16 @@ export class CoberturaParser extends BaseParser {
     super();
     this.xmlParser = new XMLParser({
       ignoreAttributes: false,
-      attributeNamePrefix: '@_'
+      attributeNamePrefix: "@_",
     });
   }
 
   canParse(filePath, content) {
     return (
-      (filePath.toLowerCase().includes('cobertura') || 
-       filePath.toLowerCase().includes('coverage')) &&
-      content.includes('<coverage') &&
-      content.includes('line-rate')
+      (filePath.toLowerCase().includes("cobertura") ||
+        filePath.toLowerCase().includes("coverage")) &&
+      content.includes("<coverage") &&
+      content.includes("line-rate")
     );
   }
 
@@ -28,20 +28,20 @@ export class CoberturaParser extends BaseParser {
     return 9;
   }
 
-  parse(content, filePath) {
+  parse(content) {
     const reportData = new ReportData();
-    reportData.reportType = 'coverage';
+    reportData.reportType = "coverage";
 
     try {
       const parsed = this.xmlParser.parse(content);
       const coverage = parsed.coverage;
 
       if (!coverage) {
-        throw new Error('Invalid Cobertura format: missing coverage element');
+        throw new Error("Invalid Cobertura format: missing coverage element");
       }
 
-      const lineRate = parseFloat(coverage['@_line-rate'] || 0);
-      const branchRate = parseFloat(coverage['@_branch-rate'] || 0);
+      const lineRate = parseFloat(coverage["@_line-rate"] || 0);
+      const branchRate = parseFloat(coverage["@_branch-rate"] || 0);
 
       // Calculate totals from packages if available
       let totalLines = 0;
@@ -74,18 +74,21 @@ export class CoberturaParser extends BaseParser {
         coveredBranches = Math.round(branchRate * 100);
       }
 
-      reportData.setCoverage(new Coverage({
-        lines: {
-          total: totalLines,
-          covered: coveredLines,
-          percentage: totalLines > 0 ? (coveredLines / totalLines) * 100 : 0
-        },
-        branches: {
-          total: totalBranches,
-          covered: coveredBranches,
-          percentage: totalBranches > 0 ? (coveredBranches / totalBranches) * 100 : 0
-        }
-      }));
+      reportData.setCoverage(
+        new Coverage({
+          lines: {
+            total: totalLines,
+            covered: coveredLines,
+            percentage: totalLines > 0 ? (coveredLines / totalLines) * 100 : 0,
+          },
+          branches: {
+            total: totalBranches,
+            covered: coveredBranches,
+            percentage:
+              totalBranches > 0 ? (coveredBranches / totalBranches) * 100 : 0,
+          },
+        }),
+      );
     } catch (error) {
       throw new Error(`Failed to parse Cobertura XML: ${error.message}`);
     }
@@ -112,15 +115,15 @@ export class CoberturaParser extends BaseParser {
 
           for (const line of lines) {
             totalLines++;
-            const hits = parseInt(line['@_hits'] || 0);
+            const hits = parseInt(line["@_hits"] || 0);
             if (hits > 0) {
               coveredLines++;
             }
 
             // Branch coverage
-            const branch = line['@_branch'] === 'true';
+            const branch = line["@_branch"] === "true";
             if (branch) {
-              const conditionCoverage = line['@_condition-coverage'] || '0%';
+              const conditionCoverage = line["@_condition-coverage"] || "0%";
               const match = conditionCoverage.match(/(\d+)\/(\d+)/);
               if (match) {
                 const covered = parseInt(match[1]);
