@@ -125,6 +125,30 @@ Generate GitHub annotations for failed tests and linting issues:
     output-format: "annotations"
 ```
 
+### Multiple Output Formats
+
+Combine multiple output formats using comma-separated values:
+
+```yaml
+- name: Parse reports with multiple outputs
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  with:
+    report-paths: "auto:all"
+    report-name: "CI Results"
+    output-format: "summary,annotations"
+```
+
+Or use "all" for all output formats:
+
+```yaml
+- name: Parse reports with all outputs
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@v1
+  with:
+    report-paths: "auto:test"
+    report-name: "Test Results"
+    output-format: "all"
+```
+
 ## Inputs
 
 | Input            | Description                                                                                                                    | Required | Default            |
@@ -132,7 +156,7 @@ Generate GitHub annotations for failed tests and linting issues:
 | `report-paths`   | Paths to report files (glob patterns supported) or auto-detection mode ('auto:test', 'auto:coverage', 'auto:lint', 'auto:all') | Yes      | -                  |
 | `report-name`    | Name to display in the summary                                                                                                 | No       | `"Report Summary"` |
 | `include-passed` | Whether to include passed tests in the summary                                                                                 | No       | `false`            |
-| `output-format`  | Output format: 'summary', 'Markdown', 'annotations', or 'both'                                                                 | No       | `"both"`           |
+| `output-format`  | Output format: comma-separated list of 'summary', 'Markdown', 'annotations', or 'all'                                          | No       | `"all"`            |
 | `fail-on-error`  | Whether to fail the action if any test failures are detected                                                                   | No       | `false`            |
 
 ## Outputs

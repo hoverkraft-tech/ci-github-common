@@ -1,76 +1,28 @@
-// Auto-detection patterns for common report files
-const AUTO_PATTERNS = {
-  test: [
-    "**/junit*.xml",
-    "**/test-results/**/*.xml",
-    "**/test-reports/**/*.xml",
-    "**/*test*.xml",
-    "**/*.tap",
-  ],
-  coverage: [
-    "**/coverage/lcov.info",
-    "**/coverage/cobertura-coverage.xml",
-    "**/coverage.xml",
-    "**/lcov.info",
-    "**/cobertura.xml",
-  ],
-  lint: [
-    "**/eslint-report.json",
-    "**/eslint.json",
-    "**/checkstyle-result.xml",
-    "**/checkstyle.xml",
-  ],
-};
-
 // Dynamically import ES modules
 async function runAction({ core, glob: globModule, inputs }) {
   try {
-    // Import the core parser
+    // Import the core parser and path resolver
     const { ReportParserCore } = await import("./ReportParserCore.js");
+    const { ReportPathResolver } = await import("./ReportPathResolver.js");
 
     const parserCore = new ReportParserCore();
+    const pathResolver = new ReportPathResolver();
 
     core.info(`Report Name: ${inputs.reportName}`);
     core.info(`Output Format: ${inputs.outputFormat}`);
 
-    // Handle auto-detection
-    let patternList = inputs.reportPaths
-      .split(/[,\n]/)
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0);
+    // Parse output formats (comma-separated or "all")
+    const outputFormats = parseOutputFormats(inputs.outputFormat);
+    core.info(`Output formats: ${outputFormats.join(", ")}`);
 
-    // Check for auto mode
-    const autoMode = patternList.find((p) => p.startsWith("auto:"));
-    if (autoMode) {
-      const mode = autoMode.split(":")[1];
-      core.info(`Auto-detection mode: ${mode}`);
+    // Resolve report paths using the dedicated component
+    const patternList = pathResolver.resolvePatterns(
+      inputs.reportPaths,
+      (msg) => core.info(msg),
+    );
 
-      patternList = [];
-      if (mode === "all" || mode === "test") {
-        patternList.push(...AUTO_PATTERNS.test);
-      }
-      if (mode === "all" || mode === "coverage") {
-        patternList.push(...AUTO_PATTERNS.coverage);
-      }
-      if (mode === "all" || mode === "lint") {
-        patternList.push(...AUTO_PATTERNS.lint);
-      }
-
-      core.info(`Using patterns: ${patternList.join(", ")}`);
-    }
-
-    // Find report files using glob
-    const files = [];
-    for (const pattern of patternList) {
-      const globber = await globModule.create(pattern, {
-        followSymbolicLinks: false,
-      });
-      const matches = await globber.glob();
-      files.push(...matches);
-    }
-
-    // Remove duplicates
-    const uniqueFiles = [...new Set(files)];
+    // Find report files
+    const uniqueFiles = await pathResolver.findFiles(patternList, globModule);
     core.info(`Found ${uniqueFiles.length} report file(s)`);
 
     if (uniqueFiles.length === 0) {
@@ -86,10 +38,7 @@ async function runAction({ core, glob: globModule, inputs }) {
     );
 
     // Generate GitHub annotations if requested
-    if (
-      inputs.outputFormat === "annotations" ||
-      inputs.outputFormat === "both"
-    ) {
+    if (outputFormats.includes("annotations")) {
       generateAnnotations(core, aggregatedData);
     }
 
@@ -102,7 +51,7 @@ async function runAction({ core, glob: globModule, inputs }) {
     );
 
     // Write to GitHub Step Summary if needed
-    if (inputs.outputFormat === "summary" || inputs.outputFormat === "both") {
+    if (outputFormats.includes("summary")) {
       await core.summary.addRaw(summary).write();
     }
 
@@ -137,6 +86,22 @@ async function runAction({ core, glob: globModule, inputs }) {
     core.setFailed(`Action failed: ${error.message}`);
     throw error;
   }
+}
+
+/**
+ * Parse output format string into array of formats
+ * @param {string} outputFormat - Output format string (comma-separated or "all")
+ * @returns {string[]} Array of output format values
+ */
+function parseOutputFormats(outputFormat) {
+  if (outputFormat === "all") {
+    return ["summary", "markdown", "annotations"];
+  }
+
+  return outputFormat
+    .split(",")
+    .map((f) => f.trim())
+    .filter((f) => f.length > 0);
 }
 
 /**
