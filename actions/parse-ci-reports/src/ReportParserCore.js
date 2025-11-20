@@ -3,15 +3,17 @@ import { ParserFactory } from "./parsers/ParserFactory.js";
 import { SummaryFormatter } from "./formatters/SummaryFormatter.js";
 import { MarkdownFormatter } from "./formatters/MarkdownFormatter.js";
 import { ReportData } from "./models/ReportData.js";
+import { PathRewriter } from "./PathRewriter.js";
 
 /**
  * Core report parsing logic shared between CLI and Action
  */
 export class ReportParserCore {
-  constructor() {
+  constructor(pathMapping = null) {
     this.parserFactory = new ParserFactory();
     this.summaryFormatter = new SummaryFormatter();
     this.markdownFormatter = new MarkdownFormatter();
+    this.pathRewriter = new PathRewriter(pathMapping);
   }
 
   /**
@@ -24,11 +26,27 @@ export class ReportParserCore {
   parseReports(files, logger = console.log, errorLogger = console.error) {
     const aggregatedData = new ReportData();
 
+    // Log path rewriting configuration if enabled
+    if (this.pathRewriter.isEnabled()) {
+      const mapping = this.pathRewriter.getMapping();
+      logger(`Path rewriting enabled: "${mapping.from}" → "${mapping.to}"`);
+    }
+
     for (const file of files) {
       try {
         logger(`Parsing ${file}...`);
         const content = readFileSync(file, "utf-8");
         const reportData = this.parserFactory.parse(file, content);
+
+        // Apply path rewriting to test results
+        for (const test of reportData.tests) {
+          test.file = this.pathRewriter.rewritePath(test.file);
+        }
+
+        // Apply path rewriting to lint issues
+        for (const issue of reportData.lintIssues) {
+          issue.file = this.pathRewriter.rewritePath(issue.file);
+        }
 
         // Merge data
         aggregatedData.tests.push(...reportData.tests);

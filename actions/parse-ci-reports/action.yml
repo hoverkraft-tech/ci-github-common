@@ -37,6 +37,13 @@ inputs:
     description: |
       Whether to fail the action if any test failures are detected.
     default: "false"
+  path-mapping:
+    description: |
+      Path mapping to rewrite file paths in reports (format: "from_path:to_path").
+      Useful when tests/lints run in a different directory or container.
+      Example: "/app/src:./src" or "/var/lib/docker/.../app:."
+    required: false
+    default: ""
 
 outputs:
   markdown:
@@ -69,6 +76,7 @@ runs:
         REPORT_NAME: ${{ inputs.report-name }}
         INCLUDE_PASSED: ${{ inputs.include-passed }}
         OUTPUT_FORMAT: ${{ inputs.output-format }}
+        PATH_MAPPING: ${{ inputs.path-mapping }}
         ACTION_PATH: ${{ github.action_path }}
       with:
         script: |
@@ -79,7 +87,8 @@ runs:
             reportPaths: process.env.REPORT_PATHS,
             reportName: process.env.REPORT_NAME,
             includePassed: process.env.INCLUDE_PASSED === 'true',
-            outputFormat: process.env.OUTPUT_FORMAT
+            outputFormat: process.env.OUTPUT_FORMAT,
+            pathMapping: process.env.PATH_MAPPING || null
           };
 
           await run({ core, glob, inputs });

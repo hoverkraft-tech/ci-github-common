@@ -83,6 +83,13 @@ It supports multiple common report standards out of the box.
     #
     # Default: `false`
     fail-on-error: "false"
+
+    # Path mapping to rewrite file paths in reports (format: "from_path:to_path").
+    # Useful when tests/lints run in a different directory or container.
+    # Example: "/app/src:./src" or "/var/lib/docker/.../app:."
+    #
+    # Default: ``
+    path-mapping: ""
 ```
 
 <!-- usage:end -->
@@ -99,6 +106,9 @@ It supports multiple common report standards out of the box.
 | **`include-passed`** | Whether to include passed tests in the summary.                                                       | **false**    | `false`          |
 | **`output-format`**  | Output format: comma-separated list of `summary`, `markdown`, `annotations`, or `all` for everything. | **false**    | `all`            |
 | **`fail-on-error`**  | Whether to fail the action if any test failures are detected.                                         | **false**    | `false`          |
+| **`path-mapping`**   | Path mapping to rewrite file paths in reports (format: `from_path:to_path`).                          | **false**    | `""`             |
+|                      | Useful when tests/lints run in a different directory or container.                                    |              |                  |
+|                      | Example: `/app/src:./src` or `/var/lib/docker/.../app:.`                                              |              |                  |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -247,6 +257,37 @@ Parse test results, coverage, and linting in one action:
       coverage/lcov.info
       eslint-report.json
     report-name: "CI Results"
+```
+
+### Path Rewriting for Containers
+
+When running tests in a container or different directory, use path-mapping to ensure file paths match your repository structure:
+
+```yaml
+- name: Run tests in container
+  run: |
+    docker run --rm -v ${{ github.workspace }}:/app myimage npm test
+
+- name: Parse test reports
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
+  with:
+    report-paths: "test-results/junit.xml"
+    report-name: "Test Results"
+    path-mapping: "/app:."
+    output-format: "annotations"
+```
+
+This ensures GitHub annotations point to the correct files in your repository, even when tests run in `/app` inside the container.
+
+Another example for complex Docker overlay paths:
+
+```yaml
+- name: Parse reports with path rewriting
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
+  with:
+    report-paths: "auto:all"
+    report-name: "CI Results"
+    path-mapping: "/var/lib/docker/overlay2/abc123/merged/workspace:./src"
 ```
 
 ### Conditional PR Comment
