@@ -129,7 +129,7 @@ It supports multiple common report standards out of the box.
 
 | **Output**         | **Description**                                 |
 | ------------------ | ----------------------------------------------- |
-| **`markdown`**     | Generated markdown output for PR comments       |
+| **`markdown`**     | Generated Markdown output for PR comments       |
 | **`summary`**      | Generated summary output                        |
 | **`parsed-files`** | List of parsed report files (JSON array)        |
 | **`has-errors`**   | Whether any errors were detected in the reports |

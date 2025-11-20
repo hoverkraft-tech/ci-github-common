@@ -27,7 +27,7 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       if: github.event_name == 'issue_comment'
       with:
         ref: refs/pull/${{ github.event.issue.number }}/head
@@ -36,7 +36,7 @@ runs:
         token: ${{ inputs.token || github.token }}
         persist-credentials: ${{ inputs.token == '' }}
 
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       if: github.event_name != 'issue_comment'
       with:
         fetch-depth: ${{ inputs.fetch-depth }}
