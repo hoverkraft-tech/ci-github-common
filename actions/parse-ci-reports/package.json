@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "Parse CI reports (tests, linting, coverage) into GitHub summaries and Markdown",
   "scripts": {
-    "test": "node --test src/**/*.test.js",
-    "test:watch": "node --test --watch src/**/*.test.js",
+    "test": "node --test src/models/*.test.js src/parsers/*.test.js src/*.test.js",
+    "test:watch": "node --test --watch src/models/*.test.js src/parsers/*.test.js src/*.test.js",
     "test:ci": "node --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test"
   },
   "keywords": [

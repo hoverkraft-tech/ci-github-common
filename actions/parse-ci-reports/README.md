@@ -84,9 +84,10 @@ It supports multiple common report standards out of the box.
     # Default: `false`
     fail-on-error: "false"
 
-    # Path mapping to rewrite file paths in reports (format: "from_path:to_path").
+    # Path mapping(s) to rewrite file paths in reports (format: "from_path:to_path").
     # Useful when tests/lints run in a different directory or container.
-    # Example: "/app/src:./src" or "/var/lib/docker/.../app:."
+    # Multiple mappings can be provided separated by newlines or commas.
+    # Examples: "/app/src:./src", "/app/src:./src,/app/tests:./tests"
     #
     # Default: ``
     path-mapping: ""
@@ -106,9 +107,10 @@ It supports multiple common report standards out of the box.
 | **`include-passed`** | Whether to include passed tests in the summary.                                                       | **false**    | `false`          |
 | **`output-format`**  | Output format: comma-separated list of `summary`, `markdown`, `annotations`, or `all` for everything. | **false**    | `all`            |
 | **`fail-on-error`**  | Whether to fail the action if any test failures are detected.                                         | **false**    | `false`          |
-| **`path-mapping`**   | Path mapping to rewrite file paths in reports (format: `from_path:to_path`).                          | **false**    | `""`             |
+| **`path-mapping`**   | Path mapping(s) to rewrite file paths in reports (format: `from_path:to_path`).                       | **false**    | `""`             |
 |                      | Useful when tests/lints run in a different directory or container.                                    |              |                  |
-|                      | Example: `/app/src:./src` or `/var/lib/docker/.../app:.`                                              |              |                  |
+|                      | Multiple mappings can be provided separated by newlines or commas.                                    |              |                  |
+|                      | Examples: `/app/src:./src`, `/app/src:./src,/app/tests:./tests`                                       |              |                  |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -278,6 +280,37 @@ When running tests in a container or different directory, use path-mapping to en
 ```
 
 This ensures GitHub annotations point to the correct files in your repository, even when tests run in `/app` inside the container.
+
+### Multiple Path Mappings
+
+When you have multiple source directories that need rewriting, provide multiple mappings separated by newlines or commas:
+
+```yaml
+- name: Parse reports with multiple path mappings
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
+  with:
+    report-paths: "auto:all"
+    report-name: "CI Results"
+    path-mapping: |
+      /app/src:./src
+      /app/tests:./tests
+      /app/lib:./lib
+    output-format: "annotations"
+```
+
+Or using comma-separated format:
+
+```yaml
+- name: Parse reports with multiple path mappings
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@e6405b7d4daa7292edb246103f42b333a96d0a9f # copilot/add-report-parser-action
+  with:
+    report-paths: "auto:all"
+    report-name: "CI Results"
+    path-mapping: "/app/src:./src,/app/tests:./tests,/app/lib:./lib"
+    output-format: "annotations"
+```
+
+The first matching mapping is applied to each file path. This is useful when dealing with complex project structures or monorepos where different parts of the codebase run in different directories.
 
 Another example for complex Docker overlay paths:
 

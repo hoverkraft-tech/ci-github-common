@@ -7,7 +7,20 @@ permissions:
   contents: read
 
 jobs:
-  tests:
+  continuous-integration:
+    uses: hoverkraft-tech/ci-github-nodejs/.github/workflows/continuous-integration.yml@32a69b7b8fd5f7ab7bf656e7e88aa90ad235cf8d # 0.18.0
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+      security-events: write
+    with:
+      working-directory: ./actions/parse-ci-reports
+      build: null
+      lint: null
+      test: '{ "coverage": null }'
+
+  integration-tests:
     name: Tests for parse-ci-reports action
     runs-on: ubuntu-latest
     steps:

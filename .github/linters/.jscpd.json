@@ -1,4 +1,4 @@
 {
   "threshold": 5,
-  "ignore": ["**/node_modules/**"]
+  "ignore": ["**/node_modules/**", "**/actions/**/coverage/**"]
 }

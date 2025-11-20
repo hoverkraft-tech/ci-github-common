@@ -5,16 +5,19 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  actions: read
-  contents: read
-  statuses: write
-  security-events: write
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   ci:
     uses: ./.github/workflows/__shared-ci.yml
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      pull-requests: write
+      statuses: write
+      security-events: write
