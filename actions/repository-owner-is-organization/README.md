@@ -33,7 +33,7 @@ Action to check if the repository owner is an organization.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/repository-owner-is-organization@d95c78dc4b10250a07e227d3ddf33b0ea093e28d # 0.29.0
+- uses: hoverkraft-tech/ci-github-common/actions/repository-owner-is-organization@1127e708e4072515056a4b0d26bcb0653646cedc # 0.30.0
   with:
     # GitHub token for fetching users API.
     # Default: `${{ github.token }}`
