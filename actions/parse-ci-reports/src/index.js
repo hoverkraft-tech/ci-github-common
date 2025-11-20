@@ -12,7 +12,7 @@ async function run({ core, glob: globModule, inputs }) {
     core.info(`Output Format: ${inputs.outputFormat}`);
 
     // Parse output formats (comma-separated or "all")
-    const outputFormats = parseOutputFormats(inputs.outputFormat);
+    const outputFormats = parserCore.parseOutputFormats(inputs.outputFormat);
     core.info(`Output formats: ${outputFormats.join(", ")}`);
 
     // Resolve report paths using the dedicated component
@@ -78,22 +78,6 @@ async function run({ core, glob: globModule, inputs }) {
     core.setFailed(`Action failed: ${error.message}`);
     throw error;
   }
-}
-
-/**
- * Parse output format string into array of formats
- * @param {string} outputFormat - Output format string (comma-separated or "all")
- * @returns {string[]} Array of output format values
- */
-function parseOutputFormats(outputFormat) {
-  if (outputFormat === "all") {
-    return ["summary", "markdown", "annotations"];
-  }
-
-  return outputFormat
-    .split(",")
-    .map((f) => f.trim())
-    .filter((f) => f.length > 0);
 }
 
 /**
