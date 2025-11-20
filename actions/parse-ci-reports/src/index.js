@@ -5,11 +5,14 @@ async function run({ core, glob: globModule, inputs }) {
     const { ReportParserCore } = await import("./ReportParserCore.js");
     const { ReportPathResolver } = await import("./ReportPathResolver.js");
 
-    const parserCore = new ReportParserCore();
+    const parserCore = new ReportParserCore(inputs.pathMapping);
     const pathResolver = new ReportPathResolver();
 
     core.info(`Report Name: ${inputs.reportName}`);
     core.info(`Output Format: ${inputs.outputFormat}`);
+    if (inputs.pathMapping) {
+      core.info(`Path Mapping: ${inputs.pathMapping}`);
+    }
 
     // Parse output formats (comma-separated or "all")
     const outputFormats = parserCore.parseOutputFormats(inputs.outputFormat);
