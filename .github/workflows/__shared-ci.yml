@@ -24,6 +24,9 @@ jobs:
     needs: linter
     permissions:
       contents: read
+      id-token: write
+      pull-requests: write
+      security-events: write
     uses: ./.github/workflows/__test-action-parse-ci-reports.yml
 
   test-action-repository-owner-is-organization:

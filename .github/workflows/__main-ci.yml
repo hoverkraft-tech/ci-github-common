@@ -23,6 +23,8 @@ jobs:
     permissions:
       actions: read
       contents: read
+      id-token: write
+      pull-requests: write
       statuses: write
       security-events: write
 

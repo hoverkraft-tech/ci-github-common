@@ -28,8 +28,11 @@ export class ReportParserCore {
 
     // Log path rewriting configuration if enabled
     if (this.pathRewriter.isEnabled()) {
-      const mapping = this.pathRewriter.getMapping();
-      logger(`Path rewriting enabled: "${mapping.from}" → "${mapping.to}"`);
+      const mappings = this.pathRewriter.getMappings();
+      logger(`Path rewriting enabled with ${mappings.length} mapping(s):`);
+      for (const mapping of mappings) {
+        logger(`  "${mapping.from}" → "${mapping.to}"`);
+      }
     }
 
     for (const file of files) {

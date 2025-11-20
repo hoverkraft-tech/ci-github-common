@@ -39,9 +39,15 @@ inputs:
     default: "false"
   path-mapping:
     description: |
-      Path mapping to rewrite file paths in reports (format: "from_path:to_path").
+      Path mapping(s) to rewrite file paths in reports (format: "from_path:to_path").
       Useful when tests/lints run in a different directory or container.
-      Example: "/app/src:./src" or "/var/lib/docker/.../app:."
+      Multiple mappings can be provided separated by newlines or commas.
+      Examples:
+        - Single mapping: "/app/src:./src"
+        - Multiple mappings: "/app/src:./src,/app/tests:./tests"
+        - Multi-line: |
+            /app/src:./src
+            /app/tests:./tests
     required: false
     default: ""
 

@@ -9,17 +9,48 @@ describe("PathRewriter", () => {
     assert.strictEqual(rewriter.rewritePath("/some/path.js"), "/some/path.js");
   });
 
-  it("should parse path mapping correctly", () => {
+  it("should parse single path mapping correctly", () => {
     const rewriter = new PathRewriter("/app/src:/workspace/src");
     assert.strictEqual(rewriter.isEnabled(), true);
 
-    const mapping = rewriter.getMapping();
-    assert.strictEqual(mapping.from, "/app/src");
-    assert.strictEqual(mapping.to, "/workspace/src");
+    const mappings = rewriter.getMappings();
+    assert.strictEqual(mappings.length, 1);
+    assert.strictEqual(mappings[0].from, "/app/src");
+    assert.strictEqual(mappings[0].to, "/workspace/src");
   });
 
-  it("should rewrite paths correctly", () => {
-    const rewriter = new PathRewriter("/app/src:/workspace/src");
+  it("should parse multiple path mappings separated by newlines", () => {
+    const rewriter = new PathRewriter(
+      "/app/src:/workspace/src\n/app/tests:/workspace/tests",
+    );
+    assert.strictEqual(rewriter.isEnabled(), true);
+
+    const mappings = rewriter.getMappings();
+    assert.strictEqual(mappings.length, 2);
+    assert.strictEqual(mappings[0].from, "/app/src");
+    assert.strictEqual(mappings[0].to, "/workspace/src");
+    assert.strictEqual(mappings[1].from, "/app/tests");
+    assert.strictEqual(mappings[1].to, "/workspace/tests");
+  });
+
+  it("should parse multiple path mappings separated by commas", () => {
+    const rewriter = new PathRewriter(
+      "/app/src:/workspace/src,/app/tests:/workspace/tests",
+    );
+    assert.strictEqual(rewriter.isEnabled(), true);
+
+    const mappings = rewriter.getMappings();
+    assert.strictEqual(mappings.length, 2);
+    assert.strictEqual(mappings[0].from, "/app/src");
+    assert.strictEqual(mappings[0].to, "/workspace/src");
+    assert.strictEqual(mappings[1].from, "/app/tests");
+    assert.strictEqual(mappings[1].to, "/workspace/tests");
+  });
+
+  it("should rewrite paths using first matching mapping", () => {
+    const rewriter = new PathRewriter(
+      "/app/src:/workspace/src\n/app/tests:/workspace/tests",
+    );
 
     assert.strictEqual(
       rewriter.rewritePath("/app/src/utils/helper.js"),
@@ -27,8 +58,26 @@ describe("PathRewriter", () => {
     );
 
     assert.strictEqual(
-      rewriter.rewritePath("/app/src/index.js"),
-      "/workspace/src/index.js",
+      rewriter.rewritePath("/app/tests/unit/test.js"),
+      "/workspace/tests/unit/test.js",
+    );
+  });
+
+  it("should use first matching mapping when multiple could match", () => {
+    const rewriter = new PathRewriter(
+      "/app/src:/workspace/src\n/app:/workspace",
+    );
+
+    // Should use first mapping that matches
+    assert.strictEqual(
+      rewriter.rewritePath("/app/src/file.js"),
+      "/workspace/src/file.js",
+    );
+
+    // Should use second mapping when first doesn't match
+    assert.strictEqual(
+      rewriter.rewritePath("/app/other/file.js"),
+      "/workspace/other/file.js",
     );
   });
 
@@ -41,7 +90,7 @@ describe("PathRewriter", () => {
     );
   });
 
-  it("should not rewrite paths that don't match", () => {
+  it("should not rewrite paths that don't match any mapping", () => {
     const rewriter = new PathRewriter("/app/src:/workspace/src");
 
     assert.strictEqual(
@@ -60,9 +109,9 @@ describe("PathRewriter", () => {
   it("should normalize trailing slashes", () => {
     const rewriter = new PathRewriter("/app/src/:/workspace/src/");
 
-    const mapping = rewriter.getMapping();
-    assert.strictEqual(mapping.from, "/app/src");
-    assert.strictEqual(mapping.to, "/workspace/src");
+    const mappings = rewriter.getMappings();
+    assert.strictEqual(mappings[0].from, "/app/src");
+    assert.strictEqual(mappings[0].to, "/workspace/src");
   });
 
   it("should throw error on invalid format", () => {
@@ -90,5 +139,31 @@ describe("PathRewriter", () => {
       ),
       "./src/utils/helper.js",
     );
+  });
+
+  it("should ignore empty lines and whitespace in multi-line mappings", () => {
+    const rewriter = new PathRewriter(`
+      /app/src:/workspace/src
+      
+      /app/tests:/workspace/tests
+      
+    `);
+
+    const mappings = rewriter.getMappings();
+    assert.strictEqual(mappings.length, 2);
+    assert.strictEqual(mappings[0].from, "/app/src");
+    assert.strictEqual(mappings[1].from, "/app/tests");
+  });
+
+  it("should handle mixed newlines and commas", () => {
+    const rewriter = new PathRewriter(
+      "/app/src:/workspace/src,/app/tests:/workspace/tests\n/app/lib:./lib",
+    );
+
+    const mappings = rewriter.getMappings();
+    assert.strictEqual(mappings.length, 3);
+    assert.strictEqual(mappings[0].from, "/app/src");
+    assert.strictEqual(mappings[1].from, "/app/tests");
+    assert.strictEqual(mappings[2].from, "/app/lib");
   });
 });
