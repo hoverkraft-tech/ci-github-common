@@ -51,18 +51,21 @@ export class ReportParserCore {
    * @param {ReportData} reportData - The parsed report data
    * @param {string} reportName - Name of the report
    * @param {boolean} includePassed - Include passed tests
-   * @param {string} outputFormat - Output format (summary, markdown, both)
+   * @param {string} outputFormat - Output format (comma-separated: summary, markdown, annotations, or "all")
    * @returns {Object} Object with markdown and summary strings
    */
   generateOutput(reportData, reportName, includePassed, outputFormat) {
+    // Parse output formats
+    const formats = this.parseOutputFormats(outputFormat);
+
     let markdown = "";
     let summary = "";
 
-    if (outputFormat === "markdown" || outputFormat === "both") {
+    if (formats.includes("markdown")) {
       markdown = this.markdownFormatter.format(reportData, reportName);
     }
 
-    if (outputFormat === "summary" || outputFormat === "both") {
+    if (formats.includes("summary")) {
       summary = this.summaryFormatter.format(
         reportData,
         reportName,
@@ -71,5 +74,21 @@ export class ReportParserCore {
     }
 
     return { markdown, summary };
+  }
+
+  /**
+   * Parse output format string into array of formats
+   * @param {string} outputFormat - Output format string (comma-separated or "all")
+   * @returns {string[]} Array of output format values
+   */
+  parseOutputFormats(outputFormat) {
+    if (outputFormat === "all") {
+      return ["summary", "markdown", "annotations"];
+    }
+
+    return outputFormat
+      .split(",")
+      .map((f) => f.trim())
+      .filter((f) => f.length > 0);
   }
 }
