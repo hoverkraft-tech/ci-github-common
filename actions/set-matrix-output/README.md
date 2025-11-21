@@ -38,7 +38,7 @@ This strategy effectively prevents any clashes or overwrites, maintaining the in
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/set-matrix-output@1127e708e4072515056a4b0d26bcb0653646cedc # 0.30.0
+- uses: hoverkraft-tech/ci-github-common/actions/set-matrix-output@c314229c3ca6914f7023ffca7afc26753ab99b41 # 0.30.1
   with:
     # The matrix output to set.
     # This input is required.
