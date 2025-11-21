@@ -18,7 +18,7 @@ inputs:
     description: |
       Paths to report files (glob patterns supported, one per line or comma-separated).
       Set to `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all` for automatic detection.
-      Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `auto:all`
+      Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `auto:all`, `auto:test,coverage/lcov.info`, `auto:test,auto:coverage`
     required: false
     default: "auto:all"
   report-name:
@@ -50,6 +50,12 @@ inputs:
             /app/tests:./tests
     required: false
     default: ""
+  working-directory:
+    description: |
+      Working directory where the action should operate.
+      Can be absolute or relative to the repository root.
+    required: false
+    default: "."
 
 outputs:
   markdown:
@@ -84,12 +90,16 @@ runs:
         OUTPUT_FORMAT: ${{ inputs.output-format }}
         PATH_MAPPING: ${{ inputs.path-mapping }}
         ACTION_PATH: ${{ github.action_path }}
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
       with:
         script: |
           const path = require('path');
-          const { run } = require(path.join(process.env.ACTION_PATH, 'src', 'index.js'));
+          const { pathToFileURL } = require('url');
+          const actionModulePath = path.join(process.env.ACTION_PATH, 'src', 'index.js');
+          const { run } = await import(pathToFileURL(actionModulePath));
 
           const inputs = {
+            workingDirectory: process.env.WORKING_DIRECTORY,
             reportPaths: process.env.REPORT_PATHS,
             reportName: process.env.REPORT_NAME,
             includePassed: process.env.INCLUDE_PASSED === 'true',

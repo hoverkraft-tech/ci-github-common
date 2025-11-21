@@ -1,44 +1,46 @@
 // Dynamically import ES modules
-async function run({ core, glob: globModule, inputs }) {
+export async function run({ core, glob: globModule, inputs }) {
   try {
     // Import the core parser and path resolver
+    const { FileSystemService } = await import("./FileSystemService.js");
     const { ReportParserCore } = await import("./ReportParserCore.js");
     const { ReportPathResolver } = await import("./ReportPathResolver.js");
+    const { LoggerService } = await import("./LoggerService.js");
 
-    const parserCore = new ReportParserCore(inputs.pathMapping);
-    const pathResolver = new ReportPathResolver();
+    const fileSystemService = new FileSystemService(inputs.workingDirectory);
+    const logger = new LoggerService(core);
 
-    core.info(`Report Name: ${inputs.reportName}`);
-    core.info(`Output Format: ${inputs.outputFormat}`);
+    const parserCore = new ReportParserCore(
+      fileSystemService,
+      logger,
+      inputs.pathMapping,
+    );
+    const pathResolver = new ReportPathResolver(fileSystemService, logger);
+
+    logger.info(`Report Name: ${inputs.reportName}`);
+    logger.info(`Output Format: ${inputs.outputFormat}`);
     if (inputs.pathMapping) {
-      core.info(`Path Mapping: ${inputs.pathMapping}`);
+      logger.info(`Path Mapping: ${inputs.pathMapping}`);
     }
 
     // Parse output formats (comma-separated or "all")
     const outputFormats = parserCore.parseOutputFormats(inputs.outputFormat);
-    core.info(`Output formats: ${outputFormats.join(", ")}`);
+    logger.info(`Output formats: ${outputFormats.join(", ")}`);
 
     // Resolve report paths using the dedicated component
-    const patternList = pathResolver.resolvePatterns(
-      inputs.reportPaths,
-      (msg) => core.info(msg),
-    );
+    const patternList = pathResolver.resolvePatterns(inputs.reportPaths);
 
     // Find report files
     const uniqueFiles = await pathResolver.findFiles(patternList, globModule);
-    core.info(`Found ${uniqueFiles.length} report file(s)`);
+    logger.info(`Found ${uniqueFiles.length} report file(s)`);
 
     if (uniqueFiles.length === 0) {
-      core.warning("No report files found");
+      logger.warning("No report files found");
       return;
     }
 
     // Parse reports using core
-    const aggregatedData = parserCore.parseReports(
-      uniqueFiles,
-      (msg) => core.info(msg),
-      (msg) => core.error(msg),
-    );
+    const aggregatedData = parserCore.parseReports(uniqueFiles);
 
     // Generate GitHub annotations if requested
     if (outputFormats.includes("annotations")) {
@@ -64,14 +66,14 @@ async function run({ core, glob: globModule, inputs }) {
     core.setOutput("parsed-files", JSON.stringify(uniqueFiles));
 
     // Log summary
-    core.info("\n--- Summary ---");
-    core.info(`Total tests: ${aggregatedData.getTotalTests()}`);
-    core.info(`Passed: ${aggregatedData.getPassedCount()}`);
-    core.info(`Failed: ${aggregatedData.getFailedCount()}`);
-    core.info(`Skipped: ${aggregatedData.getSkippedCount()}`);
-    core.info(`Lint issues: ${aggregatedData.lintIssues.length}`);
+    logger.info("\n--- Summary ---");
+    logger.info(`Total tests: ${aggregatedData.getTotalTests()}`);
+    logger.info(`Passed: ${aggregatedData.getPassedCount()}`);
+    logger.info(`Failed: ${aggregatedData.getFailedCount()}`);
+    logger.info(`Skipped: ${aggregatedData.getSkippedCount()}`);
+    logger.info(`Lint issues: ${aggregatedData.lintIssues.length}`);
     if (aggregatedData.coverage) {
-      core.info(
+      logger.info(
         `Coverage: ${aggregatedData.coverage
           .getOverallPercentage()
           .toFixed(2)}%`,
@@ -122,7 +124,3 @@ function annotateLintIssues(core, issues, annotationFn, limit) {
     annotationFn.call(core, issue.message, properties);
   }
 }
-
-module.exports = {
-  run,
-};

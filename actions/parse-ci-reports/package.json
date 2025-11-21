@@ -22,6 +22,7 @@
   ],
   "author": "hoverkraft",
   "license": "MIT",
+  "type": "module",
   "dependencies": {
     "fast-xml-parser": "^5.3.2"
   },
