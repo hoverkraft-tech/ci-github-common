@@ -26,6 +26,10 @@ const AUTO_PATTERNS = {
     "**/eslint.json",
     "**/checkstyle-result.xml",
     "**/checkstyle.xml",
+    "**/prettier-check.log",
+    "**/prettier-check.txt",
+    "**/prettier-report.log",
+    "**/prettier-report.txt",
   ],
 };
 
