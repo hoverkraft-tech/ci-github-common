@@ -33,14 +33,19 @@ on:
         type: string
         required: false
 
-permissions:
-  contents: read
-  issues: write
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
 
 jobs:
   need-fix-to-issue:
     name: "🔍 Convert TODO/FIXME to Issue"
     runs-on: ${{ inputs.runs-on && fromJson(inputs.runs-on) || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: "actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3" # v6.0.0
         with:
