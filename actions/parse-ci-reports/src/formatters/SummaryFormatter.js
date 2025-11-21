@@ -1,10 +1,10 @@
-import { BaseFormatter } from "./BaseFormatter.js";
+import { MarkdownFormatter } from "./MarkdownFormatter.js";
 
 /**
  * Formatter for GitHub Step Summary
  * Generates markdown suitable for $GITHUB_STEP_SUMMARY
  */
-export class SummaryFormatter extends BaseFormatter {
+export class SummaryFormatter extends MarkdownFormatter {
   /**
    * Format report data as GitHub Step Summary
    * @param {ReportData} reportData - The report data
@@ -13,27 +13,27 @@ export class SummaryFormatter extends BaseFormatter {
    * @returns {string} Formatted markdown
    */
   format(reportData, reportName, includePassed = false) {
-    const sections = [`## ${reportName}\n`];
-    sections.push(...this.buildSections(reportData, { includePassed }));
-    return sections.join("\n");
+    this._includePassed = includePassed;
+    try {
+      return super.format(reportData, reportName);
+    } finally {
+      this._includePassed = undefined;
+    }
   }
 
-  _formatTestResults(reportData, options = {}) {
-    const { includePassed = false } = options;
-    const total = reportData.getTotalTests();
-    const passed = reportData.getPassedCount();
+  _getTestFormatterArgs() {
+    return [this._includePassed ?? false];
+  }
+
+  _formatTestResults(reportData, includePassed = false) {
     const failed = reportData.getFailedCount();
-    const skipped = reportData.getSkippedCount();
+    const passed = reportData.getPassedCount();
 
     let output = "### Test Results\n\n";
 
     // Summary table
-    output += "| Status | Count |\n";
-    output += "|--------|-------|\n";
-    output += `| ✅ Passed | ${passed} |\n`;
-    output += `| ❌ Failed | ${failed} |\n`;
-    output += `| ⏭️ Skipped | ${skipped} |\n`;
-    output += `| **Total** | **${total}** |\n\n`;
+    output += this._buildTestSummaryTable(reportData);
+    output += "\n";
 
     // Failed tests details
     if (failed > 0) {
@@ -74,17 +74,14 @@ export class SummaryFormatter extends BaseFormatter {
   }
 
   _formatLintIssues(reportData) {
-    const errors = reportData.getErrors();
-    const warnings = reportData.getWarnings();
-
     let output = "### Lint Issues\n\n";
 
     // Summary table
-    output += "| Severity | Count |\n";
-    output += "|----------|-------|\n";
-    output += `| ❌ Errors | ${errors.length} |\n`;
-    output += `| ⚠️ Warnings | ${warnings.length} |\n`;
-    output += `| **Total** | **${reportData.lintIssues.length}** |\n\n`;
+    output += this._buildLintSummaryTable(reportData);
+    output += "\n";
+
+    const errors = reportData.getErrors();
+    const warnings = reportData.getWarnings();
 
     // Error details
     if (errors.length > 0) {
@@ -109,7 +106,9 @@ export class SummaryFormatter extends BaseFormatter {
     }
 
     if (issues.length > limit) {
-      output += `_... and ${issues.length - limit} more ${title.toLowerCase()}_\n\n`;
+      output += `_... and ${
+        issues.length - limit
+      } more ${title.toLowerCase()}_\n\n`;
     }
 
     return output;
@@ -120,23 +119,7 @@ export class SummaryFormatter extends BaseFormatter {
 
     output += "| Metric | Covered | Total | Percentage |\n";
     output += "|--------|---------|-------|------------|\n";
-
-    if (coverage.lines.total > 0) {
-      output += `| Lines | ${coverage.lines.covered} | ${coverage.lines.total} | ${this._formatPercentage(coverage.lines.percentage)} |\n`;
-    }
-
-    if (coverage.branches.total > 0) {
-      output += `| Branches | ${coverage.branches.covered} | ${coverage.branches.total} | ${this._formatPercentage(coverage.branches.percentage)} |\n`;
-    }
-
-    if (coverage.functions.total > 0) {
-      output += `| Functions | ${coverage.functions.covered} | ${coverage.functions.total} | ${this._formatPercentage(coverage.functions.percentage)} |\n`;
-    }
-
-    if (coverage.statements.total > 0) {
-      output += `| Statements | ${coverage.statements.covered} | ${coverage.statements.total} | ${this._formatPercentage(coverage.statements.percentage)} |\n`;
-    }
-
+    output += this._buildCoverageRows(coverage);
     output += "\n";
 
     // Overall percentage with visual indicator
@@ -145,25 +128,5 @@ export class SummaryFormatter extends BaseFormatter {
     output += this._getCoverageBar(overall) + "\n";
 
     return output;
-  }
-
-  _formatPercentage(percentage) {
-    return `${percentage.toFixed(2)}%`;
-  }
-
-  _getCoverageBar(percentage) {
-    const filled = Math.round(percentage / 5); // 20 blocks total
-    const empty = 20 - filled;
-
-    let bar = "";
-    if (percentage >= 80) {
-      bar = "🟩".repeat(filled) + "⬜".repeat(empty);
-    } else if (percentage >= 60) {
-      bar = "🟨".repeat(filled) + "⬜".repeat(empty);
-    } else {
-      bar = "🟥".repeat(filled) + "⬜".repeat(empty);
-    }
-
-    return bar;
   }
 }
