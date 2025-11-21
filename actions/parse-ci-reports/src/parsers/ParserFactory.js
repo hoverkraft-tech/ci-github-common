@@ -4,6 +4,7 @@ import { CoberturaParser } from "./CoberturaParser.js";
 import { LCOVParser } from "./LCOVParser.js";
 import { ESLintParser } from "./ESLintParser.js";
 import { CheckStyleParser } from "./CheckStyleParser.js";
+import { PrettierParser } from "./PrettierParser.js";
 
 /**
  * Factory class for creating and managing parsers
@@ -20,6 +21,7 @@ export class ParserFactory {
       new LCOVParser(),
       new ESLintParser(),
       new CheckStyleParser(),
+      new PrettierParser(),
     ];
 
     // Sort parsers by priority (highest first)
