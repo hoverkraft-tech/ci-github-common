@@ -94,6 +94,14 @@ It supports multiple common report standards out of the box.
     # /app/src:./src
     # /app/tests:./tests
     path-mapping: ""
+
+    # Working directory where the action should operate.
+    # Can be absolute or relative to the repository root.
+    # Patterns are resolved relative to this directory without changing
+    # the runner's working directory.
+    #
+    # Default: `.`
+    working-directory: "."
 ```
 
 <!-- usage:end -->
@@ -101,24 +109,26 @@ It supports multiple common report standards out of the box.
 
 ## Inputs
 
-| **Input**            | **Description**                                                                                       | **Required** | **Default**      |
-| -------------------- | ----------------------------------------------------------------------------------------------------- | ------------ | ---------------- |
-| **`report-paths`**   | Paths to report files (glob patterns supported, one per line or comma-separated).                     | **false**    | `auto:all`       |
-|                      | Set to `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all` for automatic detection.              |              |                  |
-|                      | Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `auto:all`                      |              |                  |
-| **`report-name`**    | Name to display in the summary (e.g., `Test Results`, `Coverage Report`).                             | **false**    | `Report Summary` |
-| **`include-passed`** | Whether to include passed tests in the summary.                                                       | **false**    | `false`          |
-| **`output-format`**  | Output format: comma-separated list of `summary`, `markdown`, `annotations`, or `all` for everything. | **false**    | `all`            |
-| **`fail-on-error`**  | Whether to fail the action if any test failures are detected.                                         | **false**    | `false`          |
-| **`path-mapping`**   | Path mapping(s) to rewrite file paths in reports (format: "from_path:to_path").                       | **false**    | -                |
-|                      | Useful when tests/lints run in a different directory or container.                                    |              |                  |
-|                      | Multiple mappings can be provided separated by newlines or commas.                                    |              |                  |
-|                      | Examples:                                                                                             |              |                  |
-|                      | - Single mapping: "/app/src:./src"                                                                    |              |                  |
-|                      | - Multiple mappings: "/app/src:./src,/app/tests:./tests"                                              |              |                  |
-|                      | - Multi-line: \|                                                                                      |              |                  |
-|                      | /app/src:./src                                                                                        |              |                  |
-|                      | /app/tests:./tests                                                                                    |              |                  |
+| **Input**               | **Description**                                                                                                                                                       | **Required** | **Default**      |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------- |
+| **`report-paths`**      | Paths to report files (glob patterns supported, one per line or comma-separated).                                                                                     | **false**    | `auto:all`       |
+|                         | Set to `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all` for automatic detection.                                                                              |              |                  |
+|                         | Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `auto:all`                                                                                      |              |                  |
+| **`report-name`**       | Name to display in the summary (e.g., `Test Results`, `Coverage Report`).                                                                                             | **false**    | `Report Summary` |
+| **`include-passed`**    | Whether to include passed tests in the summary.                                                                                                                       | **false**    | `false`          |
+| **`output-format`**     | Output format: comma-separated list of `summary`, `markdown`, `annotations`, or `all` for everything.                                                                 | **false**    | `all`            |
+| **`fail-on-error`**     | Whether to fail the action if any test failures are detected.                                                                                                         | **false**    | `false`          |
+| **`path-mapping`**      | Path mapping(s) to rewrite file paths in reports (format: "from_path:to_path").                                                                                       | **false**    | -                |
+|                         | Useful when tests/lints run in a different directory or container.                                                                                                    |              |                  |
+|                         | Multiple mappings can be provided separated by newlines or commas.                                                                                                    |              |                  |
+|                         | Examples:                                                                                                                                                             |              |                  |
+|                         | - Single mapping: "/app/src:./src"                                                                                                                                    |              |                  |
+|                         | - Multiple mappings: "/app/src:./src,/app/tests:./tests"                                                                                                              |              |                  |
+|                         | - Multi-line: \|                                                                                                                                                      |              |                  |
+|                         | /app/src:./src                                                                                                                                                        |              |                  |
+|                         | /app/tests:./tests                                                                                                                                                    |              |                  |
+| **`working-directory`** | Working directory where the action should operate.                                                                                                                    | **false**    | `.`              |
+|                         | Accepts absolute paths or paths relative to the repository root. Patterns and report files are resolved relative to this directory without changing the runner's cwd. |              |                  |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -267,6 +277,21 @@ Parse test results, coverage, and linting in one action:
       coverage/lcov.info
       eslint-report.json
     report-name: "CI Results"
+```
+
+### Run from a Subdirectory
+
+When working in a monorepo or nested package, set `working-directory` so glob patterns are evaluated relative to that folder:
+
+```yaml
+- name: Parse frontend reports
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@1127e708e4072515056a4b0d26bcb0653646cedc # 0.30.0
+  with:
+    working-directory: packages/frontend
+    report-paths: |
+      coverage/lcov.info
+      reports/junit.xml
+    report-name: "Frontend CI"
 ```
 
 ### Path Rewriting for Containers

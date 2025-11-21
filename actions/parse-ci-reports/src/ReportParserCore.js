@@ -1,4 +1,3 @@
-import { readFileSync } from "fs";
 import { ParserFactory } from "./parsers/ParserFactory.js";
 import { SummaryFormatter } from "./formatters/SummaryFormatter.js";
 import { MarkdownFormatter } from "./formatters/MarkdownFormatter.js";
@@ -9,8 +8,10 @@ import { PathRewriter } from "./PathRewriter.js";
  * Core report parsing logic shared between CLI and Action
  */
 export class ReportParserCore {
-  constructor(pathMapping = null) {
-    this.parserFactory = new ParserFactory();
+  constructor(fileSystemService, logger, pathMapping = null) {
+    this.fileSystemService = fileSystemService;
+    this.logger = logger;
+    this.parserFactory = new ParserFactory(fileSystemService);
     this.summaryFormatter = new SummaryFormatter();
     this.markdownFormatter = new MarkdownFormatter();
     this.pathRewriter = new PathRewriter(pathMapping);
@@ -19,48 +20,42 @@ export class ReportParserCore {
   /**
    * Parse all report files
    * @param {string[]} files - Array of file paths
-   * @param {Function} logger - Logging function (info)
-   * @param {Function} errorLogger - Error logging function
    * @returns {ReportData} Aggregated report data
    */
-  parseReports(files, logger = console.log, errorLogger = console.error) {
+  parseReports(files) {
     const aggregatedData = new ReportData();
 
     // Log path rewriting configuration if enabled
     if (this.pathRewriter.isEnabled()) {
       const mappings = this.pathRewriter.getMappings();
-      logger(`Path rewriting enabled with ${mappings.length} mapping(s):`);
+      this.logger.info(
+        `Path rewriting enabled with ${mappings.length} mapping(s):`,
+      );
       for (const mapping of mappings) {
-        logger(`  "${mapping.from}" → "${mapping.to}"`);
+        this.logger.info(`  "${mapping.from}" → "${mapping.to}"`);
       }
     }
 
     for (const file of files) {
-      try {
-        logger(`Parsing ${file}...`);
-        const content = readFileSync(file, "utf-8");
-        const reportData = this.parserFactory.parse(file, content);
+      this.logger.info(`Parsing ${file}...`);
+      const reportData = this.parserFactory.parse(file);
 
-        // Apply path rewriting to test results
-        for (const test of reportData.tests) {
-          test.file = this.pathRewriter.rewritePath(test.file);
-        }
+      // Apply path rewriting to test results
+      for (const test of reportData.tests) {
+        test.file = this.pathRewriter.rewritePath(test.file);
+      }
 
-        // Apply path rewriting to lint issues
-        for (const issue of reportData.lintIssues) {
-          issue.file = this.pathRewriter.rewritePath(issue.file);
-        }
+      // Apply path rewriting to lint issues
+      for (const issue of reportData.lintIssues) {
+        issue.file = this.pathRewriter.rewritePath(issue.file);
+      }
 
-        // Merge data
-        aggregatedData.tests.push(...reportData.tests);
-        aggregatedData.lintIssues.push(...reportData.lintIssues);
+      // Merge data
+      aggregatedData.tests.push(...reportData.tests);
+      aggregatedData.lintIssues.push(...reportData.lintIssues);
 
-        if (reportData.coverage) {
-          aggregatedData.setCoverage(reportData.coverage);
-        }
-      } catch (error) {
-        errorLogger(`Error parsing ${file}: ${error.message}`);
-        // Continue with other files
+      if (reportData.coverage) {
+        aggregatedData.setCoverage(reportData.coverage);
       }
     }
 

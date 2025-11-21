@@ -10,7 +10,9 @@ import { CheckStyleParser } from "./CheckStyleParser.js";
  * Implements the Factory pattern for parser selection
  */
 export class ParserFactory {
-  constructor() {
+  constructor(fileSystemService) {
+    this.fileSystemService = fileSystemService;
+
     this.parsers = [
       new JUnitParser(),
       new TAPParser(),
@@ -45,7 +47,9 @@ export class ParserFactory {
    * @param {string} content - File content
    * @returns {ReportData} Parsed report data
    */
-  parse(filePath, content) {
+  parse(filePath) {
+    const content = this.fileSystemService.readFile(filePath);
+
     const parser = this.getParser(filePath, content);
 
     if (!parser) {
