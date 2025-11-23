@@ -102,6 +102,9 @@ export class ReportPathResolver {
       this.fileSystemService.normalizeFilePath(pattern),
     );
 
+    // Add exclusion pattern for node_modules
+    normalizedPatterns.push("!**/node_modules/**");
+
     const globber = await globModule.create(normalizedPatterns.join("\n"), {
       followSymbolicLinks: false,
     });

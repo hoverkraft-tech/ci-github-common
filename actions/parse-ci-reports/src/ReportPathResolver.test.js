@@ -48,7 +48,9 @@ describe("ReportPathResolver", () => {
 
     const files = await resolver.findFiles(["coverage/**/*.xml"], globModule);
 
-    assert.deepStrictEqual(createdPatterns, ["normalized:coverage/**/*.xml"]);
+    assert.deepStrictEqual(createdPatterns, [
+      "normalized:coverage/**/*.xml\n!**/node_modules/**",
+    ]);
     assert.deepStrictEqual(files, ["resolved:match-a", "resolved:match-b"]);
     assert.deepStrictEqual(fileSystem.normalized, ["coverage/**/*.xml"]);
     assert.deepStrictEqual(fileSystem.resolved, ["match-a", "match-b"]);
@@ -120,6 +122,40 @@ describe("ReportPathResolver", () => {
       "**/coverage.xml",
       "**/lcov.info",
       "**/cobertura.xml",
+    ]);
+  });
+
+  it("excludes node_modules files from glob patterns", async () => {
+    const fileSystem = createFileSystemStub();
+    const logger = createLoggerStub();
+    const resolver = new ReportPathResolver(fileSystem, logger);
+    const createdPatterns = [];
+
+    const globModule = {
+      async create(patternsString) {
+        createdPatterns.push(patternsString);
+        return {
+          async *globGenerator() {
+            // Simulate glob behavior: return files, but node_modules should be excluded by pattern
+            yield "src/test.xml";
+            yield "coverage/report.xml";
+            // This would be excluded by the !**/node_modules/** pattern in real glob
+            // but for this test, we just verify the pattern is passed
+          },
+        };
+      },
+    };
+
+    const files = await resolver.findFiles(["**/*.xml"], globModule);
+
+    // Verify that the exclusion pattern is added
+    assert.ok(
+      createdPatterns[0].includes("!**/node_modules/**"),
+      "Should include node_modules exclusion pattern",
+    );
+    assert.deepStrictEqual(files, [
+      "resolved:src/test.xml",
+      "resolved:coverage/report.xml",
     ]);
   });
 });
