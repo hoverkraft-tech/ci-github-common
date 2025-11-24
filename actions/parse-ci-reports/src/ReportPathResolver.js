@@ -30,6 +30,10 @@ const AUTO_PATTERNS = {
     "**/prettier-check.txt",
     "**/prettier-report.log",
     "**/prettier-report.txt",
+    "**/astro-check.log",
+    "**/astro-check.txt",
+    "**/astro-check-report.log",
+    "**/astro-check-report.txt",
   ],
 };
 
