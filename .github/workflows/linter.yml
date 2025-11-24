@@ -99,7 +99,7 @@ jobs:
                 return;
               }
             }
-      - uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@ce2bb8274a37c1219be2bcae2a1b2528c2c72957 # 0.19.0
+      - uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@80acfc9bc4dd87030d73006dee4c788ed9af1fb0 # 0.20.1
         if: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
         with:
           working-directory: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
@@ -129,11 +129,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: github/codeql-action/init@e12f0178983d466f2f6028f5cc7a6d786fd97f4b # v4.31.4
+      - uses: github/codeql-action/init@fdbfb4d2750291e159f0156def62b853c2798ca2 # v4.31.5
         with:
           languages: ${{ matrix.language }}
 
-      - uses: github/codeql-action/analyze@e12f0178983d466f2f6028f5cc7a6d786fd97f4b # v4.31.4
+      - uses: github/codeql-action/analyze@fdbfb4d2750291e159f0156def62b853c2798ca2 # v4.31.5
         with:
           category: "/language:${{matrix.language}}"
 
