@@ -50,6 +50,7 @@ It supports multiple common report standards out of the box.
 - **ESLint JSON** - JavaScript/TypeScript linting
 - **CheckStyle XML** - Java and other language linting
 - **Prettier Check Logs** - Text output captured from `prettier --check`
+- **Astro Check Logs** - Diagnostics emitted by `astro check`
 
 <!-- usage:start -->
 
@@ -225,6 +226,26 @@ formatting issues alongside other lint results:
     report-paths: "prettier-check.log"
     report-name: "Prettier Formatting"
     output-format: "summary"
+```
+
+### Astro Type Checking
+
+`astro check` reports diagnostics for `.astro` files, TypeScript code, and
+content collections. Capture the CLI output and feed it to the parser to surface
+errors (or warnings when `--minimumFailingSeverity` is relaxed) alongside other
+linting tools:
+
+```yaml
+- name: Run astro check
+  run: |
+    npx astro check --minimumFailingSeverity warning | tee astro-check.log
+
+- name: Parse astro diagnostics
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@c314229c3ca6914f7023ffca7afc26753ab99b41 # 0.30.1
+  with:
+    report-paths: "astro-check.log"
+    report-name: "Astro Diagnostics"
+    output-format: "summary,annotations"
 ```
 
 ### Fail on Test Failures

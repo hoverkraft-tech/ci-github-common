@@ -5,6 +5,7 @@ import { LCOVParser } from "./LCOVParser.js";
 import { ESLintParser } from "./ESLintParser.js";
 import { CheckStyleParser } from "./CheckStyleParser.js";
 import { PrettierParser } from "./PrettierParser.js";
+import { AstroCheckParser } from "./AstroCheckParser.js";
 
 /**
  * Factory class for creating and managing parsers
@@ -22,6 +23,7 @@ export class ParserFactory {
       new ESLintParser(),
       new CheckStyleParser(),
       new PrettierParser(),
+      new AstroCheckParser(),
     ];
 
     // Sort parsers by priority (highest first)
