@@ -5,6 +5,8 @@ description: |
   Use it when consuming reusable workflows that reference local actions from the same repository—they are not automatically available in the caller repository and must be synced manually.
   Add the `self-workflow` directory to your `.gitignore` and `.dockerignore` files to avoid committing it by mistake.
 
+  **This action requires the permission: `id-token: write`**.
+
   Local actions will be available at `./<local-path>/<actions-path>` inside the current workspace.
   Example: if `local-path` is `./self-workflow` and `actions-path` is `.github/actions`, then local actions will be available at `./self-workflow/.github/actions`.
 
