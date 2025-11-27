@@ -57,7 +57,7 @@ permissions:
     # Default: `false`
     lfs: "false"
 
-    # Whether to persist the token credentials in the git config.
+    # Whether to persist the token credentials in the Git config.
     # Default to false for security reasons.
     # See https://github.com/orgs/community/discussions/179107.
     #
