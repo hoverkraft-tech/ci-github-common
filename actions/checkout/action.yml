@@ -18,10 +18,15 @@ inputs:
       Whether to download Git-LFS files.
       See https://github.com/actions/checkout#usage
     default: "false"
+  persist-credentials:
+    description: |
+      Whether to persist the token credentials in the git config.
+      Default to false for security reasons.
+      See https://github.com/orgs/community/discussions/179107.
+    default: "false"
   token:
     description: |
       Token to use for checking out the repository instead of the default GITHUB_TOKEN.
-      If specified and not empty, persist-credentials in checkout will be false.
     required: false
 
 runs:
@@ -34,7 +39,7 @@ runs:
         fetch-depth: ${{ inputs.fetch-depth }}
         lfs: ${{ inputs.lfs }}
         token: ${{ inputs.token || github.token }}
-        persist-credentials: ${{ inputs.token == '' }}
+        persist-credentials: ${{ inputs.persist-credentials }}
 
     - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       if: github.event_name != 'issue_comment'
@@ -42,4 +47,4 @@ runs:
         fetch-depth: ${{ inputs.fetch-depth }}
         lfs: ${{ inputs.lfs }}
         token: ${{ inputs.token || github.token }}
-        persist-credentials: ${{ inputs.token == '' }}
+        persist-credentials: ${{ inputs.persist-credentials }}
