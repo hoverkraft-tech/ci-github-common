@@ -3,6 +3,7 @@ description: |
   This action checks out the reusable workflow repository that triggered the current run and copies its local actions directory into the current workspace.
   It runs both during the main step and in the post step so that actions with cleanup hooks are also available.
   Use it when consuming reusable workflows that reference local actions from the same repository—they are not automatically available in the caller repository and must be synced manually.
+  Add the `self-workflow` directory to your `.gitignore` and `.dockerignore` files to avoid committing it by mistake.
 
   Local actions will be available at `./<local-path>/<actions-path>` inside the current workspace.
   Example: if `local-path` is `./self-workflow` and `actions-path` is `.github/actions`, then local actions will be available at `./self-workflow/.github/actions`.
@@ -48,7 +49,7 @@ runs:
   steps:
     # FIXME: This is a workaround for having workflow actions. See https://github.com/orgs/community/discussions/38659
     - id: oidc
-      if: ${{ inputs.repository == '' }}
+      if: inputs.repository == ''
       uses: ChristopherHX/oidc@73eee1ff03fdfce10eda179f617131532209edbd # v3
 
     - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -59,3 +60,26 @@ runs:
         ref: ${{ inputs.ref || steps.oidc.outputs.job_workflow_repo_ref }}
         sparse-checkout: |
           ${{ inputs.actions-path }}
+
+    - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          const entry = 'self-workflow';
+          const ensureIgnore = (fileName) => {
+            const filePath = path.join(process.cwd(), fileName);
+            if (fs.existsSync(filePath)) {
+              const content = fs.readFileSync(filePath, 'utf8');
+              const lines = content.split(/\r?\n/);
+              if (lines.some((line) => line.trim() === entry)) {
+              return;
+              }
+              const suffix = content.endsWith('\n') ? '' : '\n';
+              fs.writeFileSync(filePath, `${content}${suffix}${entry}\n`);
+            } else {
+              fs.writeFileSync(filePath, `${entry}\n`);
+            }
+          };
+
+          ['.gitignore', '.dockerignore'].forEach(ensureIgnore);
