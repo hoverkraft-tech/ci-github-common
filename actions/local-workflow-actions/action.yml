@@ -1,0 +1,61 @@
+name: "Local workflow actions"
+description: |
+  This action checks out the reusable workflow repository that triggered the current run and copies its local actions directory into the current workspace.
+  It runs both during the main step and in the post step so that actions with cleanup hooks are also available.
+  Use it when consuming reusable workflows that reference local actions from the same repository—they are not automatically available in the caller repository and must be synced manually.
+
+  Local actions will be available at `./<local-path>/<actions-path>` inside the current workspace.
+  Example: if `local-path` is `./self-workflow` and `actions-path` is `.github/actions`, then local actions will be available at `./self-workflow/.github/actions`.
+
+author: hoverkraft
+branding:
+  icon: download
+  color: blue
+
+inputs:
+  actions-path:
+    description: |
+      Relative path(s) (inside the workflow repository) containing the local actions to expose in the current workspace.
+      The same relative path will be used inside the current workspace (for example `.github/actions`).
+    required: false
+    default: ".github/actions"
+  local-path:
+    description: |
+      Path inside the current workspace where to copy the local actions from the reusable workflow repository.
+    required: false
+    default: "./self-workflow"
+  repository:
+    description: |
+      The reusable workflow repository that triggered the current run, in the format `owner/repo`.
+      If not provided, this is automatically filled by the OIDC action.
+    required: false
+  ref:
+    description: |
+      The git ref (branch, tag, or SHA) of the reusable workflow repository that triggered the current run.
+      If not provided, this is automatically filled by the OIDC action.
+    required: false
+
+outputs:
+  repository:
+    description: The reusable workflow repository that was checked out, in the format `owner/repo`.
+    value: ${{ inputs.repository || steps.oidc.outputs.job_workflow_repo_name_and_owner }}
+  ref:
+    description: The git ref (branch, tag, or SHA) of the reusable workflow repository that was checked out.
+    value: ${{ inputs.ref || steps.oidc.outputs.job_workflow_repo_ref }}
+
+runs:
+  using: "composite"
+  steps:
+    # FIXME: This is a workaround for having workflow actions. See https://github.com/orgs/community/discussions/38659
+    - id: oidc
+      if: ${{ inputs.repository == '' }}
+      uses: ChristopherHX/oidc@73eee1ff03fdfce10eda179f617131532209edbd # v3
+
+    - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      with:
+        persist-credentials: false
+        path: ${{ inputs.local-path }}
+        repository: ${{ inputs.repository || steps.oidc.outputs.job_workflow_repo_name_and_owner }}
+        ref: ${{ inputs.ref || steps.oidc.outputs.job_workflow_repo_ref }}
+        sparse-checkout: |
+          ${{ inputs.actions-path }}
