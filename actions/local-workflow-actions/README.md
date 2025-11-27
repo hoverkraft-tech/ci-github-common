@@ -1,6 +1,6 @@
 <!-- header:start -->
 
-# ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItZG93bmxvYWQiIGNvbG9yPSJibHVlIj48cG9seWxpbmUgcG9pbnRzPSIxNiAyIDggMTIgMTYgMjIiPjwvcG9seWxpbmU+PHBhdGggZD0iTTggMjJoMTYiPjwvcGF0aD48cGF0aCBkPSJNNCAyMmg0Ij48L3BhdGg+PC9zdmc+) GitHub Action: Local workflow actions
+# ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItZG93bmxvYWQiIGNvbG9yPSJibHVlIj48cGF0aCBkPSJNMjEgMTV2NGEyIDIgMCAwIDEtMiAySDVhMiAyIDAgMCAxLTItMnYtNCI+PC9wYXRoPjxwb2x5bGluZSBwb2ludHM9IjcgMTAgMTIgMTUgMTcgMTAiPjwvcG9seWxpbmU+PGxpbmUgeDE9IjEyIiB5MT0iMTUiIHgyPSIxMiIgeTI9IjMiPjwvbGluZT48L3N2Zz4=) GitHub Action: Local workflow actions
 
 <div align="center">
   <img src="../../.github/logo.svg" width="60px" align="center" alt="Local workflow actions" />
@@ -12,7 +12,7 @@
 
 <!-- badges:start -->
 
-[![Marketplace](https://img.shields.io/badge/Marketplace-local--workflow--actions-blue?logo=github-actions)](https://github.com/marketplace?type=actions&query=hoverkraft-tech+local-workflow-actions)
+[![Marketplace](https://img.shields.io/badge/Marketplace-local--workflow--actions-blue?logo=github-actions)](https://github.com/marketplace/actions/local-workflow-actions)
 [![Release](https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common)](https://github.com/hoverkraft-tech/ci-github-common/releases)
 [![License](https://img.shields.io/github/license/hoverkraft-tech/ci-github-common)](http://choosealicense.com/licenses/mit/)
 [![Stars](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)
@@ -24,9 +24,12 @@
 
 ## Overview
 
-This action checks out the reusable workflow repository that triggered the current run and copies its local actions directory (default `.github/actions`) into the current workspace. It runs both during the main step and in the post step so that actions with cleanup hooks are also available.
-
+This action checks out the reusable workflow repository that triggered the current run and copies its local actions directory into the current workspace.
+It runs both during the main step and in the post step so that actions with cleanup hooks are also available.
 Use it when consuming reusable workflows that reference local actions from the same repository—they are not automatically available in the caller repository and must be synced manually.
+
+Local actions will be available at `./<local-path>/<actions-path>` inside the current workspace.
+Example: if `local-path` is `./self-workflow` and `actions-path` is `.github/actions`, then local actions will be available at `./self-workflow/.github/actions`.
 
 <!-- overview:end -->
 
@@ -35,18 +38,26 @@ Use it when consuming reusable workflows that reference local actions from the s
 ## Usage
 
 ```yaml
-- name: Sync workflow-local actions
-  uses: hoverkraft-tech/ci-github-common/actions/local-workflow-actions@5e8d0e6d1e76d8577a070db6d0128a91b1c9d5ad # 0.30.2
+- uses: hoverkraft-tech/ci-github-common/actions/local-workflow-actions@a55670b58d3e064526201acde6c720ede638420c # 0.31.0
   with:
-    # Optional path (relative to the workflow repository) that contains the local actions.
-    # The same relative path will be created inside the current workspace.
+    # Relative path(s) (inside the workflow repository) containing the local actions to expose in the current workspace.
+    # The same relative path will be used inside the current workspace (for example `.github/actions`).
     #
     # Default: `.github/actions`
     actions-path: .github/actions
 
-    # Token used to download the workflow repository.
-    # Default: ${{ github.token }}
-    github-token: ${{ secrets.GITHUB_TOKEN }}
+    # Path inside the current workspace where to copy the local actions from the reusable workflow repository.
+    #
+    # Default: `./self-workflow`
+    local-path: ./self-workflow
+
+    # The reusable workflow repository that triggered the current run, in the format `owner/repo`.
+    # If not provided, this is automatically filled by the OIDC action.
+    repository: ""
+
+    # The git ref (branch, tag, or SHA) of the reusable workflow repository that triggered the current run.
+    # If not provided, this is automatically filled by the OIDC action.
+    ref: ""
 ```
 
 <!-- usage:end -->
@@ -55,10 +66,15 @@ Use it when consuming reusable workflows that reference local actions from the s
 
 ## Inputs
 
-| **Input**          | **Description**                                                                                                                                           | **Required** | **Default**           |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | --------------------- |
-| **`actions-path`** | Relative path (inside the workflow repository) containing the local actions. The same relative path will be created inside the current workspace.         | **false**    | `.github/actions`     |
-| **`github-token`** | Token used to fetch the workflow repository. Defaults to `github.token`, which is sufficient for public repos and needs `contents:read` for private ones. | **false**    | `${{ github.token }}` |
+| **Input**          | **Description**                                                                                                    | **Required** | **Default**       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ | ------------ | ----------------- |
+| **`actions-path`** | Relative path(s) (inside the workflow repository) containing the local actions to expose in the current workspace. | **false**    | `.github/actions` |
+|                    | The same relative path will be used inside the current workspace (for example `.github/actions`).                  |              |                   |
+| **`local-path`**   | Path inside the current workspace where to copy the local actions from the reusable workflow repository.           | **false**    | `./self-workflow` |
+| **`repository`**   | The reusable workflow repository that triggered the current run, in the format `owner/repo`.                       | **false**    | -                 |
+|                    | If not provided, this is automatically filled by the OIDC action.                                                  |              |                   |
+| **`ref`**          | The git ref (branch, tag, or SHA) of the reusable workflow repository that triggered the current run.              | **false**    | -                 |
+|                    | If not provided, this is automatically filled by the OIDC action.                                                  |              |                   |
 
 <!-- inputs:end -->
 
@@ -66,6 +82,14 @@ Use it when consuming reusable workflows that reference local actions from the s
 <!-- secrets:end -->
 
 <!-- outputs:start -->
+
+## Outputs
+
+| **Output**       | **Description**                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------- |
+| **`repository`** | The reusable workflow repository that was checked out, in the format `owner/repo`.          |
+| **`ref`**        | The git ref (branch, tag, or SHA) of the reusable workflow repository that was checked out. |
+
 <!-- outputs:end -->
 
 <!-- examples:start -->
