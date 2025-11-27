@@ -99,7 +99,7 @@ jobs:
                 return;
               }
             }
-      - uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@80acfc9bc4dd87030d73006dee4c788ed9af1fb0 # 0.20.1
+      - uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@ce2467e5d41ff0abe85094dcc39c98288448065a # 0.20.4
         if: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
         with:
           working-directory: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
