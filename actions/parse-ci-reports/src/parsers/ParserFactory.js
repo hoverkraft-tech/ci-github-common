@@ -6,6 +6,7 @@ import { ESLintParser } from "./ESLintParser.js";
 import { CheckStyleParser } from "./CheckStyleParser.js";
 import { PrettierParser } from "./PrettierParser.js";
 import { AstroCheckParser } from "./AstroCheckParser.js";
+import { ReportCategory } from "./BaseParser.js";
 
 /**
  * Factory class for creating and managing parsers
@@ -61,5 +62,46 @@ export class ParserFactory {
     }
 
     return parser.parse(content, filePath);
+  }
+
+  /**
+   * Get auto-detection patterns for a specific category
+   * @param {string} category - Report category (test, coverage, or lint)
+   * @returns {string[]} Array of glob patterns
+   */
+  getAutoPatternsByCategory(category) {
+    const patterns = [];
+    for (const parser of this.parsers) {
+      if (parser.getCategory() === category) {
+        patterns.push(...parser.getAutoPatterns());
+      }
+    }
+    return patterns;
+  }
+
+  /**
+   * Get all auto-detection patterns from all parsers
+   * @returns {string[]} Array of glob patterns
+   */
+  getAllAutoPatterns() {
+    const patterns = [];
+    for (const parser of this.parsers) {
+      patterns.push(...parser.getAutoPatterns());
+    }
+    return patterns;
+  }
+
+  /**
+   * Get auto-detection patterns grouped by category
+   * @returns {Object} Object with category keys and pattern arrays
+   */
+  getAutoPatternsMap() {
+    return {
+      [ReportCategory.TEST]: this.getAutoPatternsByCategory(ReportCategory.TEST),
+      [ReportCategory.COVERAGE]: this.getAutoPatternsByCategory(
+        ReportCategory.COVERAGE,
+      ),
+      [ReportCategory.LINT]: this.getAutoPatternsByCategory(ReportCategory.LINT),
+    };
   }
 }

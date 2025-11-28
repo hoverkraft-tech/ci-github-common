@@ -1,5 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
-import { BaseParser } from "./BaseParser.js";
+import { BaseParser, ReportCategory } from "./BaseParser.js";
 import { ReportData, Coverage } from "../models/ReportData.js";
 
 /**
@@ -26,6 +26,18 @@ export class CoberturaParser extends BaseParser {
 
   getPriority() {
     return 9;
+  }
+
+  getCategory() {
+    return ReportCategory.COVERAGE;
+  }
+
+  getAutoPatterns() {
+    return [
+      "**/coverage/cobertura-coverage.xml",
+      "**/coverage.xml",
+      "**/cobertura.xml",
+    ];
   }
 
   parse(content) {

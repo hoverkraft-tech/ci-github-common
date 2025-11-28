@@ -1,4 +1,13 @@
 /**
+ * Report category constants
+ */
+export const ReportCategory = {
+  TEST: "test",
+  COVERAGE: "coverage",
+  LINT: "lint",
+};
+
+/**
  * Base class for all report parsers
  * Follows the Strategy pattern for different report formats
  */
@@ -31,5 +40,21 @@ export class BaseParser {
    */
   getPriority() {
     return 0;
+  }
+
+  /**
+   * Get the category of reports this parser handles
+   * @returns {string} Report category (test, coverage, or lint)
+   */
+  getCategory() {
+    throw new Error("getCategory() must be implemented by subclass");
+  }
+
+  /**
+   * Get the glob patterns for auto-detecting files this parser can handle
+   * @returns {string[]} Array of glob patterns
+   */
+  getAutoPatterns() {
+    return [];
   }
 }

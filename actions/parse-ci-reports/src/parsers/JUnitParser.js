@@ -1,5 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
-import { BaseParser } from "./BaseParser.js";
+import { BaseParser, ReportCategory } from "./BaseParser.js";
 import { ReportData, TestResult } from "../models/ReportData.js";
 
 /**
@@ -25,6 +25,19 @@ export class JUnitParser extends BaseParser {
 
   getPriority() {
     return 10;
+  }
+
+  getCategory() {
+    return ReportCategory.TEST;
+  }
+
+  getAutoPatterns() {
+    return [
+      "**/junit*.xml",
+      "**/test-results/**/*.xml",
+      "**/test-reports/**/*.xml",
+      "**/*test*.xml",
+    ];
   }
 
   parse(content) {

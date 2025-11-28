@@ -1,4 +1,4 @@
-import { BaseParser } from "./BaseParser.js";
+import { BaseParser, ReportCategory } from "./BaseParser.js";
 import { ReportData, LintIssue } from "../models/ReportData.js";
 
 const SUMMARY_PATTERNS = [
@@ -35,6 +35,19 @@ export class PrettierParser extends BaseParser {
 
   getPriority() {
     return 7;
+  }
+
+  getCategory() {
+    return ReportCategory.LINT;
+  }
+
+  getAutoPatterns() {
+    return [
+      "**/prettier-check.log",
+      "**/prettier-check.txt",
+      "**/prettier-report.log",
+      "**/prettier-report.txt",
+    ];
   }
 
   parse(content) {

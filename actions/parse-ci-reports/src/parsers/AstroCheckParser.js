@@ -1,4 +1,4 @@
-import { BaseParser } from "./BaseParser.js";
+import { BaseParser, ReportCategory } from "./BaseParser.js";
 import { ReportData, LintIssue } from "../models/ReportData.js";
 
 const LOCATION_PATTERN = /:(\d+):(\d+)\s+-\s+(error|warning|hint)\s+/i;
@@ -19,6 +19,19 @@ export class AstroCheckParser extends BaseParser {
 
   getPriority() {
     return 8;
+  }
+
+  getCategory() {
+    return ReportCategory.LINT;
+  }
+
+  getAutoPatterns() {
+    return [
+      "**/astro-check.log",
+      "**/astro-check.txt",
+      "**/astro-check-report.log",
+      "**/astro-check-report.txt",
+    ];
   }
 
   parse(content) {

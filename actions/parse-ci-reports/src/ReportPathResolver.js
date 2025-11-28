@@ -1,41 +1,7 @@
-const AUTO_MODE_ALL = "all";
-const AUTO_MODE_TEST = "test";
-const AUTO_MODE_COVERAGE = "coverage";
-const AUTO_MODE_LINT = "lint";
+import { ParserFactory } from "./parsers/ParserFactory.js";
+import { ReportCategory } from "./parsers/BaseParser.js";
 
-/**
- * Auto-detection patterns for common report files
- */
-const AUTO_PATTERNS = {
-  [AUTO_MODE_TEST]: [
-    "**/junit*.xml",
-    "**/test-results/**/*.xml",
-    "**/test-reports/**/*.xml",
-    "**/*test*.xml",
-    "**/*.tap",
-  ],
-  [AUTO_MODE_COVERAGE]: [
-    "**/coverage/lcov.info",
-    "**/coverage/cobertura-coverage.xml",
-    "**/coverage.xml",
-    "**/lcov.info",
-    "**/cobertura.xml",
-  ],
-  [AUTO_MODE_LINT]: [
-    "**/eslint-report.json",
-    "**/eslint.json",
-    "**/checkstyle-result.xml",
-    "**/checkstyle.xml",
-    "**/prettier-check.log",
-    "**/prettier-check.txt",
-    "**/prettier-report.log",
-    "**/prettier-report.txt",
-    "**/astro-check.log",
-    "**/astro-check.txt",
-    "**/astro-check-report.log",
-    "**/astro-check-report.txt",
-  ],
-};
+const AUTO_MODE_ALL = "all";
 
 /**
  * Component responsible for resolving report file paths
@@ -44,6 +10,15 @@ export class ReportPathResolver {
   constructor(fileSystemService, logger) {
     this.fileSystemService = fileSystemService;
     this.logger = logger;
+    this.parserFactory = new ParserFactory(fileSystemService);
+  }
+
+  /**
+   * Get the auto patterns map from parsers
+   * @returns {Object} Object with category keys and pattern arrays
+   */
+  getAutoPatterns() {
+    return this.parserFactory.getAutoPatternsMap();
   }
 
   /**
@@ -57,6 +32,7 @@ export class ReportPathResolver {
       .map((p) => p.trim())
       .filter((p) => p.length > 0);
 
+    const autoPatterns = this.getAutoPatterns();
     const patternList = new Set();
     for (const segment of segments) {
       const isAuto = segment.startsWith("auto:");
@@ -74,14 +50,14 @@ export class ReportPathResolver {
       this.logger.info(`Auto-detection mode: ${normalizedMode}`);
 
       if (normalizedMode === AUTO_MODE_ALL) {
-        for (const pattern of Object.values(AUTO_PATTERNS).flat()) {
+        for (const pattern of Object.values(autoPatterns).flat()) {
           patternList.add(pattern);
         }
         continue;
       }
 
-      if (AUTO_PATTERNS[normalizedMode] !== undefined) {
-        for (const pattern of AUTO_PATTERNS[normalizedMode]) {
+      if (autoPatterns[normalizedMode] !== undefined) {
+        for (const pattern of autoPatterns[normalizedMode]) {
           patternList.add(pattern);
         }
         continue;
@@ -122,3 +98,6 @@ export class ReportPathResolver {
     return Array.from(files);
   }
 }
+
+// Export ReportCategory for convenience
+export { ReportCategory };

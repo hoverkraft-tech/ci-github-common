@@ -1,4 +1,4 @@
-import { BaseParser } from "./BaseParser.js";
+import { BaseParser, ReportCategory } from "./BaseParser.js";
 import { ReportData, Coverage } from "../models/ReportData.js";
 
 /**
@@ -16,6 +16,14 @@ export class LCOVParser extends BaseParser {
 
   getPriority() {
     return 9;
+  }
+
+  getCategory() {
+    return ReportCategory.COVERAGE;
+  }
+
+  getAutoPatterns() {
+    return ["**/coverage/lcov.info", "**/lcov.info"];
   }
 
   parse(content) {
