@@ -1,4 +1,4 @@
-import { BaseParser } from "./BaseParser.js";
+import { BaseParser, ReportCategory } from "./BaseParser.js";
 import { ReportData, LintIssue } from "../models/ReportData.js";
 
 /**
@@ -23,6 +23,14 @@ export class ESLintParser extends BaseParser {
 
   getPriority() {
     return 10;
+  }
+
+  getCategory() {
+    return ReportCategory.LINT;
+  }
+
+  getAutoPatterns() {
+    return ["**/eslint-report.json", "**/eslint.json"];
   }
 
   parse(content) {

@@ -1,4 +1,4 @@
-import { BaseParser } from "./BaseParser.js";
+import { BaseParser, ReportCategory } from "./BaseParser.js";
 import { ReportData, TestResult } from "../models/ReportData.js";
 
 /**
@@ -19,6 +19,14 @@ export class TAPParser extends BaseParser {
 
   getPriority() {
     return 8;
+  }
+
+  getCategory() {
+    return ReportCategory.TEST;
+  }
+
+  getAutoPatterns() {
+    return ["**/*.tap"];
   }
 
   parse(content, filePath) {

@@ -77,24 +77,53 @@ describe("ReportPathResolver", () => {
     assert.deepStrictEqual(files, ["resolved:match-a", "resolved:match-b"]);
   });
 
-  it("merges multiple auto modes in declaration order", () => {
+  it("returns test and coverage patterns for auto:test and auto:coverage", () => {
     const logger = createLoggerStub();
     const resolver = new ReportPathResolver({}, logger);
 
     const patterns = resolver.resolvePatterns("auto:test, auto:coverage");
 
-    assert.deepStrictEqual(patterns, [
+    // Verify test patterns are included (from JUnitParser and TAPParser)
+    const testPatterns = [
       "**/junit*.xml",
       "**/test-results/**/*.xml",
       "**/test-reports/**/*.xml",
       "**/*test*.xml",
       "**/*.tap",
+    ];
+    for (const pattern of testPatterns) {
+      assert.ok(
+        patterns.includes(pattern),
+        `Missing test pattern: ${pattern}`,
+      );
+    }
+
+    // Verify coverage patterns are included (from LCOVParser and CoberturaParser)
+    const coveragePatterns = [
       "**/coverage/lcov.info",
+      "**/lcov.info",
       "**/coverage/cobertura-coverage.xml",
       "**/coverage.xml",
-      "**/lcov.info",
       "**/cobertura.xml",
-    ]);
+    ];
+    for (const pattern of coveragePatterns) {
+      assert.ok(
+        patterns.includes(pattern),
+        `Missing coverage pattern: ${pattern}`,
+      );
+    }
+
+    // Verify no lint patterns are included
+    const lintPatterns = ["**/eslint-report.json", "**/checkstyle.xml"];
+    for (const pattern of lintPatterns) {
+      assert.ok(
+        !patterns.includes(pattern),
+        `Should not include lint pattern: ${pattern}`,
+      );
+    }
+
+    // Verify total count matches expected (5 test + 5 coverage)
+    assert.strictEqual(patterns.length, 10);
   });
 
   it("deduplicates overlapping auto modes", () => {
@@ -103,7 +132,8 @@ describe("ReportPathResolver", () => {
 
     const patterns = resolver.resolvePatterns("auto:lint,auto:all");
 
-    assert.deepStrictEqual(patterns, [
+    // All lint patterns should be included
+    const lintPatterns = [
       "**/eslint-report.json",
       "**/eslint.json",
       "**/checkstyle-result.xml",
@@ -116,17 +146,72 @@ describe("ReportPathResolver", () => {
       "**/astro-check.txt",
       "**/astro-check-report.log",
       "**/astro-check-report.txt",
+    ];
+    for (const pattern of lintPatterns) {
+      assert.ok(
+        patterns.includes(pattern),
+        `Missing lint pattern: ${pattern}`,
+      );
+    }
+
+    // All test patterns should be included
+    const testPatterns = [
       "**/junit*.xml",
       "**/test-results/**/*.xml",
       "**/test-reports/**/*.xml",
       "**/*test*.xml",
       "**/*.tap",
+    ];
+    for (const pattern of testPatterns) {
+      assert.ok(
+        patterns.includes(pattern),
+        `Missing test pattern: ${pattern}`,
+      );
+    }
+
+    // All coverage patterns should be included
+    const coveragePatterns = [
       "**/coverage/lcov.info",
+      "**/lcov.info",
       "**/coverage/cobertura-coverage.xml",
       "**/coverage.xml",
-      "**/lcov.info",
       "**/cobertura.xml",
-    ]);
+    ];
+    for (const pattern of coveragePatterns) {
+      assert.ok(
+        patterns.includes(pattern),
+        `Missing coverage pattern: ${pattern}`,
+      );
+    }
+
+    // Verify deduplication - total should be 12 lint + 5 test + 5 coverage = 22
+    assert.strictEqual(patterns.length, 22);
+  });
+
+  it("gets patterns from parsers via getAutoPatterns", () => {
+    const logger = createLoggerStub();
+    const resolver = new ReportPathResolver({}, logger);
+
+    const autoPatterns = resolver.getAutoPatterns();
+
+    // Verify structure
+    assert.ok(autoPatterns.test, "Should have test patterns");
+    assert.ok(autoPatterns.coverage, "Should have coverage patterns");
+    assert.ok(autoPatterns.lint, "Should have lint patterns");
+
+    // Verify test patterns come from JUnitParser and TAPParser
+    assert.ok(autoPatterns.test.includes("**/junit*.xml"));
+    assert.ok(autoPatterns.test.includes("**/*.tap"));
+
+    // Verify coverage patterns come from LCOVParser and CoberturaParser
+    assert.ok(autoPatterns.coverage.includes("**/coverage/lcov.info"));
+    assert.ok(autoPatterns.coverage.includes("**/cobertura.xml"));
+
+    // Verify lint patterns come from ESLintParser, CheckStyleParser, PrettierParser, AstroCheckParser
+    assert.ok(autoPatterns.lint.includes("**/eslint-report.json"));
+    assert.ok(autoPatterns.lint.includes("**/checkstyle.xml"));
+    assert.ok(autoPatterns.lint.includes("**/prettier-check.log"));
+    assert.ok(autoPatterns.lint.includes("**/astro-check.log"));
   });
 
   it("excludes node_modules files from glob patterns", async () => {

@@ -1,5 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
-import { BaseParser } from "./BaseParser.js";
+import { BaseParser, ReportCategory } from "./BaseParser.js";
 import { ReportData, LintIssue } from "../models/ReportData.js";
 
 /**
@@ -26,6 +26,14 @@ export class CheckStyleParser extends BaseParser {
 
   getPriority() {
     return 8;
+  }
+
+  getCategory() {
+    return ReportCategory.LINT;
+  }
+
+  getAutoPatterns() {
+    return ["**/checkstyle-result.xml", "**/checkstyle.xml"];
   }
 
   parse(content) {
