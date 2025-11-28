@@ -34,7 +34,7 @@ inputs:
     required: false
   ref:
     description: |
-      The git ref (branch, tag, or SHA) of the reusable workflow repository that triggered the current run.
+      The Git ref (branch, tag, or SHA) of the reusable workflow repository that triggered the current run.
       If not provided, this is automatically filled by the OIDC action.
     required: false
 
@@ -43,7 +43,7 @@ outputs:
     description: The reusable workflow repository that was checked out, in the format `owner/repo`.
     value: ${{ inputs.repository || steps.oidc.outputs.job_workflow_repo_name_and_owner }}
   ref:
-    description: The git ref (branch, tag, or SHA) of the reusable workflow repository that was checked out.
+    description: The Git ref (branch, tag, or SHA) of the reusable workflow repository that was checked out.
     value: ${{ inputs.ref || steps.oidc.outputs.job_workflow_repo_ref }}
 
 runs:
