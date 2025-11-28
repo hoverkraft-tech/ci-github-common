@@ -97,11 +97,15 @@ export class ParserFactory {
    */
   getAutoPatternsMap() {
     return {
-      [ReportCategory.TEST]: this.getAutoPatternsByCategory(ReportCategory.TEST),
+      [ReportCategory.TEST]: this.getAutoPatternsByCategory(
+        ReportCategory.TEST,
+      ),
       [ReportCategory.COVERAGE]: this.getAutoPatternsByCategory(
         ReportCategory.COVERAGE,
       ),
-      [ReportCategory.LINT]: this.getAutoPatternsByCategory(ReportCategory.LINT),
+      [ReportCategory.LINT]: this.getAutoPatternsByCategory(
+        ReportCategory.LINT,
+      ),
     };
   }
 }

@@ -55,6 +55,6 @@ export class BaseParser {
    * @returns {string[]} Array of glob patterns
    */
   getAutoPatterns() {
-    return [];
+    throw new Error("getAutoPatterns() must be implemented by subclass");
   }
 }

@@ -92,10 +92,7 @@ describe("ReportPathResolver", () => {
       "**/*.tap",
     ];
     for (const pattern of testPatterns) {
-      assert.ok(
-        patterns.includes(pattern),
-        `Missing test pattern: ${pattern}`,
-      );
+      assert.ok(patterns.includes(pattern), `Missing test pattern: ${pattern}`);
     }
 
     // Verify coverage patterns are included (from LCOVParser and CoberturaParser)
@@ -148,10 +145,7 @@ describe("ReportPathResolver", () => {
       "**/astro-check-report.txt",
     ];
     for (const pattern of lintPatterns) {
-      assert.ok(
-        patterns.includes(pattern),
-        `Missing lint pattern: ${pattern}`,
-      );
+      assert.ok(patterns.includes(pattern), `Missing lint pattern: ${pattern}`);
     }
 
     // All test patterns should be included
@@ -163,10 +157,7 @@ describe("ReportPathResolver", () => {
       "**/*.tap",
     ];
     for (const pattern of testPatterns) {
-      assert.ok(
-        patterns.includes(pattern),
-        `Missing test pattern: ${pattern}`,
-      );
+      assert.ok(patterns.includes(pattern), `Missing test pattern: ${pattern}`);
     }
 
     // All coverage patterns should be included
