@@ -58,7 +58,7 @@ Example: if `local-path` is `./self-workflow` and `actions-path` is `.github/act
     # If not provided, this is automatically filled by the OIDC action.
     repository: ""
 
-    # The git ref (branch, tag, or SHA) of the reusable workflow repository that triggered the current run.
+    # The Git ref (branch, tag, or SHA) of the reusable workflow repository that triggered the current run.
     # If not provided, this is automatically filled by the OIDC action.
     ref: ""
 ```
