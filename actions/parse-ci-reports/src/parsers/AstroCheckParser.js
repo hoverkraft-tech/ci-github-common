@@ -1,7 +1,11 @@
 import { BaseParser, ReportCategory } from "./BaseParser.js";
 import { ReportData, LintIssue } from "../models/ReportData.js";
 
-const LOCATION_PATTERN = /:(\d+):(\d+)\s+-\s+(error|warning|hint)\s+/i;
+const LOCATION_PATTERN = /:(\d+):(\d+)\s*(?:-\s+)?(error|warning|hint)\s+/i;
+const ASTRO_HEADER_PATTERNS = [
+  /Getting diagnostics for Astro files/i,
+  /Result \(\d+ files\)/i,
+];
 const ANSI_PATTERN = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 
 /**
@@ -14,7 +18,11 @@ export class AstroCheckParser extends BaseParser {
     }
 
     const sanitized = this.#stripAnsi(content);
-    return LOCATION_PATTERN.test(sanitized);
+    if (LOCATION_PATTERN.test(sanitized)) {
+      return true;
+    }
+
+    return ASTRO_HEADER_PATTERNS.some((pattern) => pattern.test(sanitized));
   }
 
   getPriority() {

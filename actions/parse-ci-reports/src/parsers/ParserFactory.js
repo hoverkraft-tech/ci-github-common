@@ -58,7 +58,9 @@ export class ParserFactory {
     const parser = this.getParser(filePath, content);
 
     if (!parser) {
-      throw new Error(`No parser found for file: ${filePath}`);
+      throw new Error(
+        `No parser found for file: ${filePath}. Ensure pattern and content are supported.`,
+      );
     }
 
     return parser.parse(content, filePath);
