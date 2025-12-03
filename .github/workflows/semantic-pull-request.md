@@ -51,7 +51,7 @@ on:
 permissions: {}
 jobs:
   semantic-pull-request:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@2d3c39a47c6af3b9d57a230bcaf57d03093e96db # 0.31.2
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@5ac504609f6ef35c5ac94bd8199063aa32104721 # 0.31.3
     permissions: {}
     secrets:
       # Token for the repository.
