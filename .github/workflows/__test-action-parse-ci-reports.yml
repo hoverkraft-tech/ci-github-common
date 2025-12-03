@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   continuous-integration:
-    uses: hoverkraft-tech/ci-github-nodejs/.github/workflows/continuous-integration.yml@ce2467e5d41ff0abe85094dcc39c98288448065a # 0.20.4
+    uses: hoverkraft-tech/ci-github-nodejs/.github/workflows/continuous-integration.yml@c61f09cd1c67a2889fbb4d16a3378fbe23a84dc9 # 0.20.5
     permissions:
       contents: read
       id-token: write
@@ -25,7 +25,7 @@ jobs:
     name: Tests for parse-ci-reports action
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
 
