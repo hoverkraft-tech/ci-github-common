@@ -4,6 +4,7 @@
 # - [Super-Linter](https://github.com/super-linter/super-linter), with some opinionated defaults.
 # - [CodeQL](https://docs.github.com/en/code-security/code-scanning/introduction-to-code-scanning/about-code-scanning-with-codeql) to analyze the code.
 # - [Ratchet](https://github.com/sethvargo/ratchet) to check that GitHub Action versions are pinned.
+# - [Actions Permissions](https://github.com/GitHubSecurityLab/actions-permissions) to analyze and optimize workflow permissions.
 
 name: "Linter"
 on:
@@ -41,6 +42,15 @@ on:
           ./action.yml
           ./.github/workflows/**/*.yml
           ./actions/**/*.yml
+      workflow-files:
+        description: |
+          List of files or directories where GitHub workflows are located.
+          Supports glob patterns.
+          Leave empty to disable the check.
+        type: string
+        required: false
+        default: |
+          ./.github/workflows/*.yml
       lint-all:
         description: "Run checks on all files, not just the changed ones."
         type: boolean
@@ -139,11 +149,12 @@ jobs:
 
   prepare-actions-linting:
     runs-on: ${{ fromJson(inputs.runs-on) }}
-    if: ${{ inputs.action-files }}
+    if: ${{ inputs.action-files || inputs.workflow-files }}
     permissions:
       contents: read
     outputs:
       action-files: ${{ steps.get-files-to-lint.outputs.action-files }}
+      workflow-names: ${{ steps.get-files-to-lint.outputs.workflow-names }}
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
@@ -156,13 +167,15 @@ jobs:
         with:
           files: |
             ${{ inputs.action-files }}
+            ${{ inputs.workflow-files }}
           dir_names_exclude_current_dir: true
 
       - id: get-files-to-lint
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          CHANGED_FILES_OUTPUT: ${{ steps.changed-files.outputs.all_changed_and_modified_files }}
+          CHANGED_FILES_OUTPUT: ${{ steps.changed-files.outputs.all_changed_and_modified_files }};
           ACTION_FILES_INPUT: ${{ inputs.action-files }}
+          WORKFLOW_FILES_INPUT: ${{ inputs.workflow-files }}
         with:
           script: |
             const fs = require("node:fs");
@@ -173,6 +186,9 @@ jobs:
 
             const actionFilesInput = process.env.ACTION_FILES_INPUT.trim();
             core.debug(`Action files input: ${actionFilesInput}`);
+
+            const workflowFilesInput = process.env.WORKFLOW_FILES_INPUT.trim();
+            core.debug(`Workflow files input: ${workflowFilesInput}`);
 
             function parseFilePatterns(filePatterns) {
               const patterns = [];
@@ -207,11 +223,19 @@ jobs:
 
               return [...new Set(foundFiles)];
             }
+
+            const parsedWorkflowFiles = parseFilePatterns(workflowFilesInput);
+            core.debug(`Parsed workflow files: ${parsedWorkflowFiles}`);
+            let workflowFiles = await findFilesByPatterns(parsedWorkflowFiles);
+            core.debug(`Workflow files: ${workflowFiles}`);
                         
             let actionFiles = [];
             if (changedFilesOutput.length > 0) {
               actionFiles = changedFilesOutput.split(" ").filter(file => file && fs.existsSync(file));
               core.debug(`Action files from changed files: ${JSON.stringify(actionFiles)}`);
+
+              workflowFiles = workflowFiles.filter(file => changedFilesOutput.includes(file));
+              core.debug(`Workflow files from changed files: ${JSON.stringify(workflowFiles)}`);
             } else {
               const parsedActionFiles = parseFilePatterns(actionFilesInput);
               core.debug(`Parsed action files: ${parsedActionFiles}`);
@@ -226,6 +250,25 @@ jobs:
 
             if (actionFiles.length > 0) {
               core.setOutput("action-files", [...new Set(actionFiles)].join(" ").trim());
+            }
+
+            let workflowNames = [];
+            for (const workflowFile of workflowFiles) {
+              try {
+                const workflowContent = fs.readFileSync(workflowFile, "utf8");
+                const match = workflowContent.match(/name:\s*(.+)/);
+                if (match) {
+                  workflowNames.push(match[1].trim());
+                } else {
+                  workflowNames.push(path.basename(workflowFile, path.extname(workflowFile)));
+                }
+              } catch (error) {
+                return core.setFailed(`Failed to read workflow file ${workflowFile}: ${error.message}`);
+              }
+            }
+            workflowNames = [...new Set(workflowNames)];
+            if (workflowNames.length > 0) {
+              core.setOutput("workflow-names", JSON.stringify(workflowNames));
             }
 
   actions-pinning:
@@ -245,3 +288,18 @@ jobs:
         if: ${{ needs.prepare-actions-linting.outputs.action-files }}
         with:
           args: "lint --format human --format actions ${{ needs.prepare-actions-linting.outputs.action-files }}"
+
+  permissions-analysis:
+    name: 🔐 Workflow Permissions Analysis
+    runs-on: ${{ fromJson(inputs.runs-on) }}
+    needs: prepare-actions-linting
+    if: ${{ needs.prepare-actions-linting.outputs.workflow-names }}
+    permissions:
+      actions: read
+    strategy:
+      matrix:
+        name: ${{ fromJson(needs.prepare-actions-linting.outputs.workflow-names) }}
+    steps:
+      - uses: GitHubSecurityLab/actions-permissions/advisor@b25f731bf2f9eb9748c2e9757d366c3e72fa2109 # v1.0.2-beta8
+        with:
+          name: ${{ matrix.name }}
