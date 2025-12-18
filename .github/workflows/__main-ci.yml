@@ -32,7 +32,7 @@ jobs:
   release:
     needs: ci
     if: github.event_name != 'schedule'
-    uses: hoverkraft-tech/ci-github-publish/.github/workflows/release-actions.yml@55f6193fb7a9eaab81f5db18aa0c3400971d87b3 # 0.17.3
+    uses: hoverkraft-tech/ci-github-publish/.github/workflows/release-actions.yml@642cdb54493d05debdc1394f4bfd7365f82e7bf1 # 0.18.2
     permissions:
       contents: read
     with:
