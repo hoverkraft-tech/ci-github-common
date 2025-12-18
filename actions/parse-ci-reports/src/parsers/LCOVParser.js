@@ -45,7 +45,7 @@ export class LCOVParser extends BaseParser {
       if (trimmed.startsWith("DA:")) {
         totalLines++;
         const parts = trimmed.substring(3).split(",");
-        const hits = parseInt(parts[1] || 0);
+        const hits = parseInt(parts[1] || 0, 10);
         if (hits > 0) {
           coveredLines++;
         }
@@ -54,7 +54,7 @@ export class LCOVParser extends BaseParser {
       else if (trimmed.startsWith("FNDA:")) {
         totalFunctions++;
         const parts = trimmed.substring(5).split(",");
-        const hits = parseInt(parts[0] || 0);
+        const hits = parseInt(parts[0] || 0, 10);
         if (hits > 0) {
           coveredFunctions++;
         }
@@ -64,7 +64,7 @@ export class LCOVParser extends BaseParser {
         totalBranches++;
         const parts = trimmed.substring(5).split(",");
         const taken = parts[3];
-        if (taken !== "-" && parseInt(taken) > 0) {
+        if (taken !== "-" && parseInt(taken, 10) > 0) {
           coveredBranches++;
         }
       }

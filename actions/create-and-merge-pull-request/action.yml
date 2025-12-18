@@ -62,16 +62,25 @@ runs:
     - id: wait-for-pull-request-mergeable-by-admin
       if: steps.create-pull-request.outputs.pull-request-number && steps.create-pull-request.outputs.pull-request-operation != 'closed'
       uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+      env:
+        PULL_REQUEST_NUMBER: ${{ steps.create-pull-request.outputs.pull-request-number }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
           let attemps = 0;
           const maxAttemps = 10;
+
+          const pullNumberRaw = process.env.PULL_REQUEST_NUMBER ?? '';
+          if (!/^[0-9]+$/.test(pullNumberRaw)) {
+            throw new Error(`Invalid pull request number: ${pullNumberRaw}`);
+          }
+          const pullNumber = Number.parseInt(pullNumberRaw, 10);
+
           while (attemps < maxAttemps) {
             const { data: { mergeable, mergeable_state } } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: ${{ steps.create-pull-request.outputs.pull-request-number }},
+              pull_number: pullNumber,
             });
 
             if (mergeable === true) {
@@ -92,16 +101,22 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}
+        PULL_REQUEST_NUMBER: ${{ steps.create-pull-request.outputs.pull-request-number }}
       run: |
         set +e
+
+        if ! [[ "$PULL_REQUEST_NUMBER" =~ ^[0-9]+$ ]]; then
+          echo "::error::Invalid pull request number: $PULL_REQUEST_NUMBER"
+          exit 1
+        fi
 
         ATTEMPS=0
         MAX_ATTEMPS=10
         REQUIRED_WORKFLOWS_ERROR="Required workflow"
 
         while [ $ATTEMPS -lt $MAX_ATTEMPS ]; do
-          echo "::debug::Merging pull request #${{ steps.create-pull-request.outputs.pull-request-number }} for repository ${{ github.repository }}..."
-          MERGE_OUTPUTS=$(gh pr merge -R "${{ github.repository }}" --rebase --admin "${{ steps.create-pull-request.outputs.pull-request-number }}" 2>&1)
+          echo "::debug::Merging pull request #${PULL_REQUEST_NUMBER} for repository ${{ github.repository }}..."
+          MERGE_OUTPUTS=$(gh pr merge -R "${{ github.repository }}" --rebase --admin "${PULL_REQUEST_NUMBER}" 2>&1)
           MERGE_EXIT_CODE=$?
           echo "::debug::Merge outputs: $MERGE_OUTPUTS"
           echo "::debug::Merge exit code: $MERGE_EXIT_CODE"

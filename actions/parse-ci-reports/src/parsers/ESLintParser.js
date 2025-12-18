@@ -6,15 +6,15 @@ import { ReportData, LintIssue } from "../models/ReportData.js";
  * Standard format for ESLint output
  */
 export class ESLintParser extends BaseParser {
-  canParse(filePath, content) {
+  canParse(_filePath, content) {
     try {
       const data = JSON.parse(content);
       // ESLint format is an array of file results
       return (
         Array.isArray(data) &&
         data.length > 0 &&
-        Object.prototype.hasOwnProperty.call(data[0], "filePath") &&
-        Object.prototype.hasOwnProperty.call(data[0], "messages")
+        Object.hasOwn(data[0], "filePath") &&
+        Object.hasOwn(data[0], "messages")
       );
     } catch {
       return false;

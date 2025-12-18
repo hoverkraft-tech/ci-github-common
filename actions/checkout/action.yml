@@ -39,7 +39,7 @@ runs:
         fetch-depth: ${{ inputs.fetch-depth }}
         lfs: ${{ inputs.lfs }}
         token: ${{ inputs.token || github.token }}
-        persist-credentials: ${{ inputs.persist-credentials }}
+        persist-credentials: ${{ inputs.persist-credentials == 'true' && 'true' || 'false' }}
 
     - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       if: github.event_name != 'issue_comment'
@@ -47,4 +47,4 @@ runs:
         fetch-depth: ${{ inputs.fetch-depth }}
         lfs: ${{ inputs.lfs }}
         token: ${{ inputs.token || github.token }}
-        persist-credentials: ${{ inputs.persist-credentials }}
+        persist-credentials: ${{ inputs.persist-credentials == 'true' && 'true' || 'false' }}

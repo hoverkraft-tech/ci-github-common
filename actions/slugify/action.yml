@@ -13,13 +13,31 @@ inputs:
 outputs:
   result:
     description: "The slugified value"
-    value: ${{ steps.slugifier.outputs.result }}
+    value: ${{ steps.slugifier.outputs.slug }}
 
 runs:
   using: "composite"
   steps:
     - id: slugifier
-      shell: bash
-      run: |
-        SLUGIFIED_VALUE=$(echo "${{ inputs.value }}" | iconv -t ascii//TRANSLIT | sed -E -e 's/[^[:alnum:]]+/-/g' -e 's/^-+|-+$//g' | tr '[:upper:]' '[:lower:]')
-        echo "result=${SLUGIFIED_VALUE}" >> $GITHUB_OUTPUT
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+      env:
+        SLUGIFY_INPUT: ${{ inputs.value }}
+      with:
+        script: |
+          const input = process.env.SLUGIFY_INPUT ?? '';
+          const slug = input
+          // Normalize common dash variants to hyphen
+          .replace(/[\u2010-\u2015\u2212]/g, "-")
+          .normalize("NFKD")
+          .toLowerCase()
+          .trim()
+          // Remove combining diacritical marks
+          .replace(/[\u0300-\u036f]/g, "")
+          // Treat separators as hyphen (NOW includes dot ".")
+          .replace(/[\s_/\\.-]+/g, "-")
+          // Keep letters/numbers (any script) + hyphen
+          .replace(/[^\p{Letter}\p{Number}-]+/gu, "")
+          // Collapse + trim hyphens
+          .replace(/-+/g, "-").replace(/^-|-$/g, "");
+
+          core.setOutput('slug', slug);
