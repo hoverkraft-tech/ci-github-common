@@ -74,8 +74,8 @@ export class CheckStyleParser extends BaseParser {
     for (const error of errors) {
       const issue = new LintIssue({
         file: fileName,
-        line: parseInt(error["@_line"] || 0),
-        column: parseInt(error["@_column"] || 0),
+        line: parseInt(error["@_line"] || 0, 10),
+        column: parseInt(error["@_column"] || 0, 10),
         severity: this._mapSeverity(error["@_severity"]),
         rule: error["@_source"] || "unknown",
         message: error["@_message"] || "",

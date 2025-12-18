@@ -61,7 +61,7 @@ export class CoberturaParser extends BaseParser {
       let totalBranches = 0;
       let coveredBranches = 0;
 
-      if (coverage.packages && coverage.packages.package) {
+      if (coverage.packages?.package) {
         const packages = Array.isArray(coverage.packages.package)
           ? coverage.packages.package
           : [coverage.packages.package];
@@ -114,20 +114,20 @@ export class CoberturaParser extends BaseParser {
     let totalBranches = 0;
     let coveredBranches = 0;
 
-    if (pkg.classes && pkg.classes.class) {
+    if (pkg.classes?.class) {
       const classes = Array.isArray(pkg.classes.class)
         ? pkg.classes.class
         : [pkg.classes.class];
 
       for (const cls of classes) {
-        if (cls.lines && cls.lines.line) {
+        if (cls.lines?.line) {
           const lines = Array.isArray(cls.lines.line)
             ? cls.lines.line
             : [cls.lines.line];
 
           for (const line of lines) {
             totalLines++;
-            const hits = parseInt(line["@_hits"] || 0);
+            const hits = parseInt(line["@_hits"] || 0, 10);
             if (hits > 0) {
               coveredLines++;
             }
@@ -138,8 +138,8 @@ export class CoberturaParser extends BaseParser {
               const conditionCoverage = line["@_condition-coverage"] || "0%";
               const match = conditionCoverage.match(/(\d+)\/(\d+)/);
               if (match) {
-                const covered = parseInt(match[1]);
-                const total = parseInt(match[2]);
+                const covered = parseInt(match[1], 10);
+                const total = parseInt(match[2], 10);
                 totalBranches += total;
                 coveredBranches += covered;
               }

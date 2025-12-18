@@ -19,7 +19,7 @@ export class BaseParser {
    * @returns {ReportData} Parsed report data
    */
   // eslint-disable-next-line no-unused-vars
-  parse(content, filePath) {
+  parse(_content, _filePath) {
     throw new Error("parse() must be implemented by subclass");
   }
 
@@ -30,7 +30,7 @@ export class BaseParser {
    * @returns {boolean} True if this parser can handle the file
    */
   // eslint-disable-next-line no-unused-vars
-  canParse(filePath, content) {
+  canParse(_filePath, _content) {
     throw new Error("canParse() must be implemented by subclass");
   }
 

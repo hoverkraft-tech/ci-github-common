@@ -125,7 +125,7 @@ export class SummaryFormatter extends MarkdownFormatter {
     // Overall percentage with visual indicator
     const overall = coverage.getOverallPercentage();
     output += `**Overall Coverage: ${this._formatPercentage(overall)}**\n`;
-    output += this._getCoverageBar(overall) + "\n";
+    output += `${this._getCoverageBar(overall)}\n`;
 
     return output;
   }

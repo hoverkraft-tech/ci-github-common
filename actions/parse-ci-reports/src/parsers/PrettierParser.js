@@ -26,7 +26,7 @@ export class PrettierParser extends BaseParser {
       return true;
     }
 
-    if (filePath && filePath.toLowerCase().includes("prettier")) {
+    if (filePath?.toLowerCase().includes("prettier")) {
       return /\[(warn|error)\]\s+.+/i.test(content);
     }
 

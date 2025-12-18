@@ -6,7 +6,7 @@ import { ReportData, TestResult } from "../models/ReportData.js";
  * Supports TAP versions 12, 13, and 14
  */
 export class TAPParser extends BaseParser {
-  canParse(filePath, content) {
+  canParse(_filePath, content) {
     const lines = content.split("\n");
     // TAP files typically start with TAP version or test plan
     return lines.some(
@@ -54,7 +54,7 @@ export class TAPParser extends BaseParser {
       const match = line.match(/^(ok|not ok)\s+(\d+)?\s*-?\s*(.*)/);
       if (match) {
         const [, status, number, description] = match;
-        testNumber = number ? parseInt(number) : testNumber + 1;
+        testNumber = number ? parseInt(number, 10) : testNumber + 1;
 
         const test = this._parseTestLine(
           status,

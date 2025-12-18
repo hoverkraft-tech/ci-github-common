@@ -20,12 +20,13 @@ runs:
   using: "composite"
   steps:
     - id: check-org
-      run: |
-        OWNER_TYPE=$(curl -s -H "Authorization: token ${{ inputs.github-token }}" \
-        "https://api.github.com/users/${{ github.repository_owner }}" | jq -r .type)
-
-        if [ "$OWNER_TYPE" = "Organization" ]; then
-          echo "is-organization=true" >> "$GITHUB_OUTPUT"
-        fi
-
-      shell: bash
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const owner = context.repo.owner;
+          const { data } = await github.rest.users.getByUsername({ username: owner });
+          const isOrganization = (data?.type ?? '').toLowerCase() === 'organization';
+          if (isOrganization) {
+            core.setOutput('is-organization', true);
+          }
