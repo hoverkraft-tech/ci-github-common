@@ -41,7 +41,7 @@ Example: if `local-path` is `./self-workflow` and `actions-path` is `.github/act
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/local-workflow-actions@a8d9ca49a0e025238acd97ee3c5014f4d6525bc3 # 0.31.5
+- uses: hoverkraft-tech/ci-github-common/actions/local-workflow-actions@b17226e57c8ef31f860719766656ebb6df017218 # 0.31.6
   with:
     # Relative path(s) (inside the workflow repository) containing the local actions to expose in the current workspace.
     # The same relative path will be used inside the current workspace (for example `.github/actions`).
