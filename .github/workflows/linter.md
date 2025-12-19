@@ -64,7 +64,7 @@ on:
 permissions: {}
 jobs:
   linter:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@949a3c2dfae290ecaa9f8dc9cac8825436b1fa11 # main
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@a8d9ca49a0e025238acd97ee3c5014f4d6525bc3 # 0.31.5
     permissions: {}
     secrets:
       # Token for marking the status of linter run in the Checks section.
@@ -127,7 +127,7 @@ jobs:
 | **`action-files`**     | List of files or directories where GitHub Actions and workflows are located.              | **false**    | **string**  | <!-- textlint-disable --><pre lang="text">./action.yml&#13;./.github/workflows/\*\*/\*.yml&#13;./actions/\*\*/\*.yml</pre><!-- textlint-enable --> |
 |                        | Supports glob patterns.                                                                   |              |             |                                                                                                                                                    |
 |                        | Leave empty to disable the check.                                                         |              |             |                                                                                                                                                    |
-| **`lint-all`**         | Run checks on all files, not just the changed ones.                                       | **false**    | **boolean** | `$\{\{ github.event_name != 'pull_request' }}`                                                                                                     |
+| **`lint-all`**         | Run checks on all files, not just the changed ones.                                       | **false**    | **boolean** | `${{ github.event_name != 'pull_request' }}`                                                                                                       |
 
 <!-- inputs:end -->
 
