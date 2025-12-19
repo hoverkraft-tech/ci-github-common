@@ -43,7 +43,7 @@ Workflow to ensure Pull Request provides semantic versionning assets:
 ```yaml
 name: Semantic Pull Request
 on:
-  pull_request_target:
+  pull_request:
     types:
       - opened
       - edited
