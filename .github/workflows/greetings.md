@@ -53,7 +53,7 @@ on:
 permissions: {}
 jobs:
   greetings:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/greetings.yml@666b7b6eb000db3e8614647871fa60c9f1eb7179 # 0.31.4
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/greetings.yml@a8d9ca49a0e025238acd97ee3c5014f4d6525bc3 # 0.31.5
     permissions: {}
     secrets:
       # Token for the repository.
