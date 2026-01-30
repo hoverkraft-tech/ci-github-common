@@ -33,7 +33,7 @@ Action to get Pull request or issue number
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/get-issue-number@b17226e57c8ef31f860719766656ebb6df017218 # 0.31.6
+- uses: hoverkraft-tech/ci-github-common/actions/get-issue-number@f24ce3360a8abf9bf386a62ab13d0ae5de5f9d13 # 0.31.7
 ```
 
 <!-- usage:end -->
@@ -86,7 +86,7 @@ This project is licensed under the MIT License.
 
 SPDX-License-Identifier: MIT
 
-Copyright © 2025 hoverkraft
+Copyright © 2026 hoverkraft
 
 For more details, see the [license](http://choosealicense.com/licenses/mit/).
 
