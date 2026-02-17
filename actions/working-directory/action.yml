@@ -1,0 +1,44 @@
+name: "working directory"
+description: "Action to resolve and validate a working directory path."
+author: hoverkraft
+branding:
+  icon: folder
+  color: blue
+
+inputs:
+  working-directory:
+    description: "Relative or absolute working directory path to resolve."
+    required: false
+    default: "."
+
+outputs:
+  working-directory:
+    description: "The resolved absolute working directory path."
+    value: ${{ steps.working-directory.outputs.working-directory }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: working-directory
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+      env:
+        WORKING_DIRECTORY_INPUT: ${{ inputs.working-directory }}
+      with:
+        script: |
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          let workingDirectory = process.env.WORKING_DIRECTORY_INPUT || '.';
+
+          if (!path.isAbsolute(workingDirectory)) {
+            workingDirectory = path.join(process.env.GITHUB_WORKSPACE, workingDirectory);
+          }
+
+          if (!fs.existsSync(workingDirectory)) {
+            core.setFailed(`The specified working directory does not exist: ${workingDirectory}`);
+            return;
+          }
+
+          workingDirectory = path.resolve(workingDirectory);
+          core.debug(`Running in working directory: ${workingDirectory}`);
+          core.setOutput('working-directory', workingDirectory);

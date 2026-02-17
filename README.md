@@ -19,36 +19,37 @@ Opinionated GitHub Actions and reusable workflows for foundational continuous-in
 
 ### Workflow & repository automation
 
-- [Checkout](actions/checkout/README.md) — event-aware drop-in replacement for `actions/checkout` that supports issue comment triggers.
-- [Create and merge pull request](actions/create-and-merge-pull-request/README.md) — opens a pull request, rebases, and merges it with the GitHub Actions bot identity.
-- [Create or update comment](actions/create-or-update-comment/README.md) — adds or updates comments on issues and pull requests idempotently.
-- [Get GitHub Actions bot user](actions/get-github-actions-bot-user/README.md) — retrieves the profile information for the GitHub Actions bot.
-- [Get issue number](actions/get-issue-number/README.md) — extracts the relevant issue number from the current workflow context.
+- [Checkout](actions/checkout/README.md) - event-aware drop-in replacement for `actions/checkout` that supports issue comment triggers.
+- [Create and merge pull request](actions/create-and-merge-pull-request/README.md) - opens a pull request, rebases, and merges it with the GitHub Actions bot identity.
+- [Create or update comment](actions/create-or-update-comment/README.md) - adds or updates comments on issues and pull requests idempotently.
+- [Get GitHub Actions bot user](actions/get-github-actions-bot-user/README.md) - retrieves the profile information for the GitHub Actions bot.
+- [Get issue number](actions/get-issue-number/README.md) - extracts the relevant issue number from the current workflow context.
 
 ### Matrix & workflow data helpers
 
-- [Get matrix outputs](actions/get-matrix-outputs/README.md) — aggregates outputs across matrix jobs for downstream steps.
-- [Set matrix output](actions/set-matrix-output/README.md) — writes structured outputs that can be consumed by other matrix jobs.
-- [Local workflow actions](actions/local-workflow-actions/README.md) — loads reusable workflow actions from the current repository.
+- [Get matrix outputs](actions/get-matrix-outputs/README.md) - aggregates outputs across matrix jobs for downstream steps.
+- [Set matrix output](actions/set-matrix-output/README.md) - writes structured outputs that can be consumed by other matrix jobs.
+- [Local workflow actions](actions/local-workflow-actions/README.md) - loads reusable workflow actions from the current repository.
 
 ### Repository insights & utilities
 
-- [Parse CI reports](actions/parse-ci-reports/README.md) — parses CI reports (tests, linting, coverage) into GitHub summaries and Markdown for PR comments.
-- [Repository owner is organization](actions/repository-owner-is-organization/README.md) — checks whether the repository owner is an organization.
-- [Slugify](actions/slugify/README.md) — converts free-form strings into GitHub-friendly slugs.
+- [Parse CI reports](actions/parse-ci-reports/README.md) - parses CI reports (tests, linting, coverage) into GitHub summaries and Markdown for PR comments.
+- [Repository owner is organization](actions/repository-owner-is-organization/README.md) - checks whether the repository owner is an organization.
+- [Working directory](actions/resolve-working-directory/README.md) - resolves and validates a working directory path as an absolute path.
+- [Slugify](actions/slugify/README.md) - converts free-form strings into GitHub-friendly slugs.
 
 ## Reusable Workflows
 
 ### Community & issue hygiene
 
-- [Greetings](.github/workflows/greetings.md) — welcomes first-time issue reporters and pull request authors.
-- [Need fix to Issue](.github/workflows/need-fix-to-issue.md) — labels issues that require follow-up fixes.
-- [Stale](.github/workflows/stale.md) — automatically marks and closes stale issues and pull requests.
+- [Greetings](.github/workflows/greetings.md) - welcomes first-time issue reporters and pull request authors.
+- [Need fix to Issue](.github/workflows/need-fix-to-issue.md) - labels issues that require follow-up fixes.
+- [Stale](.github/workflows/stale.md) - automatically marks and closes stale issues and pull requests.
 
 ### Quality gates
 
-- [Linter](.github/workflows/linter.md) — runs Super Linter and shared formatting checks across the repository.
-- [Semantic pull request](.github/workflows/semantic-pull-request.md) — enforces semantic pull request titles before merging.
+- [Linter](.github/workflows/linter.md) - runs Super Linter and shared formatting checks across the repository.
+- [Semantic pull request](.github/workflows/semantic-pull-request.md) - enforces semantic pull request titles before merging.
 
 ## Contributing
 
@@ -67,10 +68,10 @@ actions/{action-name}/
 
 ### Development standards
 
-1. **Pinned dependencies** – reference external actions by commit SHA (for example `actions/checkout@08c6903c…`).
-2. **Composite-first** – encapsulate logic in composite actions and keep scripts minimal.
-3. **Early validation** – validate inputs up front using GitHub Script or shell guards and fail fast with helpful messages.
-4. **Consistent branding** – set `author: hoverkraft` and `branding.color: blue` with an appropriate icon in every `action.yml`.
+1. **Pinned dependencies** - reference external actions by commit SHA (for example `actions/checkout@08c6903c…`).
+2. **Composite-first** - encapsulate logic in composite actions and keep scripts minimal.
+3. **Early validation** - validate inputs up front using GitHub Script or shell guards and fail fast with helpful messages.
+4. **Consistent branding** - set `author: hoverkraft` and `branding.color: blue` with an appropriate icon in every `action.yml`.
 
 ## Development Workflow
 
