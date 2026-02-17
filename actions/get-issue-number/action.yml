@@ -8,19 +8,22 @@ branding:
 outputs:
   issue-number:
     description: "The issue number."
-    value: ${{ steps.get-issue-number.outputs.result }}
+    value: ${{ steps.get-issue-number.outputs.issue-number }}
 
 runs:
   using: "composite"
   steps:
     - id: get-issue-number
-      shell: bash
-      run: |
-        if [ ! -z "${{ github.event.pull_request.number }}" ]; then
-          echo "result=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-        elif [ ! -z "${{ github.event.issue.number }}" ]; then
-          echo "result=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
-        else
-          echo "No PR or issue number found for the current event"
-          exit 1
-        fi
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+      with:
+        script: |
+          const pullRequestNumber = context.payload.pull_request?.number;
+          const issueNumber = context.payload.issue?.number;
+          const result = pullRequestNumber ?? issueNumber;
+
+          if (!result) {
+            core.setFailed('No PR or issue number found for the current event');
+            return;
+          }
+
+          core.setOutput('issue-number', result);
