@@ -36,7 +36,7 @@ Opinionated GitHub Actions and reusable workflows for foundational continuous-in
 
 - [Parse CI reports](actions/parse-ci-reports/README.md) - parses CI reports (tests, linting, coverage) into GitHub summaries and Markdown for PR comments.
 - [Repository owner is organization](actions/repository-owner-is-organization/README.md) - checks whether the repository owner is an organization.
-- [Working directory](actions/resolve-working-directory/README.md) - resolves and validates a working directory path as an absolute path.
+- [Working directory](actions/working-directory/README.md) - resolves and validates a working directory path as an absolute path.
 - [Slugify](actions/slugify/README.md) - converts free-form strings into GitHub-friendly slugs.
 
 ## Reusable Workflows
