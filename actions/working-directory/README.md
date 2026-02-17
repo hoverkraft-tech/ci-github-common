@@ -42,9 +42,10 @@ Action to resolve and validate a working directory path.
 
 ## Inputs
 
-| **Input**               | **Description**                                         | **Required** | **Default** |
-| ----------------------- | ------------------------------------------------------- | ------------ | ----------- |
-| **`working-directory`** | Relative or absolute working directory path to resolve. | **false**    | `.`         |
+| **Input**                       | **Description**                                                       | **Required** | **Default** |
+| ------------------------------- | --------------------------------------------------------------------- | ------------ | ----------- |
+| **`working-directory`**         | Relative or absolute working directory path to resolve.               | **false**    | `.`         |
+| **`enforce-path-in-workspace`** | Whether to fail when the resolved path is outside `GITHUB_WORKSPACE`. | **false**    | `true`      |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -53,9 +54,10 @@ Action to resolve and validate a working directory path.
 
 ## Outputs
 
-| **Output**              | **Description**                               |
-| ----------------------- | --------------------------------------------- |
-| **`working-directory`** | The resolved absolute working directory path. |
+| **Output**                    | **Description**                                                     |
+| ----------------------------- | ------------------------------------------------------------------- |
+| **`absolute-path`**           | The resolved absolute working directory path.                       |
+| **`workspace-relative-path`** | The resolved working directory path relative to `GITHUB_WORKSPACE`. |
 
 <!-- outputs:end -->
 <!-- examples:start -->

@@ -1,0 +1,36 @@
+name: Internal - Tests for get-github-actions-bot-user action
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests for get-github-actions-bot-user action
+    runs-on: ubuntu-latest
+    steps:
+      - name: Arrange - Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Act - Run get-github-actions-bot-user action
+        id: get-github-actions-bot-user
+        uses: ./actions/get-github-actions-bot-user
+
+      - name: Assert - Check get-github-actions-bot-user outputs
+        env:
+          STEPS_GET_GITHUB_ACTIONS_BOT_USER_OUTPUTS_NAME: ${{ steps.get-github-actions-bot-user.outputs.name }}
+          STEPS_GET_GITHUB_ACTIONS_BOT_USER_OUTPUTS_EMAIL: ${{ steps.get-github-actions-bot-user.outputs.email }}
+        run: |
+          if [ "${STEPS_GET_GITHUB_ACTIONS_BOT_USER_OUTPUTS_NAME}" != 'github-actions[bot]' ]; then
+            echo "get-github-actions-bot-user output name is not valid"
+            exit 1
+          fi
+
+          if [ "${STEPS_GET_GITHUB_ACTIONS_BOT_USER_OUTPUTS_EMAIL}" != '41898282+github-actions[bot]@users.noreply.github.com' ]; then
+            echo "get-github-actions-bot-user output email is not valid"
+            exit 1
+          fi

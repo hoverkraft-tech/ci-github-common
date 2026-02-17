@@ -11,16 +11,18 @@ jobs:
     name: Tests for slugify action
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Arrange - Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      - id: slugify
+      - name: Act - Run slugify action
+        id: slugify
         uses: ./actions/slugify
         with:
           value: test content
 
-      - name: Check slugify outputs
+      - name: Assert - Check slugify outputs
         run: |
           if [ "${STEPS_SLUGIFY_OUTPUTS_RESULT}" != 'test-content' ]; then
             echo "Slugify outputs result is not valid"

@@ -25,7 +25,8 @@ jobs:
     name: Tests for parse-ci-reports action
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Arrange - Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -71,7 +72,8 @@ jobs:
           ]
           EOF
 
-      - id: parse-ci-reports
+      - name: Act - Run parse-ci-reports action
+        id: parse-ci-reports
         uses: ./actions/parse-ci-reports
         with:
           report-paths: |
@@ -81,7 +83,7 @@ jobs:
           report-name: "Test Reports"
           output-format: "summary,markdown"
 
-      - name: Check parse-ci-reports outputs
+      - name: Assert - Check parse-ci-reports outputs
         run: |
           # Check that markdown output exists
           if [ -z "${STEPS_PARSE_CI_REPORTS_OUTPUTS_MARKDOWN}" ]; then

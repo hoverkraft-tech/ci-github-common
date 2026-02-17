@@ -1,0 +1,77 @@
+name: Internal - Tests for working-directory action
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests for working-directory action
+    runs-on: ubuntu-latest
+    steps:
+      - name: Arrange - Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Act - Resolve workspace root directory
+        id: working-directory
+        uses: ./actions/working-directory
+        with:
+          working-directory: .
+
+      - name: Assert - Check workspace root outputs
+        run: |
+          if [ "${STEPS_WORKING_DIRECTORY_OUTPUTS_ABSOLUTE_PATH}" != "${GITHUB_WORKSPACE}" ]; then
+            echo "working-directory absolute-path output is not valid"
+            exit 1
+          fi
+
+          if [ "${STEPS_WORKING_DIRECTORY_OUTPUTS_WORKSPACE_RELATIVE_PATH}" != "." ]; then
+            echo "working-directory workspace-relative-path output is not valid"
+            exit 1
+          fi
+        env:
+          STEPS_WORKING_DIRECTORY_OUTPUTS_ABSOLUTE_PATH: ${{ steps.working-directory.outputs.absolute-path }}
+          STEPS_WORKING_DIRECTORY_OUTPUTS_WORKSPACE_RELATIVE_PATH: ${{ steps.working-directory.outputs.workspace-relative-path }}
+
+      - name: Act - Run outside-workspace path with enforcement enabled
+        id: outside-workspace-disallowed
+        continue-on-error: true
+        uses: ./actions/working-directory
+        with:
+          working-directory: /tmp
+          enforce-path-in-workspace: true
+
+      - name: Assert - Check enforcement failure outside workspace
+        run: |
+          if [ "${STEPS_OUTSIDE_WORKSPACE_DISALLOWED_OUTCOME}" != "failure" ]; then
+            echo "working-directory should fail when path is outside workspace and enforcement is enabled"
+            exit 1
+          fi
+        env:
+          STEPS_OUTSIDE_WORKSPACE_DISALLOWED_OUTCOME: ${{ steps.outside-workspace-disallowed.outcome }}
+
+      - name: Act - Run outside-workspace path with enforcement disabled
+        id: outside-workspace-allowed
+        uses: ./actions/working-directory
+        with:
+          working-directory: /tmp
+          enforce-path-in-workspace: false
+
+      - name: Assert - Check enforcement opt-out outside workspace
+        run: |
+          if [ "${STEPS_OUTSIDE_WORKSPACE_ALLOWED_OUTPUTS_ABSOLUTE_PATH}" != "/tmp" ]; then
+            echo "working-directory absolute-path output is not valid when enforcement is disabled"
+            exit 1
+          fi
+
+          if [[ "${STEPS_OUTSIDE_WORKSPACE_ALLOWED_OUTPUTS_WORKSPACE_RELATIVE_PATH}" != ..* ]]; then
+            echo "working-directory workspace-relative-path should be outside workspace when enforcement is disabled"
+            exit 1
+          fi
+        env:
+          STEPS_OUTSIDE_WORKSPACE_ALLOWED_OUTPUTS_ABSOLUTE_PATH: ${{ steps.outside-workspace-allowed.outputs.absolute-path }}
+          STEPS_OUTSIDE_WORKSPACE_ALLOWED_OUTPUTS_WORKSPACE_RELATIVE_PATH: ${{ steps.outside-workspace-allowed.outputs.workspace-relative-path }}

@@ -1,0 +1,43 @@
+name: Internal - Tests for get-issue-number action
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests for get-issue-number action
+    runs-on: ubuntu-latest
+    steps:
+      - name: Arrange - Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Act - Run get-issue-number action
+        id: get-issue-number
+        continue-on-error: true
+        uses: ./actions/get-issue-number
+
+      - name: Assert - Check get-issue-number behavior by event type
+        env:
+          STEPS_GET_ISSUE_NUMBER_OUTCOME: ${{ steps.get-issue-number.outcome }}
+          STEPS_GET_ISSUE_NUMBER_OUTPUTS_ISSUE_NUMBER: ${{ steps.get-issue-number.outputs.issue-number }}
+          EXPECTED_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = 'pull_request' ]; then
+            if [ "${STEPS_GET_ISSUE_NUMBER_OUTCOME}" != 'success' ]; then
+              echo "get-issue-number should succeed for pull_request events"
+              exit 1
+            fi
+
+            if [ "${STEPS_GET_ISSUE_NUMBER_OUTPUTS_ISSUE_NUMBER}" != "${EXPECTED_PULL_REQUEST_NUMBER}" ]; then
+              echo "get-issue-number output is not valid for pull_request events"
+              exit 1
+            fi
+          elif [ "${STEPS_GET_ISSUE_NUMBER_OUTCOME}" != 'failure' ]; then
+            echo "get-issue-number should fail when event is not pull_request"
+            exit 1
+          fi

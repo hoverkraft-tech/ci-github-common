@@ -20,6 +20,18 @@ jobs:
       contents: read
     uses: ./.github/workflows/__test-action-matrix-outputs.yml
 
+  test-action-get-github-actions-bot-user:
+    needs: linter
+    permissions:
+      contents: read
+    uses: ./.github/workflows/__test-action-get-github-actions-bot-user.yml
+
+  test-action-get-issue-number:
+    needs: linter
+    permissions:
+      contents: read
+    uses: ./.github/workflows/__test-action-get-issue-number.yml
+
   test-action-parse-ci-reports:
     needs: linter
     permissions:
@@ -41,3 +53,9 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/__test-action-slugify.yml
+
+  test-action-working-directory:
+    needs: linter
+    permissions:
+      contents: read
+    uses: ./.github/workflows/__test-action-working-directory.yml
