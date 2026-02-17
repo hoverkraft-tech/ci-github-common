@@ -9,48 +9,6 @@
 ---
 
 <!-- header:end -->
-
-## Overview
-
-Action to resolve and validate a working directory path.
-
-## Usage
-
-```yaml
-- id: resolve-working-directory
-  uses: hoverkraft-tech/ci-github-common/actions/resolve-working-directory@<sha>
-  with:
-    working-directory: .
-```
-
-## Inputs
-
-| **Input**               | **Description**                                         | **Required** | **Default** |
-| ----------------------- | ------------------------------------------------------- | ------------ | ----------- |
-| **`working-directory`** | Relative or absolute working directory path to resolve. | No           | `.`         |
-
-## Outputs
-
-| **Output**              | **Description**                               |
-| ----------------------- | --------------------------------------------- |
-| **`working-directory`** | The resolved absolute working directory path. |
-
-## Example
-
-```yaml
-jobs:
-  example:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - id: resolve-working-directory
-        uses: hoverkraft-tech/ci-github-common/actions/resolve-working-directory@<sha>
-        with:
-          working-directory: actions/parse-ci-reports
-
-      - name: Show resolved directory
-        run: echo "${{ steps.resolve-working-directory.outputs.working-directory }}"
-```
 <!-- badges:start -->
 
 [![Marketplace](https://img.shields.io/badge/Marketplace-working--directory-blue?logo=github-actions)](https://github.com/marketplace/actions/working-directory)
@@ -72,7 +30,7 @@ Action to resolve and validate a working directory path.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/working-directory@f24ce3360a8abf9bf386a62ab13d0ae5de5f9d13 # 0.31.7
+- uses: hoverkraft-tech/ci-github-common/actions/working-directory@790306a64b804be99e388ca20b780fd3afa9295f # main
   with:
     # Relative or absolute working directory path to resolve.
     # Default: `.`
