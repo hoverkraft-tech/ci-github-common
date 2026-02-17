@@ -46,7 +46,7 @@ on:
 permissions: {}
 jobs:
   need-fix-to-issue:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/need-fix-to-issue.yml@f24ce3360a8abf9bf386a62ab13d0ae5de5f9d13 # 0.31.7
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/need-fix-to-issue.yml@4bfbc05c189f1177cf7d47d3060cd1cbddf04ce2 # 0.32.0
     permissions: {}
     with:
       # JSON array of runner(s) to use.
