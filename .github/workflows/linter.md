@@ -64,7 +64,7 @@ on:
 permissions: {}
 jobs:
   linter:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@4bfbc05c189f1177cf7d47d3060cd1cbddf04ce2 # 0.32.0
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@f5847cb398fe65d53794e6aba98ebdfa0801f691 # 0.32.0
     permissions: {}
     secrets:
       # Token for marking the status of linter run in the Checks section.
