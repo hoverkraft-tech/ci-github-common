@@ -1,7 +1,7 @@
 name: "Get GitHub Actions bot user"
 description: |
-  Action to get the GitHub Actions bot user informations.
-  Usefull to commit, comment, etc.
+  Action to get the GitHub Actions bot user information.
+  Useful to commit, comment, etc.
 author: hoverkraft
 branding:
   icon: user-check
@@ -20,4 +20,4 @@ runs:
   steps:
     - id: get-bot-user
       shell: bash
-      run: 'echo "Get GitHub Actions bot user informations"'
+      run: 'echo "Get GitHub Actions bot user information"'

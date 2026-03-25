@@ -1,9 +1,9 @@
 <!-- header:start -->
 
-# ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItZG93bmxvYWQtY2xvdWQiIGNvbG9yPSJibHVlIj48cG9seWxpbmUgcG9pbnRzPSI4IDE3IDEyIDIxIDE2IDE3Ij48L3BvbHlsaW5lPjxsaW5lIHgxPSIxMiIgeTE9IjEyIiB4Mj0iMTIiIHkyPSIyMSI+PC9saW5lPjxwYXRoIGQ9Ik0yMC44OCAxOC4wOUE1IDUgMCAwIDAgMTggOWgtMS4yNkE4IDggMCAxIDAgMyAxNi4yOSI+PC9wYXRoPjwvc3ZnPg==) GitHub Action: Get matrix ouput
+# ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItZG93bmxvYWQtY2xvdWQiIGNvbG9yPSJibHVlIj48cG9seWxpbmUgcG9pbnRzPSI4IDE3IDEyIDIxIDE2IDE3Ij48L3BvbHlsaW5lPjxsaW5lIHgxPSIxMiIgeTE9IjEyIiB4Mj0iMTIiIHkyPSIyMSI+PC9saW5lPjxwYXRoIGQ9Ik0yMC44OCAxOC4wOUE1IDUgMCAwIDAgMTggOWgtMS4yNkE4IDggMCAxIDAgMyAxNi4yOSI+PC9wYXRoPjwvc3ZnPg==) GitHub Action: Get matrix outputs
 
 <div align="center">
-  <img src="../../.github/logo.svg" width="60px" align="center" alt="Get matrix ouput" />
+  <img src="../../.github/logo.svg" width="60px" align="center" alt="Get matrix outputs" />
 </div>
 
 ---
@@ -12,7 +12,7 @@
 
 <!-- badges:start -->
 
-[![Marketplace](https://img.shields.io/badge/Marketplace-get--matrix--ouput-blue?logo=github-actions)](https://github.com/marketplace/actions/get-matrix-ouput)
+[![Marketplace](https://img.shields.io/badge/Marketplace-get--matrix--outputs-blue?logo=github-actions)](https://github.com/marketplace/actions/get-matrix-outputs)
 [![Release](https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common)](https://github.com/hoverkraft-tech/ci-github-common/releases)
 [![License](https://img.shields.io/github/license/hoverkraft-tech/ci-github-common)](http://choosealicense.com/licenses/mit/)
 [![Stars](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)
@@ -24,7 +24,7 @@
 
 ## Overview
 
-Download matrix ouputs from artifacts, because GitHub Action does not handle job outputs for matrix.
+Download matrix outputs from artifacts, because GitHub Action does not handle job outputs for matrix.
 Workaround for <https://github.com/orgs/community/discussions/26639>.
 
 <!-- overview:end -->

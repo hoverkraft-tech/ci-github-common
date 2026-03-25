@@ -24,8 +24,8 @@
 
 ## Overview
 
-Action to get the GitHub Actions bot user informations.
-Usefull to commit, comment, etc.
+Action to get the GitHub Actions bot user information.
+Useful to commit, comment, etc.
 
 <!-- overview:end -->
 

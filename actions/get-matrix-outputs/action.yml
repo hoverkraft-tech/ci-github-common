@@ -1,6 +1,6 @@
-name: "Get matrix ouput"
+name: "Get matrix outputs"
 description: |
-  Download matrix ouputs from artifacts, because GitHub Action does not handle job outputs for matrix.
+  Download matrix outputs from artifacts, because GitHub Action does not handle job outputs for matrix.
   Workaround for https://github.com/orgs/community/discussions/26639.
 author: hoverkraft
 branding:
