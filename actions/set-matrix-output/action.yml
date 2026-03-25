@@ -1,6 +1,6 @@
-name: "Set matrix ouput"
+name: "Set matrix output"
 description: |
-  Set matrix ouput in file to be uploaded as artifacts, because GitHub Action does not handle job outputs for matrix.
+  Set matrix output in file to be uploaded as artifacts, because GitHub Action does not handle job outputs for matrix.
   Workaround for https://github.com/orgs/community/discussions/26639.
 author: hoverkraft
 branding:

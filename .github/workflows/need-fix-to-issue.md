@@ -66,7 +66,7 @@ jobs:
 
 **Tips:**
 
-It is recommanded to add this trigger for this workflow:
+It is recommended to add this trigger for this workflow:
 
 ```yaml
 workflow_dispatch:

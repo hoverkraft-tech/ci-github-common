@@ -23,7 +23,7 @@
 
 ## Overview
 
-Workflow to ensure Pull Request provides semantic versionning assets:
+Workflow to ensure Pull Request provides semantic versioning assets:
 
 - "Squash and merge" Pull Request strategy provides a valid commit message.
   Check that the title follows the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.

@@ -67,8 +67,8 @@ runs:
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          let attemps = 0;
-          const maxAttemps = 10;
+          let attempts = 0;
+          const maxAttempts = 10;
 
           const pullNumberRaw = process.env.PULL_REQUEST_NUMBER ?? '';
           if (!/^[0-9]+$/.test(pullNumberRaw)) {
@@ -76,7 +76,7 @@ runs:
           }
           const pullNumber = Number.parseInt(pullNumberRaw, 10);
 
-          while (attemps < maxAttemps) {
+          while (attempts < maxAttempts) {
             const { data: { mergeable, mergeable_state } } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -91,7 +91,7 @@ runs:
             core.debug(`Pull request is not mergeable, mergeable_state: ${mergeable_state}`);
 
             await new Promise(resolve => setTimeout(resolve, 5000));
-            attemps++;
+            attempts++;
           }
 
           core.error('Pull request is not mergeable');
@@ -110,11 +110,11 @@ runs:
           exit 1
         fi
 
-        ATTEMPS=0
-        MAX_ATTEMPS=10
+        ATTEMPTS=0
+        MAX_ATTEMPTS=10
         REQUIRED_WORKFLOWS_ERROR="Required workflow"
 
-        while [ $ATTEMPS -lt $MAX_ATTEMPS ]; do
+        while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
           echo "::debug::Merging pull request #${PULL_REQUEST_NUMBER} for repository ${{ github.repository }}..."
           MERGE_OUTPUTS=$(gh pr merge -R "${{ github.repository }}" --rebase --admin "${PULL_REQUEST_NUMBER}" 2>&1)
           MERGE_EXIT_CODE=$?
@@ -132,8 +132,8 @@ runs:
 
           echo "::debug::Pull request is not mergeable yet because some of required workflow check issues, retrying in 5 seconds..."
           sleep 5
-          ATTEMPS=$((ATTEMPS+1))
+          ATTEMPTS=$((ATTEMPTS+1))
         done
 
-        echo "::error::Failed to merge pull request after $MAX_ATTEMPS attemps: $MERGE_OUTPUTS"
+        echo "::error::Failed to merge pull request after $MAX_ATTEMPTS attempts: $MERGE_OUTPUTS"
         exit 1
