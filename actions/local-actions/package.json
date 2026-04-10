@@ -1,0 +1,16 @@
+{
+  "name": "local-actions",
+  "version": "1.0.0",
+  "description": "Expose sibling local GitHub Actions with automatic post cleanup",
+  "scripts": {
+    "test": "node --test",
+    "test:watch": "node --test --watch",
+    "test:ci": "node --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test"
+  },
+  "author": "hoverkraft",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}
