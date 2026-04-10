@@ -32,9 +32,22 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: ./../local-actions
+    # FIXME: This is a workaround until this issue is resolved: https://github.com/actions/runner/issues/1348.
+    - name: Prepare sibling actions
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
       with:
-        source-path: ${{ github.action_path }}/../..
+        script: |
+          const path = require('node:path');
+
+          const sourcePath = path.resolve(process.env.GITHUB_ACTION_PATH, '..');
+          const destinationPath = path.resolve(process.env.GITHUB_WORKSPACE, '..', 'self-actions');
+
+          await io.rmRF(destinationPath);
+          await io.mkdirP(destinationPath);
+          await io.cp(sourcePath, destinationPath, {
+            recursive: true,
+            copySourceDirectory: false,
+          });
 
     - id: github-actions-bot-user
       uses: ./../self-actions/get-github-actions-bot-user
@@ -132,3 +145,12 @@ runs:
 
         echo "::error::Failed to merge pull request after $MAX_ATTEMPTS attempts: $MERGE_OUTPUTS"
         exit 1
+
+    - name: Cleanup sibling actions
+      if: ${{ always() }}
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+      with:
+        script: |
+          const path = require('node:path');
+
+          await io.rmRF(path.resolve(process.env.GITHUB_WORKSPACE, '..', 'self-actions'));
