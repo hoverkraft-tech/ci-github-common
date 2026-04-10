@@ -32,17 +32,12 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - shell: bash
-      # FIXME: workaround until will be merged: https://github.com/actions/runner/pull/1684
-      run: mkdir -p ./self-actions/ && cp -r $GITHUB_ACTION_PATH/../* ./self-actions/
+    - uses: ./../local-actions
+      with:
+        source-path: ${{ github.action_path }}/../..
 
     - id: github-actions-bot-user
-      uses: ./self-actions/get-github-actions-bot-user
-
-    - shell: bash
-      # FIXME: workaround until will be merged: https://github.com/actions/runner/pull/1684
-      run: |
-        rm -fr ./self-actions
+      uses: ./../self-actions/get-github-actions-bot-user
 
     - uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8.1.0
       id: create-pull-request

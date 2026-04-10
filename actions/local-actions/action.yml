@@ -1,0 +1,25 @@
+# FIXME: This is a workaround until this issue is resolved: https://github.com/actions/runner/issues/1348.
+name: "Local actions"
+description: |
+  Action to expose sibling local actions next to the current action directory.
+  It copies the parent actions directory into a configurable destination and cleans it up automatically in the post action.
+author: hoverkraft
+branding:
+  icon: copy
+  color: blue
+
+inputs:
+  source-path:
+    description: |
+      The actions root path that contains the sibling local actions.
+      Pass the caller actions root, typically by appending `/../..` to `github.action_path`.
+    required: true
+
+outputs:
+  path:
+    description: The resolved destination path for the copied local actions.
+
+runs:
+  using: node24
+  main: index.js
+  post: cleanup.js
