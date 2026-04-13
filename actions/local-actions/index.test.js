@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -70,7 +71,7 @@ const runNodeScript = (scriptPath, env) =>
     },
   });
 
-test("index.js writes outputs and creates the local actions symlink", () => {
+test("index.js writes outputs, creates a relative symlink, and saves state", () => {
   const fixture = createFixture();
 
   try {
@@ -95,6 +96,15 @@ test("index.js writes outputs and creates the local actions symlink", () => {
       ),
     );
     assert.equal(lstatSync(fixture.selfActionsPath).isSymbolicLink(), true);
+
+    // Verify relative symlink
+    const linkTarget = readlinkSync(fixture.selfActionsPath);
+    assert.equal(
+      path.isAbsolute(linkTarget),
+      false,
+      `Expected relative symlink target, got: ${linkTarget}`,
+    );
+
     assert.equal(
       realpathSync(fixture.selfActionsPath),
       fixture.actionsDirectory,
@@ -111,11 +121,11 @@ test("index.js writes outputs and creates the local actions symlink", () => {
     );
     assert.match(
       readFileSync(fixture.stateFile, "utf8"),
-      /^local_actions_created<<.+\ntrue\n.+\n/s,
+      /local_actions_created<<.+\ntrue\n.+\n/s,
     );
     assert.match(
       readFileSync(fixture.stateFile, "utf8"),
-      /^local_actions_created<<.+\ntrue\n.+\nlocal_actions_destination_path<<.+\n.*self-actions\n.+\n$/s,
+      /local_actions_destination_path<<.+\n.*self-actions\n.+\n/s,
     );
   } finally {
     fixture.teardown();

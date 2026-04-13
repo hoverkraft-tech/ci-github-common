@@ -6,8 +6,9 @@ const manager = new LocalActionsManager();
 
 try {
   const destinationPath = runtime.getState("local_actions_destination_path");
+  const created = runtime.getState("local_actions_created") === "true";
   const cleaned = await manager.cleanup({
-    created: runtime.getState("local_actions_created") === "true",
+    created,
     destinationPath,
   });
 
