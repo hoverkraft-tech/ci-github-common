@@ -15,7 +15,11 @@ export class LocalActionsManager {
     }
 
     await mkdir(path.dirname(destinationPath), { recursive: true });
-    await symlink(sourceDirectory, destinationPath, this.#getSymlinkType());
+    const symlinkTarget = this.#resolveSymlinkTarget(
+      sourceDirectory,
+      destinationPath,
+    );
+    await symlink(symlinkTarget, destinationPath, this.#getSymlinkType());
 
     return {
       created: true,
@@ -29,6 +33,7 @@ export class LocalActionsManager {
     }
 
     await rm(destinationPath, { force: true, recursive: true });
+
     return true;
   }
 
@@ -37,8 +42,7 @@ export class LocalActionsManager {
       throw new Error("Workspace path is required.");
     }
 
-    const normalizedWorkspacePath = path.resolve(workspacePath);
-    return path.resolve(normalizedWorkspacePath, "../self-actions");
+    return path.resolve(workspacePath, "../self-actions");
   }
 
   async resolveSourceDirectory({ sourcePath }) {
@@ -73,5 +77,19 @@ export class LocalActionsManager {
 
   #getSymlinkType() {
     return process.platform === "win32" ? "junction" : "dir";
+  }
+
+  /**
+   * Computes the symlink target. Uses a relative path on non-Windows
+   * platforms so the symlink resolves correctly from both the container
+   * filesystem and the host filesystem (bind-mount path differs).
+   * Windows junctions require absolute targets.
+   */
+  #resolveSymlinkTarget(sourceDirectory, destinationPath) {
+    if (this.#getSymlinkType() === "junction") {
+      return sourceDirectory;
+    }
+
+    return path.relative(path.dirname(destinationPath), sourceDirectory);
   }
 }

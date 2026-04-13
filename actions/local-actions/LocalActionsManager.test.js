@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -53,7 +54,7 @@ const createFixture = () => {
   };
 };
 
-test("prepare creates a symlink to sibling actions in the destination", async () => {
+test("prepare creates a relative symlink to sibling actions in the destination", async () => {
   const fixture = createFixture();
   const manager = new LocalActionsManager();
 
@@ -66,6 +67,16 @@ test("prepare creates a symlink to sibling actions in the destination", async ()
     assert.equal(result.created, true);
     assert.equal(result.destinationPath, fixture.selfActionsPath);
     assert.equal(lstatSync(fixture.selfActionsPath).isSymbolicLink(), true);
+
+    // Verify the symlink uses a relative target
+    const linkTarget = readlinkSync(fixture.selfActionsPath);
+    assert.equal(
+      path.isAbsolute(linkTarget),
+      false,
+      `Expected relative symlink target, got: ${linkTarget}`,
+    );
+
+    // Verify it resolves to the correct directory
     assert.equal(
       realpathSync(fixture.selfActionsPath),
       fixture.actionsDirectory,
@@ -141,6 +152,8 @@ test("cleanup removes the destination only when it was created by the action", a
       }),
       true,
     );
+    assert.equal(existsSync(fixture.selfActionsPath), false);
+
     assert.equal(
       await manager.cleanup({
         created: false,
