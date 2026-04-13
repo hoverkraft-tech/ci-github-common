@@ -1,8 +1,9 @@
-# FIXME: This is a workaround until this issue is resolved: https://github.com/actions/runner/issues/1348.
 name: "Local actions"
 description: |
   Action to expose sibling local actions next to the current action directory.
-  It copies the parent actions directory into a configurable destination and cleans it up automatically in the post action.
+  It creates a symlink to the parent actions directory at `../self-actions` relative to `github.workspace`
+  during the main step and removes it automatically in the post step.
+# FIXME: This is a workaround until this issue is resolved: https://github.com/actions/runner/issues/1348.
 author: hoverkraft
 branding:
   icon: copy
