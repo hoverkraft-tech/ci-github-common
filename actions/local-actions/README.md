@@ -32,7 +32,7 @@ during the main step and removes it automatically in the post step.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/local-actions@03a5a2a3626b03434b19b79cdd2e141bea410bae # main
+- uses: hoverkraft-tech/ci-github-common/actions/local-actions@03a5a2a3626b03434b19b79cdd2e141bea410bae # 0.34.1
   with:
     # The actions root path that contains the sibling local actions.
     # Pass the caller actions root, typically by appending `/../..` to `github.action_path`.
