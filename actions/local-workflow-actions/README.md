@@ -24,15 +24,10 @@
 
 ## Overview
 
-This action checks out the reusable workflow repository that triggered the current run and copies its local actions directory into the current workspace.
-It runs both during the main step and in the post step so that actions with cleanup hooks are also available.
+This action checks out the reusable workflow repository that defines the current job and moves it to `../self-workflow` relative to `github.workspace`.
 Use it when consuming reusable workflows that reference local actions from the same repository—they are not automatically available in the caller repository and must be synced manually.
-Add the `self-workflow` directory to your `.gitignore` and `.dockerignore` files to avoid committing it by mistake.
-
-**This action requires the permission: `id-token: write`**.
-
-Local actions will be available at `./<local-path>/<actions-path>` inside the current workspace.
-Example: if `local-path` is `./self-workflow` and `actions-path` is `.github/actions`, then local actions will be available at `./self-workflow/.github/actions`.
+Local actions will be available at `../self-workflow/<actions-path>` relative to `github.workspace`.
+Example: if `actions-path` is `.github/actions`, then local actions will be available at `../self-workflow/.github/actions`.
 
 <!-- overview:end -->
 
@@ -44,23 +39,11 @@ Example: if `local-path` is `./self-workflow` and `actions-path` is `.github/act
 - uses: hoverkraft-tech/ci-github-common/actions/local-workflow-actions@71b85947453f32b5d147ff3ab37351439a92d840 # 0.34.2
   with:
     # Relative path(s) (inside the workflow repository) containing the local actions to expose in the current workspace.
-    # The same relative path will be used inside the current workspace (for example `.github/actions`).
+    # The same relative path will be available under `../self-workflow` relative to `github.workspace`
+    # (for example `../self-workflow/.github/actions`).
     #
     # Default: `.github/actions`
     actions-path: .github/actions
-
-    # Path inside the current workspace where to copy the local actions from the reusable workflow repository.
-    #
-    # Default: `./self-workflow`
-    local-path: ./self-workflow
-
-    # The reusable workflow repository that triggered the current run, in the format `owner/repo`.
-    # If not provided, this is automatically filled by the OIDC action.
-    repository: ""
-
-    # The Git ref (branch, tag, or SHA) of the reusable workflow repository that triggered the current run.
-    # If not provided, this is automatically filled by the OIDC action.
-    ref: ""
 ```
 
 <!-- usage:end -->
@@ -72,12 +55,7 @@ Example: if `local-path` is `./self-workflow` and `actions-path` is `.github/act
 | **Input**          | **Description**                                                                                                    | **Required** | **Default**       |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------ | ------------ | ----------------- |
 | **`actions-path`** | Relative path(s) (inside the workflow repository) containing the local actions to expose in the current workspace. | **false**    | `.github/actions` |
-|                    | The same relative path will be used inside the current workspace (for example `.github/actions`).                  |              |                   |
-| **`local-path`**   | Path inside the current workspace where to copy the local actions from the reusable workflow repository.           | **false**    | `./self-workflow` |
-| **`repository`**   | The reusable workflow repository that triggered the current run, in the format `owner/repo`.                       | **false**    | -                 |
-|                    | If not provided, this is automatically filled by the OIDC action.                                                  |              |                   |
-| **`ref`**          | The Git ref (branch, tag, or SHA) of the reusable workflow repository that triggered the current run.              | **false**    | -                 |
-|                    | If not provided, this is automatically filled by the OIDC action.                                                  |              |                   |
+|                    | The same relative path will be available under `../self-workflow` relative to `github.workspace`.                  |              |                   |
 
 <!-- inputs:end -->
 
@@ -88,10 +66,11 @@ Example: if `local-path` is `./self-workflow` and `actions-path` is `.github/act
 
 ## Outputs
 
-| **Output**       | **Description**                                                                             |
-| ---------------- | ------------------------------------------------------------------------------------------- |
-| **`repository`** | The reusable workflow repository that was checked out, in the format `owner/repo`.          |
-| **`ref`**        | The Git ref (branch, tag, or SHA) of the reusable workflow repository that was checked out. |
+| **Output**       | **Description**                                                                    |
+| ---------------- | ---------------------------------------------------------------------------------- |
+| **`repository`** | The reusable workflow repository that was checked out, in the format `owner/repo`. |
+| **`ref`**        | The Git ref or SHA of the reusable workflow repository that was checked out.       |
+| **`path`**       | The resolved path where the reusable workflow actions are available.               |
 
 <!-- outputs:end -->
 

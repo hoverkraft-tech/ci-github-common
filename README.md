@@ -31,7 +31,7 @@ Opinionated GitHub Actions and reusable workflows for foundational continuous-in
 - [Get matrix outputs](actions/get-matrix-outputs/README.md) - aggregates outputs across matrix jobs for downstream steps.
 - [Local actions](actions/local-actions/README.md) - exposes sibling local actions for a composite action and cleans them up automatically.
 - [Set matrix output](actions/set-matrix-output/README.md) - writes structured outputs that can be consumed by other matrix jobs.
-- [Local workflow actions](actions/local-workflow-actions/README.md) - loads reusable workflow actions from the current repository.
+- [Local workflow actions](actions/local-workflow-actions/README.md) - exposes local actions from the reusable workflow repository.
 
 ### Repository insights & utilities
 
