@@ -1,14 +1,9 @@
 name: "Local workflow actions"
 description: |
-  This action checks out the reusable workflow repository that triggered the current run and copies its local actions directory into the current workspace.
-  It runs both during the main step and in the post step so that actions with cleanup hooks are also available.
+  This action checks out the reusable workflow repository that defines the current job and moves it to `../self-workflow` relative to `github.workspace`.
   Use it when consuming reusable workflows that reference local actions from the same repository—they are not automatically available in the caller repository and must be synced manually.
-  Add the `self-workflow` directory to your `.gitignore` and `.dockerignore` files to avoid committing it by mistake.
-
-  **This action requires the permission: `id-token: write`**.
-
-  Local actions will be available at `./<local-path>/<actions-path>` inside the current workspace.
-  Example: if `local-path` is `./self-workflow` and `actions-path` is `.github/actions`, then local actions will be available at `./self-workflow/.github/actions`.
+  Local actions will be available at `../self-workflow/<actions-path>` relative to `github.workspace`.
+  Example: if `actions-path` is `.github/actions`, then local actions will be available at `../self-workflow/.github/actions`.
 
 author: hoverkraft
 branding:
@@ -19,69 +14,54 @@ inputs:
   actions-path:
     description: |
       Relative path(s) (inside the workflow repository) containing the local actions to expose in the current workspace.
-      The same relative path will be used inside the current workspace (for example `.github/actions`).
+      The same relative path will be available under `../self-workflow` relative to `github.workspace` (for example `../self-workflow/.github/actions`).
     required: false
     default: ".github/actions"
-  local-path:
-    description: |
-      Path inside the current workspace where to copy the local actions from the reusable workflow repository.
-    required: false
-    default: "./self-workflow"
-  repository:
-    description: |
-      The reusable workflow repository that triggered the current run, in the format `owner/repo`.
-      If not provided, this is automatically filled by the OIDC action.
-    required: false
-  ref:
-    description: |
-      The Git ref (branch, tag, or SHA) of the reusable workflow repository that triggered the current run.
-      If not provided, this is automatically filled by the OIDC action.
-    required: false
 
 outputs:
   repository:
     description: The reusable workflow repository that was checked out, in the format `owner/repo`.
-    value: ${{ inputs.repository || steps.oidc.outputs.job_workflow_repo_name_and_owner }}
+    value: ${{ job.workflow_repository }}
   ref:
-    description: The Git ref (branch, tag, or SHA) of the reusable workflow repository that was checked out.
-    value: ${{ inputs.ref || steps.oidc.outputs.job_workflow_repo_ref }}
+    description: The Git ref or SHA of the reusable workflow repository that was checked out.
+    value: ${{ job.workflow_sha }}
+  path:
+    description: The resolved path where the reusable workflow actions are available.
+    value: ${{ steps.prepare.outputs.path }}
 
 runs:
   using: "composite"
   steps:
-    # FIXME: This is a workaround for having workflow actions. See https://github.com/orgs/community/discussions/38659
-    - id: oidc
-      if: inputs.repository == ''
-      uses: ChristopherHX/oidc@73eee1ff03fdfce10eda179f617131532209edbd # v3
-
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         persist-credentials: false
-        path: ${{ inputs.local-path }}
-        repository: ${{ inputs.repository || steps.oidc.outputs.job_workflow_repo_name_and_owner }}
-        ref: ${{ inputs.ref || steps.oidc.outputs.job_workflow_repo_ref }}
+        path: ./.self-workflow-source
+        repository: ${{ job.workflow_repository }}
+        ref: ${{ job.workflow_sha }}
         sparse-checkout: |
           ${{ inputs.actions-path }}
 
-    - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+    - id: prepare
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       with:
         script: |
           const fs = require('fs');
           const path = require('path');
-          const entry = 'self-workflow';
-          const ensureIgnore = (fileName) => {
-            const filePath = path.join(process.cwd(), fileName);
-            if (fs.existsSync(filePath)) {
-              const content = fs.readFileSync(filePath, 'utf8');
-              const lines = content.split(/\r?\n/);
-              if (lines.some((line) => line.trim() === entry)) {
-              return;
-              }
-              const suffix = content.endsWith('\n') ? '' : '\n';
-              fs.writeFileSync(filePath, `${content}${suffix}${entry}\n`);
-            } else {
-              fs.writeFileSync(filePath, `${entry}\n`);
-            }
-          };
+          const workspacePath = process.env.GITHUB_WORKSPACE;
+          if (!workspacePath) {
+            throw new Error('GITHUB_WORKSPACE is not set.');
+          }
 
-          ['.gitignore', '.dockerignore'].forEach(ensureIgnore);
+          const sourcePath = path.resolve(workspacePath, '.self-workflow-source');
+          const destinationPath = path.resolve(workspacePath, '../self-workflow');
+          core.setOutput('path', destinationPath);
+
+          if (fs.existsSync(destinationPath)) {
+            fs.rmSync(sourcePath, { recursive: true, force: true });
+            core.info(`Reusable workflow actions already available at ${destinationPath}.`);
+            return;
+          }
+
+          fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
+          fs.renameSync(sourcePath, destinationPath);
+          core.info(`Moved reusable workflow actions to ${destinationPath}.`);
