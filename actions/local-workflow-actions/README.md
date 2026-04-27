@@ -39,8 +39,7 @@ Example: if `actions-path` is `.github/actions`, then local actions will be avai
 - uses: hoverkraft-tech/ci-github-common/actions/local-workflow-actions@71b85947453f32b5d147ff3ab37351439a92d840 # 0.34.2
   with:
     # Relative path(s) (inside the workflow repository) containing the local actions to expose in the current workspace.
-    # The same relative path will be available under `../self-workflow` relative to `github.workspace`
-    # (for example `../self-workflow/.github/actions`).
+    # The same relative path will be available under `../self-workflow` relative to `github.workspace` (for example `../self-workflow/.github/actions`).
     #
     # Default: `.github/actions`
     actions-path: .github/actions
@@ -52,10 +51,10 @@ Example: if `actions-path` is `.github/actions`, then local actions will be avai
 
 ## Inputs
 
-| **Input**          | **Description**                                                                                                    | **Required** | **Default**       |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------ | ------------ | ----------------- |
-| **`actions-path`** | Relative path(s) (inside the workflow repository) containing the local actions to expose in the current workspace. | **false**    | `.github/actions` |
-|                    | The same relative path will be available under `../self-workflow` relative to `github.workspace`.                  |              |                   |
+| **Input**          | **Description**                                                                                                                                    | **Required** | **Default**       |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------------- |
+| **`actions-path`** | Relative path(s) (inside the workflow repository) containing the local actions to expose in the current workspace.                                 | **false**    | `.github/actions` |
+|                    | The same relative path will be available under `../self-workflow` relative to `github.workspace` (for example `../self-workflow/.github/actions`). |              |                   |
 
 <!-- inputs:end -->
 
