@@ -241,7 +241,8 @@ jobs:
           persist-credentials: false
 
       # FIXME: should be updated by dependabot. See https://github.com/dependabot/dependabot-core/issues/8362
-      - uses: "docker://ghcr.io/sethvargo/ratchet:0.11.4@sha256:242445a1c55430ad7477e6fcf2027c77d03f5760702537bca4cf622e7338fc81" # 0.11.3
+      # https://github.com/sethvargo/ratchet/pkgs/container/ratchet
+      - uses: "docker://ghcr.io/sethvargo/ratchet:0.11.4@sha256:242445a1c55430ad7477e6fcf2027c77d03f5760702537bca4cf622e7338fc81" # 0.11.4
         if: ${{ needs.prepare-actions-linting.outputs.action-files }}
         with:
           args: "lint --format human --format actions ${{ needs.prepare-actions-linting.outputs.action-files }}"
