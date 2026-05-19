@@ -18,6 +18,10 @@ inputs:
       Whether to download Git-LFS files.
       See https://github.com/actions/checkout#usage
     default: "false"
+  sparse-checkout:
+    description: |
+      Whether to enable sparse checkout and the list of files or directories to include in the checkout.
+      See https://github.com/actions/checkout#usage
   persist-credentials:
     description: |
       Whether to persist the token credentials in the Git config.
@@ -55,6 +59,7 @@ runs:
       with:
         fetch-depth: ${{ inputs.fetch-depth }}
         lfs: ${{ inputs.lfs }}
+        sparse-checkout: ${{ inputs.sparse-checkout }}
         token: ${{ inputs.token || github.token }}
         persist-credentials: true
 
@@ -63,5 +68,6 @@ runs:
       with:
         fetch-depth: ${{ inputs.fetch-depth }}
         lfs: ${{ inputs.lfs }}
+        sparse-checkout: ${{ inputs.sparse-checkout }}
         token: ${{ inputs.token || github.token }}
         persist-credentials: false
