@@ -29,6 +29,14 @@ inputs:
     description: "The commit message for the pull request"
     required: true
 
+outputs:
+  merged-ref:
+    description: "The fully qualified ref updated by the merge."
+    value: ${{ steps.merge-pull-request.outputs.merged-ref }}
+  merged-sha:
+    description: "The commit SHA at the merged ref after the merge completes."
+    value: ${{ steps.merge-pull-request.outputs.merged-sha }}
+
 runs:
   using: "composite"
   steps:
@@ -67,84 +75,147 @@ runs:
         author: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
         committer: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
 
-    - id: wait-for-pull-request-mergeable-by-admin
+    - id: merge-pull-request
+      name: Merge pull request
       if: steps.create-pull-request.outputs.pull-request-number && steps.create-pull-request.outputs.pull-request-operation != 'closed'
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
+        GH_TOKEN: ${{ inputs.github-token }}
         PULL_REQUEST_NUMBER: ${{ steps.create-pull-request.outputs.pull-request-number }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          let attempts = 0;
           const maxAttempts = 10;
+          const requiredWorkflowsError = 'Required workflow';
+          const repository = `${context.repo.owner}/${context.repo.repo}`;
+          const getRetryDelayMs = attempt => Math.min(1000 * (2 ** attempt), 10000);
 
-          const pullNumberRaw = process.env.PULL_REQUEST_NUMBER ?? '';
-          if (!/^[0-9]+$/.test(pullNumberRaw)) {
-            throw new Error(`Invalid pull request number: ${pullNumberRaw}`);
-          }
-          const pullNumber = Number.parseInt(pullNumberRaw, 10);
+          const sleep = delayMs => new Promise(resolve => setTimeout(resolve, delayMs));
 
-          while (attempts < maxAttempts) {
-            const { data: { mergeable, mergeable_state } } = await github.rest.pulls.get({
+          const waitFor = async ({
+            run,
+            isComplete,
+            shouldRetry = () => true,
+            onAttempt = () => {},
+            getRetryMessage,
+            getFailureMessage,
+            getTimeoutMessage,
+          }) => {
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+              const result = await run();
+
+              onAttempt(result);
+
+              if (isComplete(result)) {
+                return result;
+              }
+
+              if (!shouldRetry(result)) {
+                throw new Error(getFailureMessage(result));
+              }
+
+              const retryDelayMs = getRetryDelayMs(attempt);
+              core.debug(getRetryMessage(result, retryDelayMs));
+              await sleep(retryDelayMs);
+            }
+
+            throw new Error(getTimeoutMessage());
+          };
+
+          const parsePullRequestNumber = pullNumberRaw => {
+            if (!/^[0-9]+$/.test(pullNumberRaw)) {
+              throw new Error(`Invalid pull request number: ${pullNumberRaw}`);
+            }
+
+            return Number.parseInt(pullNumberRaw, 10);
+          };
+
+          const getPullRequest = async pullNumber => {
+            const { data: pullRequest } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: pullNumber,
             });
 
-            if (mergeable === true) {
-              core.setOutput('is-mergeable', true);
-              return;
-            }
+            return pullRequest;
+          };
 
-            core.debug(`Pull request is not mergeable, mergeable_state: ${mergeable_state}`);
+          const waitForMergeablePullRequest = pullNumber =>
+            waitFor({
+              run: () => getPullRequest(pullNumber),
+              isComplete: pullRequest => pullRequest.mergeable === true,
+              onAttempt: pullRequest => {
+                if (pullRequest.mergeable !== true) {
+                  core.debug(`Pull request is not mergeable, mergeable_state: ${pullRequest.mergeable_state}`);
+                }
+              },
+              getRetryMessage: (_pullRequest, retryDelayMs) => `Retrying mergeability check in ${retryDelayMs}ms...`,
+              getFailureMessage: () => `Pull request #${pullNumber} cannot be retried because it is not mergeable.`,
+              getTimeoutMessage: () => `Pull request #${pullNumber} is not mergeable after ${maxAttempts} attempts`,
+            });
 
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            attempts++;
-          }
+          const mergePullRequest = async pullNumber => {
+            core.debug(`Merging pull request #${pullNumber} for repository ${repository}...`);
 
-          core.error('Pull request is not mergeable');
+            const { exitCode, stdout, stderr } = await exec.getExecOutput(
+              'gh',
+              [
+                'pr',
+                'merge',
+                '-R',
+                repository,
+                '--rebase',
+                '--admin',
+                String(pullNumber),
+              ],
+              {
+                env: process.env,
+                ignoreReturnCode: true,
+                silent: true,
+              },
+            );
 
-    - name: Merge pull request
-      if: steps.wait-for-pull-request-mergeable-by-admin.outputs.is-mergeable
-      shell: bash
-      env:
-        GH_TOKEN: ${{ inputs.github-token }}
-        PULL_REQUEST_NUMBER: ${{ steps.create-pull-request.outputs.pull-request-number }}
-      run: |
-        set +e
+            return {
+              mergeExitCode: exitCode,
+              mergeOutputs: [stdout, stderr].filter(Boolean).join('\n').trim(),
+            };
+          };
 
-        if ! [[ "$PULL_REQUEST_NUMBER" =~ ^[0-9]+$ ]]; then
-          echo "::error::Invalid pull request number: $PULL_REQUEST_NUMBER"
-          exit 1
-        fi
+          const verifyMergedPullRequest = async (pullNumber, mergeOutputs) => {
+            const pullRequest = await waitFor({
+              run: () => getPullRequest(pullNumber),
+              isComplete: currentPullRequest => Boolean(
+                currentPullRequest.merged
+                  && currentPullRequest.base.ref
+                  && currentPullRequest.merge_commit_sha,
+              ),
+              getRetryMessage: (_pullRequest, retryDelayMs) => `Pull request merge has not been reflected by the REST API yet, retrying in ${retryDelayMs}ms...`,
+              getFailureMessage: () => `Pull request merge verification stopped before completion: ${mergeOutputs}`,
+              getTimeoutMessage: () => `Pull request merge succeeded but timed out while waiting for REST API verification: ${mergeOutputs}`,
+            });
 
-        ATTEMPTS=0
-        MAX_ATTEMPTS=10
-        REQUIRED_WORKFLOWS_ERROR="Required workflow"
+            core.setOutput('merged-ref', `refs/heads/${pullRequest.base.ref}`);
+            core.setOutput('merged-sha', pullRequest.merge_commit_sha);
+          };
 
-        while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
-          echo "::debug::Merging pull request #${PULL_REQUEST_NUMBER} for repository ${{ github.repository }}..."
-          MERGE_OUTPUTS=$(gh pr merge -R "${{ github.repository }}" --rebase --admin "${PULL_REQUEST_NUMBER}" 2>&1)
-          MERGE_EXIT_CODE=$?
-          echo "::debug::Merge outputs: $MERGE_OUTPUTS"
-          echo "::debug::Merge exit code: $MERGE_EXIT_CODE"
+          const pullNumber = parsePullRequestNumber(process.env.PULL_REQUEST_NUMBER ?? '');
 
-          if [ "$MERGE_EXIT_CODE" = "0" ]; then
-            exit 0
-          fi
+          await waitForMergeablePullRequest(pullNumber);
 
-          if [[ "$MERGE_OUTPUTS" != *"$REQUIRED_WORKFLOWS_ERROR"* ]]; then
-            echo "::error::Failed to merge pull request: $MERGE_OUTPUTS"
-            exit 1
-          fi
+          const { mergeOutputs } = await waitFor({
+            run: () => mergePullRequest(pullNumber),
+            isComplete: ({ mergeExitCode }) => mergeExitCode === 0,
+            shouldRetry: ({ mergeOutputs }) => mergeOutputs.includes(requiredWorkflowsError),
+            onAttempt: ({ mergeExitCode, mergeOutputs }) => {
+              core.debug(`Merge outputs: ${mergeOutputs}`);
+              core.debug(`Merge exit code: ${mergeExitCode}`);
+            },
+            getRetryMessage: (_result, retryDelayMs) => `Pull request is not mergeable yet because some of required workflow check issues, retrying in ${retryDelayMs}ms...`,
+            getFailureMessage: ({ mergeOutputs }) => `Failed to merge pull request: ${mergeOutputs}`,
+            getTimeoutMessage: () => `Failed to merge pull request after ${maxAttempts} attempts`,
+          });
 
-          echo "::debug::Pull request is not mergeable yet because some of required workflow check issues, retrying in 5 seconds..."
-          sleep 5
-          ATTEMPTS=$((ATTEMPTS+1))
-        done
-
-        echo "::error::Failed to merge pull request after $MAX_ATTEMPTS attempts: $MERGE_OUTPUTS"
-        exit 1
+          await verifyMergedPullRequest(pullNumber, mergeOutputs);
 
     - name: Cleanup sibling actions
       if: ${{ always() }}
