@@ -65,7 +65,11 @@ permissions: {}
 jobs:
   linter:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@4c9d51717dc04d823dac2dc9ac2857e7b3069454 # 0.35.0
-    permissions: {}
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      statuses: write
     secrets:
       # Token for marking the status of linter run in the Checks section.
       # See https://github.com/super-linter/super-linter#how-to-use.
