@@ -43,7 +43,7 @@ permissions:
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/checkout@71b85947453f32b5d147ff3ab37351439a92d840 # 0.34.2
+- uses: hoverkraft-tech/ci-github-common/actions/checkout@b48521243b3ce4824d46bf414c32d8078171b48b # 0.35.1
   with:
     # Number of commits to fetch. 0 indicates all history for all branches and tags.
     # See https://github.com/actions/checkout#usage
@@ -56,6 +56,10 @@ permissions:
     #
     # Default: `false`
     lfs: "false"
+
+    # Whether to enable sparse checkout and the list of files or directories to include in the checkout.
+    # See https://github.com/actions/checkout#usage
+    sparse-checkout: ""
 
     # Whether to persist the token credentials in the Git config.
     # Default to false for security reasons.
@@ -74,16 +78,18 @@ permissions:
 
 ## Inputs
 
-| **Input**                 | **Description**                                                                   | **Required** | **Default** |
-| ------------------------- | --------------------------------------------------------------------------------- | ------------ | ----------- |
-| **`fetch-depth`**         | Number of commits to fetch. 0 indicates all history for all branches and tags.    | **false**    | `1`         |
-|                           | See <https://github.com/actions/checkout#usage>                                   |              |             |
-| **`lfs`**                 | Whether to download Git-LFS files.                                                | **false**    | `false`     |
-|                           | See <https://github.com/actions/checkout#usage>                                   |              |             |
-| **`persist-credentials`** | Whether to persist the token credentials in the Git config.                       | **false**    | `false`     |
-|                           | Default to false for security reasons.                                            |              |             |
-|                           | See <https://github.com/orgs/community/discussions/179107>.                       |              |             |
-| **`token`**               | Token to use for checking out the repository instead of the default GITHUB_TOKEN. | **false**    | -           |
+| **Input**                 | **Description**                                                                                    | **Required** | **Default** |
+| ------------------------- | -------------------------------------------------------------------------------------------------- | ------------ | ----------- |
+| **`fetch-depth`**         | Number of commits to fetch. 0 indicates all history for all branches and tags.                     | **false**    | `1`         |
+|                           | See <https://github.com/actions/checkout#usage>                                                    |              |             |
+| **`lfs`**                 | Whether to download Git-LFS files.                                                                 | **false**    | `false`     |
+|                           | See <https://github.com/actions/checkout#usage>                                                    |              |             |
+| **`sparse-checkout`**     | Whether to enable sparse checkout and the list of files or directories to include in the checkout. | **false**    | -           |
+|                           | See <https://github.com/actions/checkout#usage>                                                    |              |             |
+| **`persist-credentials`** | Whether to persist the token credentials in the Git config.                                        | **false**    | `false`     |
+|                           | Default to false for security reasons.                                                             |              |             |
+|                           | See <https://github.com/orgs/community/discussions/179107>.                                        |              |             |
+| **`token`**               | Token to use for checking out the repository instead of the default GITHUB_TOKEN.                  | **false**    | -           |
 
 <!-- inputs:end -->
 
