@@ -32,7 +32,7 @@ during the main step and removes it automatically in the post step.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/local-actions@71b85947453f32b5d147ff3ab37351439a92d840 # 0.34.2
+- uses: hoverkraft-tech/ci-github-common/actions/local-actions@ff815105ba418bd0203868c8b52e0e02fea3f1a4 # 0.35.2
   with:
     # The actions root path that contains the sibling local actions.
     # Pass the caller actions root, typically by appending `/../..` to `github.action_path`.
@@ -43,8 +43,8 @@ during the main step and removes it automatically in the post step.
     # Destination directory name created next to `github.workspace`.
     # Use only a directory name (no path separators).
     #
-    # This input is optional. The default is `self-actions`.
-    destination-directory-name: "self-actions"
+    # Default: `self-actions`
+    destination-directory-name: self-actions
 ```
 
 <!-- usage:end -->
