@@ -23,7 +23,7 @@
 ## Overview
 
 Action to expose sibling local actions next to the current action directory.
-It creates a symlink to the parent actions directory at `../self-actions` relative to `github.workspace`
+It creates a symlink to the parent actions directory at `../<destination-directory-name>` relative to `github.workspace`
 during the main step and removes it automatically in the post step.
 
 <!-- overview:end -->
@@ -39,6 +39,12 @@ during the main step and removes it automatically in the post step.
     #
     # This input is required.
     source-path: ""
+
+    # Destination directory name created next to `github.workspace`.
+    # Use only a directory name (no path separators).
+    #
+    # This input is optional. The default is `self-actions`.
+    destination-directory-name: "self-actions"
 ```
 
 <!-- usage:end -->
@@ -46,10 +52,12 @@ during the main step and removes it automatically in the post step.
 
 ## Inputs
 
-| **Input**         | **Description**                                                                        | **Required** | **Default** |
-| ----------------- | -------------------------------------------------------------------------------------- | ------------ | ----------- |
-| **`source-path`** | The actions root path that contains the sibling local actions.                         | **true**     | -           |
-|                   | Pass the caller actions root, typically by appending `/../..` to `github.action_path`. |              |             |
+| **Input**                        | **Description**                                                                        | **Required** | **Default**    |
+| -------------------------------- | -------------------------------------------------------------------------------------- | ------------ | -------------- |
+| **`source-path`**                | The actions root path that contains the sibling local actions.                         | **true**     | -              |
+|                                  | Pass the caller actions root, typically by appending `/../..` to `github.action_path`. |              |                |
+| **`destination-directory-name`** | Destination directory name created next to `github.workspace`.                         | **false**    | `self-actions` |
+|                                  | Use only a directory name (no path separators).                                        |              |                |
 
 <!-- inputs:end -->
 <!-- secrets:start -->

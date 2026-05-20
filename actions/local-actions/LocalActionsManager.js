@@ -3,9 +3,12 @@ import process from "node:process";
 import path from "node:path";
 
 export class LocalActionsManager {
-  async prepare({ sourcePath, workspacePath }) {
+  async prepare({ sourcePath, workspacePath, destinationDirectoryName }) {
     const sourceDirectory = await this.resolveSourceDirectory({ sourcePath });
-    const destinationPath = this.resolveDestinationPath({ workspacePath });
+    const destinationPath = this.resolveDestinationPath({
+      workspacePath,
+      destinationDirectoryName,
+    });
 
     if (await this.#exists(destinationPath)) {
       return {
@@ -37,12 +40,16 @@ export class LocalActionsManager {
     return true;
   }
 
-  resolveDestinationPath({ workspacePath }) {
+  resolveDestinationPath({ workspacePath, destinationDirectoryName }) {
     if (!workspacePath?.trim()) {
       throw new Error("Workspace path is required.");
     }
 
-    return path.resolve(workspacePath, "../self-actions");
+    const targetDirectoryName = this.#resolveDestinationDirectoryName(
+      destinationDirectoryName,
+    );
+
+    return path.resolve(workspacePath, `../${targetDirectoryName}`);
   }
 
   async resolveSourceDirectory({ sourcePath }) {
@@ -77,6 +84,25 @@ export class LocalActionsManager {
 
   #getSymlinkType() {
     return process.platform === "win32" ? "junction" : "dir";
+  }
+
+  #resolveDestinationDirectoryName(destinationDirectoryName) {
+    if (destinationDirectoryName === undefined) {
+      return "self-actions";
+    }
+
+    const trimmedName = destinationDirectoryName.trim();
+    if (!trimmedName) {
+      return "self-actions";
+    }
+
+    if (trimmedName.includes("/") || trimmedName.includes("\\")) {
+      throw new Error(
+        "Input destination-directory-name must be a directory name, not a path.",
+      );
+    }
+
+    return trimmedName;
   }
 
   /**

@@ -154,3 +154,35 @@ test("cleanup.js removes the created destination from saved state", () => {
     fixture.teardown();
   }
 });
+
+test("index.js supports a custom destination-directory-name input", () => {
+  const fixture = createFixture();
+  const customDestinationPath = path.join(
+    fixture.sandboxDirectory,
+    "my-actions",
+  );
+
+  try {
+    const result = runNodeScript(path.join(packageDirectory, "index.js"), {
+      GITHUB_WORKSPACE: fixture.workspaceDirectory,
+      GITHUB_OUTPUT: fixture.outputFile,
+      GITHUB_STATE: fixture.stateFile,
+      "INPUT_SOURCE-PATH": fixture.actionsDirectory,
+      "INPUT_DESTINATION-DIRECTORY-NAME": "my-actions",
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(lstatSync(customDestinationPath).isSymbolicLink(), true);
+    assert.equal(realpathSync(customDestinationPath), fixture.actionsDirectory);
+    assert.match(
+      readFileSync(fixture.outputFile, "utf8"),
+      /^path<<.+\n.*my-actions\n.+\n$/s,
+    );
+    assert.match(
+      readFileSync(fixture.stateFile, "utf8"),
+      /local_actions_destination_path<<.+\n.*my-actions\n.+\n/s,
+    );
+  } finally {
+    fixture.teardown();
+  }
+});

@@ -1,7 +1,7 @@
 name: "Local actions"
 description: |
   Action to expose sibling local actions next to the current action directory.
-  It creates a symlink to the parent actions directory at `../self-actions` relative to `github.workspace`
+  It creates a symlink to the parent actions directory at `../<destination-directory-name>` relative to `github.workspace`
   during the main step and removes it automatically in the post step.
 # FIXME: This is a workaround until this issue is resolved: https://github.com/actions/runner/issues/1348.
 author: hoverkraft
@@ -15,6 +15,12 @@ inputs:
       The actions root path that contains the sibling local actions.
       Pass the caller actions root, typically by appending `/../..` to `github.action_path`.
     required: true
+  destination-directory-name:
+    description: |
+      Destination directory name created next to `github.workspace`.
+      Use only a directory name (no path separators).
+    required: false
+    default: self-actions
 
 outputs:
   path:
