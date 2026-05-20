@@ -6,9 +6,15 @@ const manager = new LocalActionsManager();
 
 try {
   const sourcePath = runtime.getInput("source-path", { required: true });
+  const destinationDirectoryName = runtime.getInput(
+    "destination-directory-name",
+  );
   const workspacePath = runtime.getWorkspace();
   const sourceDirectory = await manager.resolveSourceDirectory({ sourcePath });
-  const destinationPath = manager.resolveDestinationPath({ workspacePath });
+  const destinationPath = manager.resolveDestinationPath({
+    workspacePath,
+    destinationDirectoryName,
+  });
 
   runtime.info(`Resolved local actions source: ${sourceDirectory}.`);
   runtime.info(`Resolved local actions destination: ${destinationPath}.`);
@@ -16,6 +22,7 @@ try {
   const result = await manager.prepare({
     sourcePath,
     workspacePath,
+    destinationDirectoryName,
   });
 
   await runtime.setOutput("path", result.destinationPath);

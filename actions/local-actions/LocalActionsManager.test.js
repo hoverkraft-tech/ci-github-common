@@ -176,3 +176,28 @@ test("resolveDestinationPath resolves to workspace parent self-actions", () => {
     path.resolve("/tmp/workspace", "../self-actions"),
   );
 });
+
+test("resolveDestinationPath supports custom destination directory name", () => {
+  const manager = new LocalActionsManager();
+
+  assert.equal(
+    manager.resolveDestinationPath({
+      workspacePath: "/tmp/workspace",
+      destinationDirectoryName: "custom-actions",
+    }),
+    path.resolve("/tmp/workspace", "../custom-actions"),
+  );
+});
+
+test("resolveDestinationPath rejects destination directory names containing path separators", () => {
+  const manager = new LocalActionsManager();
+
+  assert.throws(
+    () =>
+      manager.resolveDestinationPath({
+        workspacePath: "/tmp/workspace",
+        destinationDirectoryName: "nested/custom-actions",
+      }),
+    /destination-directory-name must be a directory name, not a path/,
+  );
+});
