@@ -32,13 +32,12 @@ updates:
 
   - package-ecosystem: npm
     open-pull-requests-limit: 20
-    directory: "/actions/parse-ci-reports"
+    directories:
+      - "/actions/**/*"
     schedule:
       interval: weekly
       day: friday
       time: "04:00"
-    cooldown:
-      default-days: 7
     groups:
       npm-dependencies:
         patterns:

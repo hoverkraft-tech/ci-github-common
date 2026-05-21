@@ -22,6 +22,10 @@ inputs:
     description: |
       Whether to enable sparse checkout and the list of files or directories to include in the checkout.
       See https://github.com/actions/checkout#usage
+  ref:
+    description: |
+      The branch, tag or SHA to checkout. For pull requests, the ref is set to the merge ref of the PR.
+      See https://github.com/actions/checkout#usage
   persist-credentials:
     description: |
       Whether to persist the token credentials in the Git config.
@@ -37,7 +41,7 @@ runs:
   using: "composite"
   steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      if: github.event_name == 'issue_comment' && inputs.persist-credentials == 'true'
+      if: inputs.ref == '' && github.event_name == 'issue_comment' && inputs.persist-credentials == 'true'
       with:
         ref: refs/pull/${{ github.event.issue.number }}/head
         fetch-depth: ${{ inputs.fetch-depth }}
@@ -46,7 +50,7 @@ runs:
         persist-credentials: true
 
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      if: github.event_name == 'issue_comment' && inputs.persist-credentials != 'true'
+      if: inputs.ref == '' && github.event_name == 'issue_comment' && inputs.persist-credentials != 'true'
       with:
         ref: refs/pull/${{ github.event.issue.number }}/head
         fetch-depth: ${{ inputs.fetch-depth }}
@@ -55,19 +59,21 @@ runs:
         persist-credentials: false
 
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      if: github.event_name != 'issue_comment' && inputs.persist-credentials == 'true'
+      if: inputs.persist-credentials == 'true'
       with:
         fetch-depth: ${{ inputs.fetch-depth }}
         lfs: ${{ inputs.lfs }}
         sparse-checkout: ${{ inputs.sparse-checkout }}
+        ref: ${{ inputs.ref }}
         token: ${{ inputs.token || github.token }}
         persist-credentials: true
 
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      if: github.event_name != 'issue_comment' && inputs.persist-credentials != 'true'
+      if: inputs.persist-credentials != 'true'
       with:
         fetch-depth: ${{ inputs.fetch-depth }}
         lfs: ${{ inputs.lfs }}
         sparse-checkout: ${{ inputs.sparse-checkout }}
+        ref: ${{ inputs.ref }}
         token: ${{ inputs.token || github.token }}
         persist-credentials: false
