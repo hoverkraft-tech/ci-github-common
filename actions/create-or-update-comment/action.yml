@@ -62,7 +62,7 @@ runs:
         body-includes: ${{ inputs.title }}
         token: ${{ inputs.token || github.token }}
 
-    - uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
+    - uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0  # zizmor: ignore[superfluous-actions] packaged comment upsert behavior is intentional
       with:
         edit-mode: replace
         comment-id: ${{ steps.find-comment.outputs.comment-id }}

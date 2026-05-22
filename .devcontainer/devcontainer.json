@@ -1,30 +1,30 @@
 {
-  "name": "ci-github-common",
-  "image": "mcr.microsoft.com/devcontainers/base:debian",
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:3": {
-      "moby": false
-    },
-    "ghcr.io/devcontainers/features/github-cli:1": {
-      "extensions": "nektos/gh-act"
-    }
-  },
-  "remoteEnv": {
-    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"
-  },
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "eamodio.gitlens",
-        "github.vscode-github-actions",
-        "github.copilot",
-        "github.copilot-chat",
-        "ms-vscode.makefile-tools",
-        "esbenp.prettier-vscode"
-      ],
-      "settings": {
-        "terminal.integrated.defaultProfile.linux": "zsh"
-      }
-    }
-  }
+	"name": "ci-github-common",
+	"image": "mcr.microsoft.com/devcontainers/base:debian",
+	"features": {
+		"ghcr.io/devcontainers/features/docker-in-docker:3": {
+			"moby": false
+		},
+		"ghcr.io/devcontainers/features/github-cli:1": {
+			"extensions": "nektos/gh-act"
+		}
+	},
+	"remoteEnv": {
+		"GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"eamodio.gitlens",
+				"github.vscode-github-actions",
+				"github.copilot",
+				"github.copilot-chat",
+				"ms-vscode.makefile-tools",
+				"esbenp.prettier-vscode"
+			],
+			"settings": {
+				"terminal.integrated.defaultProfile.linux": "zsh"
+			}
+		}
+	}
 }
