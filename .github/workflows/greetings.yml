@@ -55,6 +55,6 @@ jobs:
     steps:
       - uses: actions/first-interaction@1c4688942c71f71d4f5502a26ea67c331730fa4d # v3.1.0
         with:
-          repo_token: ${{ secrets.github-token || github.token }}
+          repo_token: ${{ secrets.github-token || github.token }} # zizmor: ignore[secrets-outside-env] reusable workflow token override is intentional
           issue_message: ${{ inputs.issue_message || 'Hi, thank for reporting an issue, we will check it out very soon' }}
           pr_message: ${{ inputs.pr_message || 'Hi, thank you for creating your PR, we will check it out very soon' }}

@@ -38,6 +38,11 @@ updates:
       interval: weekly
       day: friday
       time: "04:00"
+    cooldown:
+      default-days: 7
+      semver-major-days: 7
+      semver-minor-days: 5
+      semver-patch-days: 3
     groups:
       npm-dependencies:
         patterns:
