@@ -2,7 +2,7 @@
   "name": "ci-github-common",
   "image": "mcr.microsoft.com/devcontainers/base:debian",
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:": {
+    "ghcr.io/devcontainers/features/docker-in-docker:3": {
       "moby": false
     },
     "ghcr.io/devcontainers/features/github-cli:1": {
