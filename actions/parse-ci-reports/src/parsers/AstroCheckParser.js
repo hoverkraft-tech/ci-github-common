@@ -34,12 +34,15 @@ export class AstroCheckParser extends BaseParser {
 	}
 
 	getAutoPatterns() {
-		return [
-			"**/astro-check.log",
-			"**/astro-check.txt",
-			"**/astro-check-report.log",
-			"**/astro-check-report.txt",
-		];
+		return this.buildBasenamePatterns(
+			[
+				"astro-check.log",
+				"astro-check.txt",
+				"astro-check-report.log",
+				"astro-check-report.txt",
+			],
+			{ includePrefixed: true },
+		);
 	}
 
 	parse(content) {

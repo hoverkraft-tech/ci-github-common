@@ -99,9 +99,12 @@ describe("ReportPathResolver", () => {
 		const coveragePatterns = [
 			"**/coverage/lcov.info",
 			"**/lcov.info",
-			"**/coverage/cobertura-coverage.xml",
-			"**/coverage.xml",
-			"**/cobertura.xml",
+			"**/coverage/*-lcov.info",
+			"**/*-lcov.info",
+			"**/coverage/coverage.xml",
+			"**/coverage/*-coverage.xml",
+			"**/coverage/cobertura.xml",
+			"**/coverage/*-cobertura.xml",
 		];
 		for (const pattern of coveragePatterns) {
 			assert.ok(
@@ -119,8 +122,8 @@ describe("ReportPathResolver", () => {
 			);
 		}
 
-		// Verify total count matches expected (5 test + 5 coverage)
-		assert.strictEqual(patterns.length, 10);
+		// Verify total count matches expected (5 test + 8 coverage)
+		assert.strictEqual(patterns.length, 13);
 	});
 
 	it("deduplicates overlapping auto modes", () => {
@@ -133,16 +136,32 @@ describe("ReportPathResolver", () => {
 		const lintPatterns = [
 			"**/eslint-report.json",
 			"**/eslint.json",
+			"**/*-eslint-report.json",
+			"**/*-eslint.json",
 			"**/checkstyle-result.xml",
 			"**/checkstyle.xml",
+			"**/*-checkstyle-result.xml",
+			"**/*-checkstyle.xml",
+			"**/*.sarif",
+			"**/*.sarif.json",
+			"**/sarif-report.json",
+			"**/*-sarif-report.json",
 			"**/prettier-check.log",
 			"**/prettier-check.txt",
 			"**/prettier-report.log",
 			"**/prettier-report.txt",
+			"**/*-prettier-check.log",
+			"**/*-prettier-check.txt",
+			"**/*-prettier-report.log",
+			"**/*-prettier-report.txt",
 			"**/astro-check.log",
 			"**/astro-check.txt",
 			"**/astro-check-report.log",
 			"**/astro-check-report.txt",
+			"**/*-astro-check.log",
+			"**/*-astro-check.txt",
+			"**/*-astro-check-report.log",
+			"**/*-astro-check-report.txt",
 		];
 		for (const pattern of lintPatterns) {
 			assert.ok(patterns.includes(pattern), `Missing lint pattern: ${pattern}`);
@@ -164,9 +183,12 @@ describe("ReportPathResolver", () => {
 		const coveragePatterns = [
 			"**/coverage/lcov.info",
 			"**/lcov.info",
-			"**/coverage/cobertura-coverage.xml",
-			"**/coverage.xml",
-			"**/cobertura.xml",
+			"**/coverage/*-lcov.info",
+			"**/*-lcov.info",
+			"**/coverage/coverage.xml",
+			"**/coverage/*-coverage.xml",
+			"**/coverage/cobertura.xml",
+			"**/coverage/*-cobertura.xml",
 		];
 		for (const pattern of coveragePatterns) {
 			assert.ok(
@@ -175,8 +197,8 @@ describe("ReportPathResolver", () => {
 			);
 		}
 
-		// Verify deduplication - total should be 12 lint + 5 test + 5 coverage = 22
-		assert.strictEqual(patterns.length, 22);
+		// Verify deduplication - total should be 28 lint + 5 test + 8 coverage = 41
+		assert.strictEqual(patterns.length, 41);
 	});
 
 	it("gets patterns from parsers via getAutoPatterns", () => {
@@ -196,13 +218,22 @@ describe("ReportPathResolver", () => {
 
 		// Verify coverage patterns come from LCOVParser and CoberturaParser
 		assert.ok(autoPatterns.coverage.includes("**/coverage/lcov.info"));
-		assert.ok(autoPatterns.coverage.includes("**/cobertura.xml"));
+		assert.ok(autoPatterns.coverage.includes("**/coverage/cobertura.xml"));
+		assert.ok(autoPatterns.coverage.includes("**/*-lcov.info"));
+		assert.ok(autoPatterns.coverage.includes("**/coverage/*-coverage.xml"));
+		assert.ok(autoPatterns.coverage.includes("**/coverage/*-cobertura.xml"));
 
-		// Verify lint patterns come from ESLintParser, CheckStyleParser, PrettierParser, AstroCheckParser
+		// Verify lint patterns come from ESLintParser, CheckStyleParser, SarifParser, PrettierParser, AstroCheckParser
 		assert.ok(autoPatterns.lint.includes("**/eslint-report.json"));
 		assert.ok(autoPatterns.lint.includes("**/checkstyle.xml"));
+		assert.ok(autoPatterns.lint.includes("**/*.sarif"));
 		assert.ok(autoPatterns.lint.includes("**/prettier-check.log"));
 		assert.ok(autoPatterns.lint.includes("**/astro-check.log"));
+		assert.ok(autoPatterns.lint.includes("**/*-eslint.json"));
+		assert.ok(autoPatterns.lint.includes("**/*-checkstyle.xml"));
+		assert.ok(autoPatterns.lint.includes("**/*-sarif-report.json"));
+		assert.ok(autoPatterns.lint.includes("**/*-prettier-check.log"));
+		assert.ok(autoPatterns.lint.includes("**/*-astro-check.log"));
 	});
 
 	it("excludes node_modules files from glob patterns", async () => {

@@ -27,11 +27,14 @@ describe("ParserFactory", () => {
 		// LCOVParser patterns
 		assert.ok(coveragePatterns.includes("**/coverage/lcov.info"));
 		assert.ok(coveragePatterns.includes("**/lcov.info"));
+		assert.ok(coveragePatterns.includes("**/coverage/*-lcov.info"));
+		assert.ok(coveragePatterns.includes("**/*-lcov.info"));
 
 		// CoberturaParser patterns
-		assert.ok(coveragePatterns.includes("**/coverage/cobertura-coverage.xml"));
-		assert.ok(coveragePatterns.includes("**/coverage.xml"));
-		assert.ok(coveragePatterns.includes("**/cobertura.xml"));
+		assert.ok(coveragePatterns.includes("**/coverage/coverage.xml"));
+		assert.ok(coveragePatterns.includes("**/coverage/*-coverage.xml"));
+		assert.ok(coveragePatterns.includes("**/coverage/cobertura.xml"));
+		assert.ok(coveragePatterns.includes("**/coverage/*-cobertura.xml"));
 	});
 
 	it("returns lint patterns from lint parsers", () => {
@@ -40,22 +43,40 @@ describe("ParserFactory", () => {
 		// ESLintParser patterns
 		assert.ok(lintPatterns.includes("**/eslint-report.json"));
 		assert.ok(lintPatterns.includes("**/eslint.json"));
+		assert.ok(lintPatterns.includes("**/*-eslint-report.json"));
+		assert.ok(lintPatterns.includes("**/*-eslint.json"));
 
 		// CheckStyleParser patterns
 		assert.ok(lintPatterns.includes("**/checkstyle-result.xml"));
 		assert.ok(lintPatterns.includes("**/checkstyle.xml"));
+		assert.ok(lintPatterns.includes("**/*-checkstyle-result.xml"));
+		assert.ok(lintPatterns.includes("**/*-checkstyle.xml"));
 
 		// PrettierParser patterns
 		assert.ok(lintPatterns.includes("**/prettier-check.log"));
 		assert.ok(lintPatterns.includes("**/prettier-check.txt"));
 		assert.ok(lintPatterns.includes("**/prettier-report.log"));
 		assert.ok(lintPatterns.includes("**/prettier-report.txt"));
+		assert.ok(lintPatterns.includes("**/*-prettier-check.log"));
+		assert.ok(lintPatterns.includes("**/*-prettier-check.txt"));
+		assert.ok(lintPatterns.includes("**/*-prettier-report.log"));
+		assert.ok(lintPatterns.includes("**/*-prettier-report.txt"));
 
 		// AstroCheckParser patterns
 		assert.ok(lintPatterns.includes("**/astro-check.log"));
 		assert.ok(lintPatterns.includes("**/astro-check.txt"));
 		assert.ok(lintPatterns.includes("**/astro-check-report.log"));
 		assert.ok(lintPatterns.includes("**/astro-check-report.txt"));
+		assert.ok(lintPatterns.includes("**/*-astro-check.log"));
+		assert.ok(lintPatterns.includes("**/*-astro-check.txt"));
+		assert.ok(lintPatterns.includes("**/*-astro-check-report.log"));
+		assert.ok(lintPatterns.includes("**/*-astro-check-report.txt"));
+
+		// SarifParser patterns
+		assert.ok(lintPatterns.includes("**/*.sarif"));
+		assert.ok(lintPatterns.includes("**/*.sarif.json"));
+		assert.ok(lintPatterns.includes("**/sarif-report.json"));
+		assert.ok(lintPatterns.includes("**/*-sarif-report.json"));
 	});
 
 	it("returns all patterns across all categories", () => {
@@ -67,8 +88,8 @@ describe("ParserFactory", () => {
 		assert.ok(allPatterns.includes("**/eslint-report.json")); // lint
 
 		// Should have the total expected count
-		// Test: 5, Coverage: 5, Lint: 12
-		assert.strictEqual(allPatterns.length, 22);
+		// Test: 5, Coverage: 8, Lint: 28
+		assert.strictEqual(allPatterns.length, 41);
 	});
 
 	it("returns patterns grouped by category", () => {

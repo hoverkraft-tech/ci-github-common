@@ -18,7 +18,7 @@ inputs:
     description: |
       Paths to report files (glob patterns supported, one per line or comma-separated).
       Set to `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all` for automatic detection.
-      Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `auto:all`, `auto:test,coverage/lcov.info`, `auto:test,auto:coverage`
+      Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `reports/results.sarif`, `auto:all`, `auto:test,coverage/lcov.info`, `auto:test,auto:coverage`
     required: false
     default: "auto:all"
   report-name:

@@ -42,12 +42,15 @@ export class PrettierParser extends BaseParser {
 	}
 
 	getAutoPatterns() {
-		return [
-			"**/prettier-check.log",
-			"**/prettier-check.txt",
-			"**/prettier-report.log",
-			"**/prettier-report.txt",
-		];
+		return this.buildBasenamePatterns(
+			[
+				"prettier-check.log",
+				"prettier-check.txt",
+				"prettier-report.log",
+				"prettier-report.txt",
+			],
+			{ includePrefixed: true },
+		);
 	}
 
 	parse(content) {

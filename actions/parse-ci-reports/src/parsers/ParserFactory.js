@@ -6,6 +6,7 @@ import { ESLintParser } from "./ESLintParser.js";
 import { CheckStyleParser } from "./CheckStyleParser.js";
 import { PrettierParser } from "./PrettierParser.js";
 import { AstroCheckParser } from "./AstroCheckParser.js";
+import { SarifParser } from "./SarifParser.js";
 import { ReportCategory } from "./BaseParser.js";
 
 /**
@@ -25,6 +26,7 @@ export class ParserFactory {
 			new CheckStyleParser(),
 			new PrettierParser(),
 			new AstroCheckParser(),
+			new SarifParser(),
 		];
 
 		// Sort parsers by priority (highest first)

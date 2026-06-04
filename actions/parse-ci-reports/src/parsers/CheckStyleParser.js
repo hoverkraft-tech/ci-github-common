@@ -33,7 +33,10 @@ export class CheckStyleParser extends BaseParser {
 	}
 
 	getAutoPatterns() {
-		return ["**/checkstyle-result.xml", "**/checkstyle.xml"];
+		return this.buildBasenamePatterns(
+			["checkstyle-result.xml", "checkstyle.xml"],
+			{ includePrefixed: true },
+		);
 	}
 
 	parse(content) {

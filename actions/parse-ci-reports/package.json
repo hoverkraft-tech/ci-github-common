@@ -18,7 +18,8 @@
 		"lcov",
 		"cobertura",
 		"eslint",
-		"checkstyle"
+		"checkstyle",
+		"sarif"
 	],
 	"author": "hoverkraft",
 	"license": "MIT",

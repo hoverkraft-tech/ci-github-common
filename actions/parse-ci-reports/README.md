@@ -50,8 +50,27 @@ It supports multiple common report standards out of the box.
 
 - **ESLint JSON** - JavaScript/TypeScript linting
 - **CheckStyle XML** - Java and other language linting
+- **SARIF** - Static analysis results in the SARIF 2.1.0 format
 - **Prettier Check Logs** - Text output captured from `prettier --check`
 - **Astro Check Logs** - Diagnostics emitted by `astro check`
+
+### Expected Auto-Detection Paths
+
+When `report-paths` uses `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all`, the action searches for these glob patterns:
+
+| **Report Type**         | **Auto-Detected Paths**                                                                                                                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **JUnit XML**           | `**/junit*.xml`, `**/test-results/**/*.xml`, `**/test-reports/**/*.xml`, `**/*test*.xml`                                                                                                                           |
+| **TAP**                 | `**/*.tap`                                                                                                                                                                                                         |
+| **Cobertura XML**       | `**/coverage/*-coverage.xml`, `**/coverage/*-cobertura.xml`, `**/coverage/coverage.xml`, `**/coverage/cobertura.xml`                                                                                               |
+| **LCOV**                | `**/coverage/lcov.info`, `**/lcov.info`, `**/coverage/*-lcov.info`, `**/*-lcov.info`                                                                                                                               |
+| **ESLint JSON**         | `**/eslint-report.json`, `**/eslint.json`, `**/*-eslint-report.json`, `**/*-eslint.json`                                                                                                                           |
+| **CheckStyle XML**      | `**/checkstyle-result.xml`, `**/checkstyle.xml`, `**/*-checkstyle-result.xml`, `**/*-checkstyle.xml`                                                                                                               |
+| **SARIF**               | `**/*.sarif`, `**/*.sarif.json`, `**/sarif-report.json`, `**/*-sarif-report.json`                                                                                                                                  |
+| **Prettier Check Logs** | `**/prettier-check.log`, `**/prettier-check.txt`, `**/prettier-report.log`, `**/prettier-report.txt`, `**/*-prettier-check.log`, `**/*-prettier-check.txt`, `**/*-prettier-report.log`, `**/*-prettier-report.txt` |
+| **Astro Check Logs**    | `**/astro-check.log`, `**/astro-check.txt`, `**/astro-check-report.log`, `**/astro-check-report.txt`, `**/*-astro-check.log`, `**/*-astro-check.txt`, `**/*-astro-check-report.log`, `**/*-astro-check-report.txt` |
+
+If your reports are written elsewhere, pass explicit paths or glob patterns instead of relying on `auto:*` detection.
 
 <!-- usage:start -->
 
@@ -62,7 +81,7 @@ It supports multiple common report standards out of the box.
   with:
     # Paths to report files (glob patterns supported, one per line or comma-separated).
     # Set to `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all` for automatic detection.
-    # Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `auto:all`, `auto:test,coverage/lcov.info`, `auto:test,auto:coverage`
+    # Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `reports/results.sarif`, `auto:all`, `auto:test,coverage/lcov.info`, `auto:test,auto:coverage`
     #
     # Default: `auto:all`
     report-paths: auto:all
@@ -110,26 +129,26 @@ It supports multiple common report standards out of the box.
 
 ## Inputs
 
-| **Input**               | **Description**                                                                                                                             | **Required** | **Default**      |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------- |
-| **`report-paths`**      | Paths to report files (glob patterns supported, one per line or comma-separated).                                                           | **false**    | `auto:all`       |
-|                         | Set to `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all` for automatic detection.                                                    |              |                  |
-|                         | Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `auto:all`, `auto:test,coverage/lcov.info`, `auto:test,auto:coverage` |              |                  |
-| **`report-name`**       | Name to display in the summary (e.g., `Test Results`, `Coverage Report`).                                                                   | **false**    | `Report Summary` |
-| **`include-passed`**    | Whether to include passed tests in the summary.                                                                                             | **false**    | `false`          |
-| **`output-format`**     | Output format: comma-separated list of `summary`, `markdown`, `annotations`, or `all` for everything.                                       | **false**    | `all`            |
-| **`fail-on-error`**     | Whether to fail the action if any test failures are detected.                                                                               | **false**    | `false`          |
-| **`path-mapping`**      | Path mapping(s) to rewrite file paths in reports (format: "from_path:to_path").                                                             | **false**    | -                |
-|                         | Useful when tests/lints run in a different directory or container.                                                                          |              |                  |
-|                         | Multiple mappings can be provided separated by newlines or commas.                                                                          |              |                  |
-|                         | Examples:                                                                                                                                   |              |                  |
-|                         | - Single mapping: "/app/src:./src"                                                                                                          |              |                  |
-|                         | - Multiple mappings: "/app/src:./src,/app/tests:./tests"                                                                                    |              |                  |
-|                         | - Multi-line: \|                                                                                                                            |              |                  |
-|                         | /app/src:./src                                                                                                                              |              |                  |
-|                         | /app/tests:./tests                                                                                                                          |              |                  |
-| **`working-directory`** | Working directory where the action should operate.                                                                                          | **false**    | `.`              |
-|                         | Can be absolute or relative to the repository root.                                                                                         |              |                  |
+| **Input**               | **Description**                                                                                                                                                      | **Required** | **Default**      |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------- |
+| **`report-paths`**      | Paths to report files (glob patterns supported, one per line or comma-separated).                                                                                    | **false**    | `auto:all`       |
+|                         | Set to `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all` for automatic detection.                                                                             |              |                  |
+|                         | Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `reports/results.sarif`, `auto:all`, `auto:test,coverage/lcov.info`, `auto:test,auto:coverage` |              |                  |
+| **`report-name`**       | Name to display in the summary (e.g., `Test Results`, `Coverage Report`).                                                                                            | **false**    | `Report Summary` |
+| **`include-passed`**    | Whether to include passed tests in the summary.                                                                                                                      | **false**    | `false`          |
+| **`output-format`**     | Output format: comma-separated list of `summary`, `markdown`, `annotations`, or `all` for everything.                                                                | **false**    | `all`            |
+| **`fail-on-error`**     | Whether to fail the action if any test failures are detected.                                                                                                        | **false**    | `false`          |
+| **`path-mapping`**      | Path mapping(s) to rewrite file paths in reports (format: "from_path:to_path").                                                                                      | **false**    | -                |
+|                         | Useful when tests/lints run in a different directory or container.                                                                                                   |              |                  |
+|                         | Multiple mappings can be provided separated by newlines or commas.                                                                                                   |              |                  |
+|                         | Examples:                                                                                                                                                            |              |                  |
+|                         | - Single mapping: "/app/src:./src"                                                                                                                                   |              |                  |
+|                         | - Multiple mappings: "/app/src:./src,/app/tests:./tests"                                                                                                             |              |                  |
+|                         | - Multi-line: \|                                                                                                                                                     |              |                  |
+|                         | /app/src:./src                                                                                                                                                       |              |                  |
+|                         | /app/tests:./tests                                                                                                                                                   |              |                  |
+| **`working-directory`** | Working directory where the action should operate.                                                                                                                   | **false**    | `.`              |
+|                         | Can be absolute or relative to the repository root.                                                                                                                  |              |                  |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -178,7 +197,7 @@ Auto-detection modes:
 
 - `auto:coverage` - Finds LCOV and Cobertura coverage files
 
-- `auto:lint` - Finds ESLint JSON and CheckStyle XML files
+- `auto:lint` - Finds ESLint JSON, CheckStyle XML, SARIF files, Prettier check logs, and Astro check logs
 
 - `auto:all` - Finds all supported report types
 
@@ -250,6 +269,22 @@ linting tools:
   with:
     report-paths: "astro-check.log"
     report-name: "Astro Diagnostics"
+    output-format: "summary,annotations"
+```
+
+### SARIF Static Analysis
+
+Parse SARIF output from tools such as CodeQL or other static analyzers:
+
+```yaml
+- name: Run static analysis
+  run: codeql database analyze db javascript-security-extended --format=sarif-latest --output=reports/results.sarif
+
+- name: Parse SARIF report
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  with:
+    report-paths: "reports/results.sarif"
+    report-name: "Static Analysis"
     output-format: "summary,annotations"
 ```
 
@@ -464,6 +499,7 @@ src/
 │   ├── LCOVParser.js
 │   ├── ESLintParser.js
 │   ├── CheckStyleParser.js
+│   ├── SarifParser.js
 │   └── ParserFactory.js  # Factory pattern for parser selection
 ├── formatters/      # Output formatters
 │   ├── SummaryFormatter.js
