@@ -77,7 +77,7 @@ If your reports are written elsewhere, pass explicit paths or glob patterns inst
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+- uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     # Paths to report files (glob patterns supported, one per line or comma-separated).
     # Set to `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all` for automatic detection.
@@ -175,7 +175,7 @@ Let the action automatically find common report files:
 
 ```yaml
 - name: Parse all CI reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "auto:all"
     report-name: "CI Results"
@@ -185,7 +185,7 @@ Or target specific report types:
 
 ```yaml
 - name: Parse test reports only
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "auto:test"
     report-name: "Test Results"
@@ -206,7 +206,7 @@ Auto-detection modes:
 ```yaml
 - name: Parse test reports
   id: parse-reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "**/test-results/*.xml"
     report-name: "Test Results"
@@ -223,7 +223,7 @@ Auto-detection modes:
 
 ```yaml
 - name: Parse coverage
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "coverage/cobertura-coverage.xml"
     report-name: "Coverage Report"
@@ -242,7 +242,7 @@ formatting issues alongside other lint results:
     npx prettier --check "src/**/*.{js,ts,tsx}" | tee prettier-check.log
 
 - name: Parse Prettier report
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "prettier-check.log"
     report-name: "Prettier Formatting"
@@ -265,7 +265,7 @@ linting tools:
     npx astro check --minimumFailingSeverity warning | tee astro-check.log
 
 - name: Parse astro diagnostics
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "astro-check.log"
     report-name: "Astro Diagnostics"
@@ -281,7 +281,7 @@ Parse SARIF output from tools such as CodeQL or other static analyzers:
   run: codeql database analyze db javascript-security-extended --format=sarif-latest --output=reports/results.sarif
 
 - name: Parse SARIF report
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "reports/results.sarif"
     report-name: "Static Analysis"
@@ -292,7 +292,7 @@ Parse SARIF output from tools such as CodeQL or other static analyzers:
 
 ```yaml
 - name: Parse test reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "**/junit.xml"
     report-name: "Test Results"
@@ -305,7 +305,7 @@ Generate GitHub annotations for failed tests and linting issues:
 
 ```yaml
 - name: Parse reports with annotations
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "auto:all"
     report-name: "CI Results"
@@ -318,7 +318,7 @@ Combine multiple output formats using comma-separated values:
 
 ```yaml
 - name: Parse reports with multiple outputs
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "auto:all"
     report-name: "CI Results"
@@ -329,7 +329,7 @@ Or use "all" for all output formats:
 
 ```yaml
 - name: Parse reports with all outputs
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "auto:test"
     report-name: "Test Results"
@@ -348,7 +348,7 @@ Parse test results, coverage, and linting in one action:
   run: npm run lint -- --format json --output-file eslint-report.json
 
 - name: Parse all reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: |
       test-results/junit.xml
@@ -363,7 +363,7 @@ When working in a monorepo or nested package, set `working-directory` so glob pa
 
 ```yaml
 - name: Parse frontend reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     working-directory: packages/frontend
     report-paths: |
@@ -382,7 +382,7 @@ When running tests in a container or different directory, use path-mapping to en
     docker run --rm -v ${{ github.workspace }}:/app myimage npm test
 
 - name: Parse test reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "test-results/junit.xml"
     report-name: "Test Results"
@@ -398,7 +398,7 @@ When you have multiple source directories that need rewriting, provide multiple 
 
 ```yaml
 - name: Parse reports with multiple path mappings
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "auto:all"
     report-name: "CI Results"
@@ -413,7 +413,7 @@ Or using comma-separated format:
 
 ```yaml
 - name: Parse reports with multiple path mappings
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "auto:all"
     report-name: "CI Results"
@@ -427,7 +427,7 @@ Another example for complex Docker overlay paths:
 
 ```yaml
 - name: Parse reports with path rewriting
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "auto:all"
     report-name: "CI Results"
@@ -441,7 +441,7 @@ Only comment on PRs if there are failures:
 ```yaml
 - name: Parse test reports
   id: parse-reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: "**/test-results/*.xml"
     report-name: "Test Results"
@@ -467,7 +467,7 @@ Only comment on PRs if there are failures:
   run: mvn test
 
 - name: Parse all test reports
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@66578f5b9aec4ac5558b5dad750c4c74dfcb65c5 # 0.35.5
+  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@4bb7594b1bf3696c54b2bbae970376056853f8ea # 0.36.0
   with:
     report-paths: |
       pytest-results.xml
