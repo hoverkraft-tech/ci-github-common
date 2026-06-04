@@ -30,7 +30,9 @@ export class ESLintParser extends BaseParser {
 	}
 
 	getAutoPatterns() {
-		return ["**/eslint-report.json", "**/eslint.json"];
+		return this.buildBasenamePatterns(["eslint-report.json", "eslint.json"], {
+			includePrefixed: true,
+		});
 	}
 
 	parse(content) {

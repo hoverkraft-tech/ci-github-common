@@ -23,7 +23,14 @@ export class LCOVParser extends BaseParser {
 	}
 
 	getAutoPatterns() {
-		return ["**/coverage/lcov.info", "**/lcov.info"];
+		return [
+			...this.buildScopedBasenamePatterns("lcov.info", ["coverage"], {
+				includePrefixed: true,
+			}),
+			...this.buildBasenamePatterns(["lcov.info"], {
+				includePrefixed: true,
+			}),
+		];
 	}
 
 	parse(content) {

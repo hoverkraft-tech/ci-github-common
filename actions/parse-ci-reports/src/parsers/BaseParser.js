@@ -13,6 +13,60 @@ export const ReportCategory = {
  */
 export class BaseParser {
 	/**
+	 * Build glob patterns for file basenames matched anywhere in the workspace.
+	 * @param {string[]} baseNames - File basenames to match
+	 * @param {Object} [options] - Pattern options
+	 * @param {boolean} [options.includePrefixed=false] - Also match *-prefixed variants
+	 * @returns {string[]} Array of glob patterns
+	 */
+	buildBasenamePatterns(baseNames, { includePrefixed = false } = {}) {
+		const patterns = [];
+
+		for (const baseName of baseNames) {
+			patterns.push(`**/${baseName}`);
+			if (includePrefixed) {
+				patterns.push(`**/*-${baseName}`);
+			}
+		}
+
+		return patterns;
+	}
+
+	/**
+	 * Build glob patterns for filenames within specific directories.
+	 * @param {string} baseName - File basename to match
+	 * @param {string[]} directories - Directory segments relative to any workspace folder
+	 * @param {Object} [options] - Pattern options
+	 * @param {boolean} [options.includePrefixed=false] - Also match *-prefixed variants
+	 * @returns {string[]} Array of glob patterns
+	 */
+	buildScopedBasenamePatterns(
+		baseName,
+		directories,
+		{ includePrefixed = false } = {},
+	) {
+		const patterns = [];
+
+		for (const directory of directories) {
+			patterns.push(`**/${directory}/${baseName}`);
+			if (includePrefixed) {
+				patterns.push(`**/${directory}/*-${baseName}`);
+			}
+		}
+
+		return patterns;
+	}
+
+	/**
+	 * Build extension-based glob patterns.
+	 * @param {string[]} extensions - Extensions without the leading *.
+	 * @returns {string[]} Array of glob patterns
+	 */
+	buildExtensionPatterns(extensions) {
+		return extensions.map((extension) => `**/*.${extension}`);
+	}
+
+	/**
 	 * Parse a report file
 	 * @param {string} content - The file content
 	 * @param {string} filePath - The file path for context
