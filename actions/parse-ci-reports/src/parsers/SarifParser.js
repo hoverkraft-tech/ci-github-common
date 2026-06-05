@@ -6,8 +6,19 @@ import { ReportData, LintIssue } from "../models/ReportData.js";
  * Parser for SARIF 2.1.0 static analysis results
  */
 export class SarifParser extends BaseParser {
-	canParse(_filePath, content) {
+	canParse(filePath, content) {
 		if (!content) {
+			return false;
+		}
+
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) ||
+			normalizedPath.endsWith(".sarif") ||
+			normalizedPath.endsWith(".sarif.json") ||
+			normalizedPath.endsWith(".json");
+
+		if (!hasSupportedName) {
 			return false;
 		}
 

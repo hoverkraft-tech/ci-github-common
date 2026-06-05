@@ -6,8 +6,16 @@ import { ReportData, TestResult } from "../models/ReportData.js";
  * Supports TAP versions 12, 13, and 14
  */
 export class TAPParser extends BaseParser {
-	canParse(_filePath, content) {
+	canParse(filePath, content) {
 		const lines = content.split("\n");
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) || normalizedPath.endsWith(".tap");
+
+		if (!hasSupportedName) {
+			return false;
+		}
+
 		// TAP files typically start with TAP version or test plan
 		return lines.some(
 			(line) =>

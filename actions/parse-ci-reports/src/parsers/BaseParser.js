@@ -12,6 +12,10 @@ export const ReportCategory = {
  * Follows the Strategy pattern for different report formats
  */
 export class BaseParser {
+	constructor() {
+		this._autoPatternRegexCache = null;
+	}
+
 	/**
 	 * Build glob patterns for file basenames matched anywhere in the workspace.
 	 * @param {string[]} baseNames - File basenames to match
@@ -64,6 +68,52 @@ export class BaseParser {
 	 */
 	buildExtensionPatterns(extensions) {
 		return extensions.map((extension) => `**/*.${extension}`);
+	}
+
+	/**
+	 * Check if a file path matches this parser auto-detection patterns.
+	 * @param {string} filePath - Path to evaluate
+	 * @returns {boolean} True if path matches any auto pattern
+	 */
+	matchesAutoPatterns(filePath) {
+		if (!filePath) {
+			return false;
+		}
+
+		const normalizedPath = this._normalizeFilePath(filePath).toLowerCase();
+		const matchers = this._getAutoPatternRegexes();
+
+		return matchers.some((matcher) => matcher.test(normalizedPath));
+	}
+
+	_getAutoPatternRegexes() {
+		if (this._autoPatternRegexCache) {
+			return this._autoPatternRegexCache;
+		}
+
+		const patterns = this.getAutoPatterns();
+		this._autoPatternRegexCache = patterns.map((pattern) =>
+			this._globToRegex(pattern),
+		);
+
+		return this._autoPatternRegexCache;
+	}
+
+	_normalizeFilePath(filePath) {
+		return String(filePath).replace(/\\/g, "/");
+	}
+
+	_globToRegex(pattern) {
+		const escapedPattern = pattern
+			.toLowerCase()
+			.replace(/[-[\]{}()+?.,\\^$|#\s]/g, "\\$&")
+			.replace(/\*\*\//g, "<<<ANY_DIR_PREFIX>>>")
+			.replace(/\*\*/g, "<<<ANY_DIR>>>")
+			.replace(/\*/g, "[^/]*")
+			.replace(/<<<ANY_DIR_PREFIX>>>/g, "(?:.*/)?")
+			.replace(/<<<ANY_DIR>>>/g, ".*");
+
+		return new RegExp(`^${escapedPattern}$`, "i");
 	}
 
 	/**

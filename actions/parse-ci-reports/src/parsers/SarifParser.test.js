@@ -52,6 +52,14 @@ const SAMPLE_SARIF = JSON.stringify({
 });
 
 describe("SarifParser", () => {
+	it("keeps auto-pattern path detection synchronized", () => {
+		const parser = new SarifParser();
+		const filePath = "reports/humanize-sarif-report.json";
+
+		assert.ok(parser.matchesAutoPatterns(filePath));
+		assert.ok(parser.canParse(filePath, SAMPLE_SARIF));
+	});
+
 	it("identifies SARIF reports", () => {
 		const parser = new SarifParser();
 

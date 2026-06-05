@@ -16,12 +16,14 @@ export class CheckStyleParser extends BaseParser {
 	}
 
 	canParse(filePath, content) {
-		return (
-			(filePath.toLowerCase().includes("checkstyle") ||
-				filePath.endsWith(".xml")) &&
-			content.includes("<checkstyle") &&
-			content.includes("<file")
-		);
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) ||
+			normalizedPath.includes("checkstyle") ||
+			normalizedPath.endsWith(".xml");
+		const hasCheckstyleRoot = /<\s*checkstyle\b/i.test(content);
+
+		return hasSupportedName && hasCheckstyleRoot;
 	}
 
 	getPriority() {

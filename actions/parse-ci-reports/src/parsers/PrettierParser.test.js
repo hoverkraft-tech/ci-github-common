@@ -12,6 +12,14 @@ const SAMPLE_ERROR_LOG = `Checking formatting...
 [warn] Code style issues found in the above file(s). Forgot to run Prettier?`;
 
 describe("PrettierParser", () => {
+	it("keeps auto-pattern path detection synchronized", () => {
+		const parser = new PrettierParser();
+		const filePath = "application/humanize-prettier-report.log";
+
+		assert.ok(parser.matchesAutoPatterns(filePath));
+		assert.ok(parser.canParse(filePath, SAMPLE_FAILURE_LOG));
+	});
+
 	it("identifies prettier check logs", () => {
 		const parser = new PrettierParser();
 

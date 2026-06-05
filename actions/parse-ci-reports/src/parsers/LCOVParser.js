@@ -7,8 +7,14 @@ import { ReportData, Coverage } from "../models/ReportData.js";
  */
 export class LCOVParser extends BaseParser {
 	canParse(filePath, content) {
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) ||
+			normalizedPath.includes("lcov") ||
+			normalizedPath.endsWith(".info");
+
 		return (
-			(filePath.toLowerCase().includes("lcov") || filePath.endsWith(".info")) &&
+			hasSupportedName &&
 			content.includes("TN:") &&
 			(content.includes("SF:") || content.includes("DA:"))
 		);

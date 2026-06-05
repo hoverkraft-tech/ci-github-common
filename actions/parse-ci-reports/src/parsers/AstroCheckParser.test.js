@@ -23,6 +23,14 @@ Result (26 files):
 - 0 hints`;
 
 describe("AstroCheckParser", () => {
+	it("keeps auto-pattern path detection synchronized", () => {
+		const parser = new AstroCheckParser();
+		const filePath = "application/humanize-astro-check-report.log";
+
+		assert.ok(parser.matchesAutoPatterns(filePath));
+		assert.ok(parser.canParse(filePath, SAMPLE_ERROR));
+	});
+
 	it("identifies astro check diagnostics", () => {
 		const parser = new AstroCheckParser();
 

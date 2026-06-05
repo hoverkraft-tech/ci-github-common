@@ -26,7 +26,15 @@ export class PrettierParser extends BaseParser {
 			return true;
 		}
 
-		if (filePath?.toLowerCase().includes("prettier")) {
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) || normalizedPath.includes("prettier");
+
+		if (!hasSupportedName) {
+			return false;
+		}
+
+		if (normalizedPath.includes("prettier")) {
 			return /\[(warn|error)\]\s+.+/i.test(content);
 		}
 
