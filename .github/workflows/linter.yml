@@ -108,6 +108,11 @@ jobs:
               },
             };
 
+            const defaultLinterVariables = {
+              KUBERNETES_KUBECONFORM_OPTIONS:
+                "-schema-location default -schema-location https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json",
+            };
+
             function parseEnvironmentLines(serializedEnvironment) {
               const environment = new Map();
 
@@ -156,7 +161,10 @@ jobs:
             }
 
             const customEnvironment = parseEnvironmentLines(process.env.LINTER_ENV ?? "");
-            const defaultEnvironment = getToolchainEnvironment(process.env.LINTER_TOOLCHAIN);
+            const defaultEnvironment = {
+              ...defaultLinterVariables,
+              ...getToolchainEnvironment(process.env.LINTER_TOOLCHAIN),
+            };
             const mergedEnvironment = mergeEnvironment(customEnvironment, defaultEnvironment);
 
             for (const [key, value] of mergedEnvironment) {
