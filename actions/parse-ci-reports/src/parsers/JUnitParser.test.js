@@ -15,6 +15,14 @@ describe("JUnitParser", () => {
 		assert.strictEqual(parser.canParse("test-results.xml", content), true);
 	});
 
+	it("keeps auto-pattern path detection synchronized", () => {
+		const filePath = "reports/junit-report.xml";
+		const content = `<?xml version="1.0"?><testsuite name="suite"><testcase name="ok"/></testsuite>`;
+
+		assert.ok(parser.matchesAutoPatterns(filePath));
+		assert.ok(parser.canParse(filePath, content));
+	});
+
 	it("should parse simple JUnit XML", () => {
 		const content = `<?xml version="1.0"?>
       <testsuite name="Test Suite" tests="3" failures="1" skipped="1">

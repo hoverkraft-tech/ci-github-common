@@ -15,6 +15,16 @@ ok 3 - test passed # SKIP`;
 		assert.strictEqual(parser.canParse("test.tap", content), true);
 	});
 
+	it("keeps auto-pattern path detection synchronized", () => {
+		const filePath = "reports/results.tap";
+		const content = `TAP version 13
+1..1
+ok 1 - sample`;
+
+		assert.ok(parser.matchesAutoPatterns(filePath));
+		assert.ok(parser.canParse(filePath, content));
+	});
+
 	it("should parse basic TAP output", () => {
 		const content = `TAP version 13
 1..3

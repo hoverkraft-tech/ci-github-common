@@ -16,9 +16,14 @@ export class CoberturaParser extends BaseParser {
 	}
 
 	canParse(filePath, content) {
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) ||
+			normalizedPath.includes("cobertura") ||
+			normalizedPath.includes("coverage");
+
 		return (
-			(filePath.toLowerCase().includes("cobertura") ||
-				filePath.toLowerCase().includes("coverage")) &&
+			hasSupportedName &&
 			content.includes("<coverage") &&
 			content.includes("line-rate")
 		);

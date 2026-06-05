@@ -17,8 +17,14 @@ export class JUnitParser extends BaseParser {
 	}
 
 	canParse(filePath, content) {
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) ||
+			normalizedPath.includes("junit") ||
+			normalizedPath.endsWith(".xml");
+
 		return (
-			(filePath.toLowerCase().includes("junit") || filePath.endsWith(".xml")) &&
+			hasSupportedName &&
 			(content.includes("<testsuite") || content.includes("<testsuites"))
 		);
 	}
