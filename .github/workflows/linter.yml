@@ -22,13 +22,20 @@ on:
           See https://github.com/super-linter/super-linter.
         type: string
         required: false
-      linter-toolchain:
+      javascript-linter-toolchain:
         description: |
-          Lint toolchain to use for Super-Linter frontend validators.
+          Lint toolchain to use for Super-Linter JavaScript and frontend validators.
           Supported values: biome, eslint-prettier.
         type: string
         required: false
         default: biome
+      python-linter-toolchain:
+        description: |
+          Lint toolchain to use for Super-Linter Python format validators.
+          Supported values: black, ruff-format.
+        type: string
+        required: false
+        default: ruff-format
       codeql-languages:
         description: |
           JSON array of languages to analyze with CodeQL.
@@ -79,10 +86,11 @@ jobs:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           LINTER_ENV: ${{ inputs.linter-env }}
-          LINTER_TOOLCHAIN: ${{ inputs.linter-toolchain }}
+          JAVASCRIPT_LINTER_TOOLCHAIN: ${{ inputs.javascript-linter-toolchain }}
+          PYTHON_LINTER_TOOLCHAIN: ${{ inputs.python-linter-toolchain }}
         with:
           script: |
-            const toolchainVariables = {
+            const javascriptToolchainVariables = {
               biome: {
                 VALIDATE_CSS: "false",
                 VALIDATE_CSS_PRETTIER: "false",
@@ -105,6 +113,15 @@ jobs:
               "eslint-prettier": {
                 VALIDATE_BIOME_FORMAT: "false",
                 VALIDATE_BIOME_LINT: "false",
+              },
+            };
+
+            const pythonToolchainVariables = {
+              black: {
+                VALIDATE_PYTHON_RUFF_FORMAT: "false",
+              },
+              "ruff-format": {
+                VALIDATE_PYTHON_BLACK: "false",
               },
             };
 
@@ -139,13 +156,25 @@ jobs:
               return environment;
             }
 
-            function getToolchainEnvironment(toolchain) {
+            function getToolchainEnvironment(toolchain, toolchainVariables, variableName) {
+              if (toolchain === "") {
+                return {};
+              }
+
               const environment = toolchainVariables[toolchain];
               if (!environment) {
-                throw new Error(`Unsupported lint toolchain: ${toolchain}`);
+                throw new Error(`Unsupported ${variableName}: ${toolchain}`);
               }
 
               return environment;
+            }
+
+            function resolveToolchain(customEnvironment, variableName, defaultValue) {
+              if (customEnvironment.has(variableName)) {
+                return customEnvironment.get(variableName) ?? "";
+              }
+
+              return defaultValue;
             }
 
             function mergeEnvironment(customEnvironment, defaultEnvironment) {
@@ -161,9 +190,30 @@ jobs:
             }
 
             const customEnvironment = parseEnvironmentLines(process.env.LINTER_ENV ?? "");
+            const javascriptToolchain = resolveToolchain(
+              customEnvironment,
+              "VALIDATE_JAVASCRIPT_TOOLCHAIN",
+              process.env.JAVASCRIPT_LINTER_TOOLCHAIN ?? "",
+            );
+            const pythonToolchain = resolveToolchain(
+              customEnvironment,
+              "VALIDATE_PYTHON_TOOLCHAIN",
+              process.env.PYTHON_LINTER_TOOLCHAIN ?? "",
+            );
             const defaultEnvironment = {
               ...defaultLinterVariables,
-              ...getToolchainEnvironment(process.env.LINTER_TOOLCHAIN),
+              VALIDATE_JAVASCRIPT_TOOLCHAIN: javascriptToolchain,
+              VALIDATE_PYTHON_TOOLCHAIN: pythonToolchain,
+              ...getToolchainEnvironment(
+                javascriptToolchain,
+                javascriptToolchainVariables,
+                "VALIDATE_JAVASCRIPT_TOOLCHAIN",
+              ),
+              ...getToolchainEnvironment(
+                pythonToolchain,
+                pythonToolchainVariables,
+                "VALIDATE_PYTHON_TOOLCHAIN",
+              ),
             };
             const mergedEnvironment = mergeEnvironment(customEnvironment, defaultEnvironment);
 
