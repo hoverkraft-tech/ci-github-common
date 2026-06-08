@@ -38,7 +38,7 @@ See <https://docs.github.com/en/repositories/managing-your-repositorys-settings-
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@6718ae98e8b6e009f8f2790af074daa1a06946c2 # 0.36.2
+- uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@ba599fc83e506112157ffd316e77d864f8b24b36 # 0.36.3
   with:
     # GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write).
     # See https://github.com/peter-evans/create-pull-request#action-inputs.

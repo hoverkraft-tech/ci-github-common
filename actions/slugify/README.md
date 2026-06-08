@@ -34,7 +34,7 @@ Action to slugify a given string value.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/slugify@6718ae98e8b6e009f8f2790af074daa1a06946c2 # 0.36.2
+- uses: hoverkraft-tech/ci-github-common/actions/slugify@ba599fc83e506112157ffd316e77d864f8b24b36 # 0.36.3
   with:
     # The value to slugify.
     # This input is required.
