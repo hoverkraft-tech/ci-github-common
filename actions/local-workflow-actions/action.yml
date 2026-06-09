@@ -17,6 +17,12 @@ inputs:
       The same relative path will be available under `../self-workflow` relative to `github.workspace` (for example `../self-workflow/.github/actions`).
     required: false
     default: ".github/actions"
+  github-token:
+    description: |
+      A GitHub token with permissions to checkout the reusable workflow repository.
+      This is required when the repository is private. For public repositories, this can be left empty and the checkout will be attempted anonymously.
+    required: false
+    default: ${{ github.token }}
 
 outputs:
   repository:
@@ -40,6 +46,7 @@ runs:
         ref: ${{ job.workflow_sha }}
         sparse-checkout: |
           ${{ inputs.actions-path }}
+        token: ${{ inputs.github-token || github.token }}
 
     - id: prepare
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
