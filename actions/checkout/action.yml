@@ -40,40 +40,22 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      if: inputs.ref == '' && github.event_name == 'issue_comment' && inputs.persist-credentials == 'true'
+    - if: inputs.persist-credentials == 'false'
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       with:
-        ref: refs/pull/${{ github.event.issue.number }}/head
-        fetch-depth: ${{ inputs.fetch-depth }}
-        lfs: ${{ inputs.lfs }}
-        token: ${{ inputs.token || github.token }}
-        persist-credentials: true
-
-    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      if: inputs.ref == '' && github.event_name == 'issue_comment' && inputs.persist-credentials != 'true'
-      with:
-        ref: refs/pull/${{ github.event.issue.number }}/head
-        fetch-depth: ${{ inputs.fetch-depth }}
-        lfs: ${{ inputs.lfs }}
-        token: ${{ inputs.token || github.token }}
-        persist-credentials: false
-
-    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      if: inputs.persist-credentials == 'true'
-      with:
+        ref: ${{ inputs.ref == '' && github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) || inputs.ref }}
         fetch-depth: ${{ inputs.fetch-depth }}
         lfs: ${{ inputs.lfs }}
         sparse-checkout: ${{ inputs.sparse-checkout }}
-        ref: ${{ inputs.ref }}
         token: ${{ inputs.token || github.token }}
-        persist-credentials: true
+        persist-credentials: false
 
-    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      if: inputs.persist-credentials != 'true'
+    - if: inputs.persist-credentials == 'true'
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       with:
+        ref: ${{ inputs.ref == '' && github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) || inputs.ref }}
         fetch-depth: ${{ inputs.fetch-depth }}
         lfs: ${{ inputs.lfs }}
         sparse-checkout: ${{ inputs.sparse-checkout }}
-        ref: ${{ inputs.ref }}
         token: ${{ inputs.token || github.token }}
-        persist-credentials: false
+        persist-credentials: true
