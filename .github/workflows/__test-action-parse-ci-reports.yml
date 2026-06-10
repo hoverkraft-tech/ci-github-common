@@ -31,46 +31,61 @@ jobs:
           persist-credentials: false
 
       - name: Arrange - Create test report files
-        run: |
-          mkdir -p test-reports
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { mkdirSync, writeFileSync } = require('node:fs');
 
-          # Create JUnit XML test report
-          cat > test-reports/junit.xml << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <testsuite name="Test Suite" tests="3" failures="0" errors="0" skipped="0" time="1.234">
-            <testcase name="test_example_1" classname="TestClass" time="0.123"/>
-            <testcase name="test_example_2" classname="TestClass" time="0.456"/>
-            <testcase name="test_example_3" classname="TestClass" time="0.655"/>
-          </testsuite>
-          EOF
+            mkdirSync('test-reports', { recursive: true });
 
-          # Create LCOV coverage report
-          cat > test-reports/lcov.info << 'EOF'
-          TN:
-          SF:src/example.js
-          FN:1,exampleFunction
-          FNDA:5,exampleFunction
-          FNF:1
-          FNH:1
-          DA:1,5
-          DA:2,5
-          DA:3,5
-          LF:3
-          LH:3
-          end_of_record
-          EOF
+            writeFileSync(
+              'test-reports/junit.xml',
+              [
+                '<?xml version="1.0" encoding="UTF-8"?>',
+                '<testsuite name="Test Suite" tests="3" failures="0" errors="0" skipped="0" time="1.234">',
+                '  <testcase name="test_example_1" classname="TestClass" time="0.123"/>',
+                '  <testcase name="test_example_2" classname="TestClass" time="0.456"/>',
+                '  <testcase name="test_example_3" classname="TestClass" time="0.655"/>',
+                '</testsuite>',
+                '',
+              ].join('\n')
+            );
 
-          # Create ESLint JSON report
-          cat > test-reports/eslint.json << 'EOF'
-          [
-            {
-              "filePath": "src/example.js",
-              "messages": [],
-              "errorCount": 0,
-              "warningCount": 0
-            }
-          ]
-          EOF
+            writeFileSync(
+              'test-reports/lcov.info',
+              [
+                'TN:',
+                'SF:src/example.js',
+                'FN:1,exampleFunction',
+                'FNDA:5,exampleFunction',
+                'FNF:1',
+                'FNH:1',
+                'DA:1,5',
+                'DA:2,5',
+                'DA:3,5',
+                'LF:3',
+                'LH:3',
+                'end_of_record',
+                '',
+              ].join('\n')
+            );
+
+            writeFileSync(
+              'test-reports/eslint.json',
+              [
+                '[',
+                '  {',
+                '    "filePath": "src/example.js",',
+                '    "messages": [],',
+                '    "errorCount": 0,',
+                '    "warningCount": 0',
+                '  }',
+                ']',
+                '',
+              ].join('\n')
+            );
+
+            core.info('Created test report files under test-reports');
 
       - name: Act - Run parse-ci-reports action
         id: parse-ci-reports
@@ -84,27 +99,26 @@ jobs:
           output-format: "summary,markdown"
 
       - name: Assert - Check parse-ci-reports outputs
-        run: |
-          # Check that markdown output exists
-          if [ -z "${STEPS_PARSE_CI_REPORTS_OUTPUTS_MARKDOWN}" ]; then
-            echo "parse-ci-reports markdown output is empty"
-            exit 1
-          fi
-
-          # Check that summary output exists
-          if [ -z "${STEPS_PARSE_CI_REPORTS_OUTPUTS_SUMMARY}" ]; then
-            echo "parse-ci-reports summary output is empty"
-            exit 1
-          fi
-
-          # Check that parsed-files output exists and is valid JSON
-          if [ -z "${STEPS_PARSE_CI_REPORTS_OUTPUTS_PARSED_FILES}" ]; then
-            echo "parse-ci-reports parsed-files output is empty"
-            exit 1
-          fi
-
-          echo "All outputs are valid"
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           STEPS_PARSE_CI_REPORTS_OUTPUTS_MARKDOWN: ${{ steps.parse-ci-reports.outputs.markdown }}
           STEPS_PARSE_CI_REPORTS_OUTPUTS_SUMMARY: ${{ steps.parse-ci-reports.outputs.summary }}
           STEPS_PARSE_CI_REPORTS_OUTPUTS_PARSED_FILES: ${{ steps.parse-ci-reports.outputs.parsed-files }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const markdown = process.env.STEPS_PARSE_CI_REPORTS_OUTPUTS_MARKDOWN;
+            const summary = process.env.STEPS_PARSE_CI_REPORTS_OUTPUTS_SUMMARY;
+            const parsedFiles = process.env.STEPS_PARSE_CI_REPORTS_OUTPUTS_PARSED_FILES;
+
+            try {
+              assert.ok(markdown && markdown.length > 0, 'parse-ci-reports markdown output is empty');
+              assert.ok(summary && summary.length > 0, 'parse-ci-reports summary output is empty');
+              assert.ok(parsedFiles && parsedFiles.length > 0, 'parse-ci-reports parsed-files output is empty');
+              JSON.parse(parsedFiles);
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
+
+            core.info('All outputs are valid');

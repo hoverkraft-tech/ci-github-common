@@ -23,6 +23,19 @@ jobs:
       contents: read
     uses: ./.github/workflows/__test-action-matrix-outputs.yml
 
+  test-action-checkout:
+    needs: linter
+    permissions:
+      contents: read
+    uses: ./.github/workflows/__test-action-checkout.yml
+
+  test-action-checkout-issue-comment:
+    needs: linter
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/__test-action-checkout-issue-comment.yml
+
   test-action-get-github-actions-bot-user:
     needs: linter
     permissions:

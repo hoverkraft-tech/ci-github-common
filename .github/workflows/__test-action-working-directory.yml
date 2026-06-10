@@ -23,19 +23,25 @@ jobs:
           working-directory: .
 
       - name: Assert - Check workspace root outputs
-        run: |
-          if [ "${STEPS_WORKING_DIRECTORY_OUTPUTS_ABSOLUTE_PATH}" != "${GITHUB_WORKSPACE}" ]; then
-            echo "working-directory absolute-path output is not valid"
-            exit 1
-          fi
-
-          if [ "${STEPS_WORKING_DIRECTORY_OUTPUTS_WORKSPACE_RELATIVE_PATH}" != "." ]; then
-            echo "working-directory workspace-relative-path output is not valid"
-            exit 1
-          fi
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
+          GITHUB_WORKSPACE_VALUE: ${{ github.workspace }}
           STEPS_WORKING_DIRECTORY_OUTPUTS_ABSOLUTE_PATH: ${{ steps.working-directory.outputs.absolute-path }}
           STEPS_WORKING_DIRECTORY_OUTPUTS_WORKSPACE_RELATIVE_PATH: ${{ steps.working-directory.outputs.workspace-relative-path }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const absolutePath = process.env.STEPS_WORKING_DIRECTORY_OUTPUTS_ABSOLUTE_PATH;
+            const relativePath = process.env.STEPS_WORKING_DIRECTORY_OUTPUTS_WORKSPACE_RELATIVE_PATH;
+            const workspacePath = process.env.GITHUB_WORKSPACE_VALUE;
+
+            try {
+              assert.strictEqual(absolutePath, workspacePath, 'working-directory absolute-path output is not valid');
+              assert.strictEqual(relativePath, '.', 'working-directory workspace-relative-path output is not valid');
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
 
       - name: Act - Run outside-workspace path with enforcement enabled
         id: outside-workspace-disallowed
@@ -46,13 +52,24 @@ jobs:
           enforce-path-in-workspace: true
 
       - name: Assert - Check enforcement failure outside workspace
-        run: |
-          if [ "${STEPS_OUTSIDE_WORKSPACE_DISALLOWED_OUTCOME}" != "failure" ]; then
-            echo "working-directory should fail when path is outside workspace and enforcement is enabled"
-            exit 1
-          fi
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           STEPS_OUTSIDE_WORKSPACE_DISALLOWED_OUTCOME: ${{ steps.outside-workspace-disallowed.outcome }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const outcome = process.env.STEPS_OUTSIDE_WORKSPACE_DISALLOWED_OUTCOME;
+
+            try {
+              assert.strictEqual(
+                outcome,
+                'failure',
+                'working-directory should fail when path is outside workspace and enforcement is enabled'
+              );
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
 
       - name: Act - Run outside-workspace path with enforcement disabled
         id: outside-workspace-allowed
@@ -62,16 +79,27 @@ jobs:
           enforce-path-in-workspace: false
 
       - name: Assert - Check enforcement opt-out outside workspace
-        run: |
-          if [ "${STEPS_OUTSIDE_WORKSPACE_ALLOWED_OUTPUTS_ABSOLUTE_PATH}" != "/tmp" ]; then
-            echo "working-directory absolute-path output is not valid when enforcement is disabled"
-            exit 1
-          fi
-
-          if [[ "${STEPS_OUTSIDE_WORKSPACE_ALLOWED_OUTPUTS_WORKSPACE_RELATIVE_PATH}" != ..* ]]; then
-            echo "working-directory workspace-relative-path should be outside workspace when enforcement is disabled"
-            exit 1
-          fi
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           STEPS_OUTSIDE_WORKSPACE_ALLOWED_OUTPUTS_ABSOLUTE_PATH: ${{ steps.outside-workspace-allowed.outputs.absolute-path }}
           STEPS_OUTSIDE_WORKSPACE_ALLOWED_OUTPUTS_WORKSPACE_RELATIVE_PATH: ${{ steps.outside-workspace-allowed.outputs.workspace-relative-path }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const absolutePath = process.env.STEPS_OUTSIDE_WORKSPACE_ALLOWED_OUTPUTS_ABSOLUTE_PATH;
+            const relativePath = process.env.STEPS_OUTSIDE_WORKSPACE_ALLOWED_OUTPUTS_WORKSPACE_RELATIVE_PATH;
+
+            try {
+              assert.strictEqual(
+                absolutePath,
+                '/tmp',
+                'working-directory absolute-path output is not valid when enforcement is disabled'
+              );
+              assert.ok(
+                relativePath.startsWith('..'),
+                'working-directory workspace-relative-path should be outside workspace when enforcement is disabled'
+              );
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }

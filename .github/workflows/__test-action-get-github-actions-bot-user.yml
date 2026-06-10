@@ -21,16 +21,27 @@ jobs:
         uses: ./actions/get-github-actions-bot-user
 
       - name: Assert - Check get-github-actions-bot-user outputs
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           STEPS_GET_GITHUB_ACTIONS_BOT_USER_OUTPUTS_NAME: ${{ steps.get-github-actions-bot-user.outputs.name }}
           STEPS_GET_GITHUB_ACTIONS_BOT_USER_OUTPUTS_EMAIL: ${{ steps.get-github-actions-bot-user.outputs.email }}
-        run: |
-          if [ "${STEPS_GET_GITHUB_ACTIONS_BOT_USER_OUTPUTS_NAME}" != 'github-actions[bot]' ]; then
-            echo "get-github-actions-bot-user output name is not valid"
-            exit 1
-          fi
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const outputName = process.env.STEPS_GET_GITHUB_ACTIONS_BOT_USER_OUTPUTS_NAME;
+            const outputEmail = process.env.STEPS_GET_GITHUB_ACTIONS_BOT_USER_OUTPUTS_EMAIL;
 
-          if [ "${STEPS_GET_GITHUB_ACTIONS_BOT_USER_OUTPUTS_EMAIL}" != '41898282+github-actions[bot]@users.noreply.github.com' ]; then
-            echo "get-github-actions-bot-user output email is not valid"
-            exit 1
-          fi
+            core.info(`Output name: ${outputName}`);
+            core.info(`Output email: ${outputEmail}`);
+
+            try {
+              assert.strictEqual(outputName, 'github-actions[bot]', 'get-github-actions-bot-user output name is not valid');
+              assert.strictEqual(
+                outputEmail,
+                '41898282+github-actions[bot]@users.noreply.github.com',
+                'get-github-actions-bot-user output email is not valid'
+              );
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }

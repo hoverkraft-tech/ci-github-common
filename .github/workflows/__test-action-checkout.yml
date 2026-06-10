@@ -1,0 +1,77 @@
+name: Internal - Tests for checkout action
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests for checkout action
+    runs-on: ubuntu-latest
+    steps:
+      - name: Arrange - Checkout repository using checkout action
+        id: checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Act - Run custom checkout action with defaults
+        id: custom-checkout-defaults
+        uses: ./actions/checkout
+
+      - name: Assert - Verify repository is checked out
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const { existsSync } = require('node:fs');
+            assert.ok(existsSync('.git'), 'Repository .git directory is missing');
+            assert.ok(existsSync('README.md'), 'README.md is missing');
+
+      - name: Act - Run custom checkout action with fetch-depth 0
+        id: custom-checkout-full-history
+        uses: ./actions/checkout
+        with:
+          fetch-depth: "0"
+
+      - name: Assert - Verify full history is fetched
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const { execSync } = require('child_process');
+            const commitCount = Number.parseInt(execSync('git rev-list --count HEAD').toString().trim(), 10);
+            assert.ok(commitCount >= 1, 'No commits found in repository');
+
+      - name: Act - Run custom checkout action with LFS disabled (default)
+        id: custom-checkout-no-lfs
+        uses: ./actions/checkout
+        with:
+          lfs: "false"
+
+      - name: Assert - Verify checkout succeeded
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const { existsSync } = require('node:fs');
+            assert.ok(existsSync('README.md'), 'README.md is missing');
+
+      - name: Assert - Verify token is not persisted by default
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const { execSync } = require('child_process');
+
+            let persisted = false;
+            try {
+              execSync('git config --local --get url.https://github.com/.insteadOf', { stdio: 'pipe' });
+              persisted = true;
+            } catch {
+              persisted = false;
+            }
+
+            assert.equal(persisted, false, 'Token credentials were persisted when they should not have been');

@@ -1,0 +1,106 @@
+name: Internal - Tests for checkout action (issue_comment simulation)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  test-checkout-issue-comment:
+    name: Checkout action on simulated issue_comment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Arrange - Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Arrange - Get PR information for simulation
+        id: pr-info
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const prNumber = 1;
+            assert.ok(prNumber, 'Could not determine PR number from static test configuration');
+
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            core.setOutput('head-sha', pr.data.head.sha);
+            core.setOutput('head-ref', pr.data.head.ref);
+            core.setOutput('pr-number', prNumber);
+
+            core.info(`PR #${prNumber} Head SHA: ${pr.data.head.sha}`);
+            core.info(`PR #${prNumber} Head Ref: ${pr.data.head.ref}`);
+
+      - name: Act - Simulate issue_comment event context and checkout
+        id: checkout
+        uses: ./actions/checkout
+        with:
+          ref: refs/pull/${{ steps.pr-info.outputs.pr-number }}/head
+          persist-credentials: true
+
+      - name: Assert - Verify correct PR SHA was checked out
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          EXPECTED_SHA: ${{ steps.pr-info.outputs.head-sha }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const { execSync } = require('child_process');
+            const currentSha = execSync('git rev-parse HEAD').toString().trim();
+            const expectedSha = process.env.EXPECTED_SHA;
+
+            core.info(`Current SHA: ${currentSha}`);
+            core.info(`Expected PR Head SHA: ${expectedSha}`);
+
+            try {
+              assert.strictEqual(
+                currentSha,
+                expectedSha,
+                `Checked out SHA (${currentSha}) does not match PR head SHA (${expectedSha})`
+              );
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
+
+            core.info('Verified: Checked out correct PR head SHA');
+
+      - name: Assert - Verify not on main branch
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          EXPECTED_BRANCH: ${{ steps.pr-info.outputs.head-ref }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const { execSync } = require('child_process');
+            const currentBranch = execSync('git rev-parse --abbrev-ref HEAD').toString().trim();
+            const expectedBranch = process.env.EXPECTED_BRANCH;
+
+            core.info(`Current branch/ref: ${currentBranch}`);
+            core.info(`Expected branch: ${expectedBranch}`);
+
+            try {
+              assert.notStrictEqual(currentBranch, 'main', 'Checked out main branch instead of PR branch');
+              assert.notStrictEqual(currentBranch, 'master', 'Checked out master branch instead of PR branch');
+              assert.ok(
+                currentBranch === 'HEAD' || currentBranch === expectedBranch,
+                `Checked out unexpected ref ${currentBranch}; expected HEAD or ${expectedBranch}`
+              );
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
+
+            if (currentBranch === 'HEAD') {
+              core.warning('Repository is in detached HEAD state; this is expected when checking out refs/pull/<n>/head.');
+            }
+
+            core.info('Verified: Not on main/master branch');
