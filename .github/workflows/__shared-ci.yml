@@ -10,6 +10,9 @@ jobs:
     permissions:
       actions: read
       contents: read
+      issues: write
+      packages: read
+      pull-requests: write
       security-events: write
       statuses: write
     uses: ./.github/workflows/linter.yml
