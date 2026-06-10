@@ -23,10 +23,17 @@ jobs:
           value: test content
 
       - name: Assert - Check slugify outputs
-        run: |
-          if [ "${STEPS_SLUGIFY_OUTPUTS_RESULT}" != 'test-content' ]; then
-            echo "Slugify outputs result is not valid"
-            exit 1
-          fi
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           STEPS_SLUGIFY_OUTPUTS_RESULT: ${{ steps.slugify.outputs.result }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const result = process.env.STEPS_SLUGIFY_OUTPUTS_RESULT;
+
+            try {
+              assert.strictEqual(result, 'test-content', 'Slugify outputs result is not valid');
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }

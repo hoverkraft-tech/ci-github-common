@@ -21,10 +21,17 @@ jobs:
         uses: ./actions/repository-owner-is-organization
 
       - name: Assert - Check repository-owner-is-organization outputs
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           STEPS_REPOSITORY_OWNER_IS_ORGANIZATION_OUTPUTS_IS_ORGANIZATION: ${{ steps.repository-owner-is-organization.outputs.is-organization }}
-        run: |
-          if [ "${STEPS_REPOSITORY_OWNER_IS_ORGANIZATION_OUTPUTS_IS_ORGANIZATION}" != 'true' ]; then
-            echo "repository-owner-is-organization outputs result is not valid"
-            exit 1
-          fi
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const isOrganization = process.env.STEPS_REPOSITORY_OWNER_IS_ORGANIZATION_OUTPUTS_IS_ORGANIZATION;
+
+            try {
+              assert.strictEqual(isOrganization, 'true', 'repository-owner-is-organization outputs result is not valid');
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }

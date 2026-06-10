@@ -28,16 +28,27 @@ jobs:
           artifact-name: "test-matrix-outputs-${{ matrix.os }}"
 
       - name: Check set matrix outputs
-        shell: bash
-        run: |
-          EXPECTED_ARTIFACT_NAME="$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER-test-matrix-outputs-${{ matrix.os }}"
-
-          if [ "${STEPS_SET_MATRIX_OUTPUT_OUTPUTS_ARTIFACT_NAME}" != "$EXPECTED_ARTIFACT_NAME" ]; then
-            echo "Set matrix output 1 result is not valid"
-            exit 1
-          fi
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
+          GITHUB_RUN_ID_VALUE: ${{ github.run_id }}
+          GITHUB_RUN_NUMBER_VALUE: ${{ github.run_number }}
+          MATRIX_OS: ${{ matrix.os }}
           STEPS_SET_MATRIX_OUTPUT_OUTPUTS_ARTIFACT_NAME: ${{ steps.set-matrix-output.outputs.artifact-name }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const actualArtifactName = process.env.STEPS_SET_MATRIX_OUTPUT_OUTPUTS_ARTIFACT_NAME;
+            const expectedArtifactName = `${process.env.GITHUB_RUN_ID_VALUE}-${process.env.GITHUB_RUN_NUMBER_VALUE}-test-matrix-outputs-${process.env.MATRIX_OS}`;
+
+            core.info(`Actual artifact name: ${actualArtifactName}`);
+            core.info(`Expected artifact name: ${expectedArtifactName}`);
+
+            try {
+              assert.strictEqual(actualArtifactName, expectedArtifactName, 'Set matrix output 1 result is not valid');
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
 
   tests-2:
     name: Arrange - Set empty output
@@ -96,27 +107,50 @@ jobs:
           artifact-name: test-matrix-outputs-${{ matrix.os }}
 
       - name: Check matrix outputs
-        shell: bash
-        run: |
-          # Output result must be a json array of 2 entries
-          if [ "$(echo "$OUTPUT_RESULT" | jq -e '. | length')" != "2" ]; then
-            echo "Get matrix outputs result is not valid"
-            exit 1
-          fi
-
-          # Output result must contain the first and third entries
-          if [ "$(echo "$OUTPUT_RESULT" | jq -ce '. | sort')" != '[{"test":"test content 1"},{"test":"test content 3"}]' ]; then
-            echo "Get matrix outputs result is not valid"
-            exit 1
-          fi
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           OUTPUT_RESULT: ${{ steps.get-matrix-outputs.outputs.result }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const outputResult = process.env.OUTPUT_RESULT;
+
+            let parsed;
+            try {
+              parsed = JSON.parse(outputResult);
+            } catch (error) {
+              core.setFailed(`Get matrix outputs result is not valid JSON: ${error.message}`);
+              return;
+            }
+
+            try {
+              assert.ok(Array.isArray(parsed), 'Get matrix outputs result is not an array');
+              assert.strictEqual(parsed.length, 2, 'Get matrix outputs result does not contain 2 entries');
+
+              const normalizedActual = [...parsed].sort((a, b) => String(a.test).localeCompare(String(b.test)));
+              const normalizedExpected = [
+                { test: 'test content 1' },
+                { test: 'test content 3' },
+              ];
+              assert.deepStrictEqual(normalizedActual, normalizedExpected, 'Get matrix outputs result is not valid');
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
 
       - name: Check artifacts have been deleted
-        shell: bash
-        run: |
-          ARTIFACTS_PATH="/tmp/$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER-test-matrix-outputs-${{ matrix.os }}"
-          if [ -d "$ARTIFACTS_PATH" ]; then
-            echo "Artifacts have not been deleted"
-            exit 1
-          fi
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          ARTIFACTS_PATH: /tmp/${{ github.run_id }}-${{ github.run_number }}-test-matrix-outputs-${{ matrix.os }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const { existsSync } = require('node:fs');
+            const artifactsPath = process.env.ARTIFACTS_PATH;
+
+            try {
+              assert.strictEqual(existsSync(artifactsPath), false, 'Artifacts have not been deleted');
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }

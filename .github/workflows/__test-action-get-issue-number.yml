@@ -22,22 +22,35 @@ jobs:
         uses: ./actions/get-issue-number
 
       - name: Assert - Check get-issue-number behavior by event type
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
+          EVENT_NAME: ${{ github.event_name }}
           STEPS_GET_ISSUE_NUMBER_OUTCOME: ${{ steps.get-issue-number.outcome }}
           STEPS_GET_ISSUE_NUMBER_OUTPUTS_ISSUE_NUMBER: ${{ steps.get-issue-number.outputs.issue-number }}
           EXPECTED_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          if [ "${GITHUB_EVENT_NAME}" = 'pull_request' ]; then
-            if [ "${STEPS_GET_ISSUE_NUMBER_OUTCOME}" != 'success' ]; then
-              echo "get-issue-number should succeed for pull_request events"
-              exit 1
-            fi
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const eventName = process.env.EVENT_NAME;
+            const outcome = process.env.STEPS_GET_ISSUE_NUMBER_OUTCOME;
+            const issueNumber = process.env.STEPS_GET_ISSUE_NUMBER_OUTPUTS_ISSUE_NUMBER;
+            const expectedPrNumber = process.env.EXPECTED_PULL_REQUEST_NUMBER;
 
-            if [ "${STEPS_GET_ISSUE_NUMBER_OUTPUTS_ISSUE_NUMBER}" != "${EXPECTED_PULL_REQUEST_NUMBER}" ]; then
-              echo "get-issue-number output is not valid for pull_request events"
-              exit 1
-            fi
-          elif [ "${STEPS_GET_ISSUE_NUMBER_OUTCOME}" != 'failure' ]; then
-            echo "get-issue-number should fail when event is not pull_request"
-            exit 1
-          fi
+            core.info(`Event name: ${eventName}`);
+            core.info(`Action outcome: ${outcome}`);
+
+            try {
+              if (eventName === 'pull_request') {
+                assert.strictEqual(outcome, 'success', 'get-issue-number should succeed for pull_request events');
+                assert.strictEqual(
+                  issueNumber,
+                  expectedPrNumber,
+                  'get-issue-number output is not valid for pull_request events'
+                );
+              } else {
+                assert.strictEqual(outcome, 'failure', 'get-issue-number should fail when event is not pull_request');
+              }
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
