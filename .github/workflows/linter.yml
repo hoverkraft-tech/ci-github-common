@@ -76,6 +76,9 @@ jobs:
     runs-on: ${{ fromJson(inputs.runs-on) }}
     permissions:
       contents: read
+      issues: write
+      packages: read
+      pull-requests: write
       statuses: write
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -246,7 +249,7 @@ jobs:
           VALIDATE_ALL_CODEBASE: ${{ inputs.lint-all }}
           LOG_LEVEL: WARN
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          GITHUB_TOKEN: ${{ secrets.github-token || github.token }} # zizmor: ignore[secrets-outside-env] reusable workflow token override is intentional
+          GITHUB_TOKEN: ${{ secrets.github-token || secrets.GITHUB_TOKEN || github.token }} # zizmor: ignore[secrets-outside-env] reusable workflow token override is intentional
           IGNORE_GITIGNORED_FILES: "true"
 
   codeql:
