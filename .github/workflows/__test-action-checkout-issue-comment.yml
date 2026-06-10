@@ -23,7 +23,7 @@ jobs:
         with:
           script: |
             const assert = require('node:assert/strict');
-            const prNumber = 1;
+            const prNumber = 570;
             assert.ok(prNumber, 'Could not determine PR number from static test configuration');
 
             const pr = await github.rest.pulls.get({
