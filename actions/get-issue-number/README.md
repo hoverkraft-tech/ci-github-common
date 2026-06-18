@@ -34,7 +34,7 @@ Action to get Pull request or issue number
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/get-issue-number@624be17604ee0a7378488191aacb35851e7cf001 # 0.37.1
+- uses: hoverkraft-tech/ci-github-common/actions/get-issue-number@7034f6ae5bae1ec46a0108e8efb60d102e88961d # 0.37.2
 ```
 
 <!-- usage:end -->
