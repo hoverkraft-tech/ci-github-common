@@ -15,8 +15,10 @@ export class LCOVParser extends BaseParser {
 
 		return (
 			hasSupportedName &&
-			content.includes("TN:") &&
-			(content.includes("SF:") || content.includes("DA:"))
+			content.includes("SF:") &&
+			(content.includes("DA:") ||
+				content.includes("LF:") ||
+				content.includes("end_of_record"))
 		);
 	}
 

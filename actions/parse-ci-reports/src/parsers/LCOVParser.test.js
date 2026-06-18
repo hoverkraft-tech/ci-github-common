@@ -12,6 +12,14 @@ BRDA:2,0,1,0
 end_of_record
 `;
 
+const SAMPLE_LCOV_WITHOUT_TEST_NAME = `SF:lib/main.dart
+DA:1,1
+DA:2,0
+LF:2
+LH:1
+end_of_record
+`;
+
 describe("LCOVParser", () => {
 	it("keeps auto-pattern path detection synchronized", () => {
 		const parser = new LCOVParser();
@@ -25,6 +33,12 @@ describe("LCOVParser", () => {
 		const parser = new LCOVParser();
 
 		assert.ok(parser.canParse("coverage/lcov.info", SAMPLE_LCOV));
+		assert.ok(
+			parser.canParse(
+				"flutter/coverage/lcov.info",
+				SAMPLE_LCOV_WITHOUT_TEST_NAME,
+			),
+		);
 		assert.ok(!parser.canParse("coverage/report.txt", SAMPLE_LCOV));
 	});
 
