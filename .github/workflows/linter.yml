@@ -128,9 +128,17 @@ jobs:
               },
             };
 
+            const kubeconformSchemaLocations = [
+              "default",
+              "https://raw.githubusercontent.com/hoverkraft-tech/crds-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json",
+              "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json",
+            ];
+
             const defaultLinterVariables = {
               KUBERNETES_KUBECONFORM_OPTIONS:
-                "-schema-location default -schema-location https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json",
+                kubeconformSchemaLocations
+                  .map((schemaLocation) => `-schema-location ${schemaLocation}`)
+                  .join(" "),
             };
 
             function parseEnvironmentLines(serializedEnvironment) {
