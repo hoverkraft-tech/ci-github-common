@@ -25,7 +25,7 @@
 	"license": "MIT",
 	"type": "module",
 	"dependencies": {
-		"fast-xml-parser": "^5.8.0"
+		"fast-xml-parser": "^5.9.2"
 	},
 	"engines": {
 		"node": ">=24.0.0"
