@@ -3,7 +3,7 @@
 name: "Create and merge Pull Request"
 description: |
   Action to create and merge Pull Request.
-  Opinionated, set GitHub Actions bot as author, then rebase and merge.
+  Opinionated, set GitHub Actions bot as author, then merge with the configured strategy.
 author: hoverkraft
 branding:
   icon: git-pull-request
@@ -20,14 +20,20 @@ inputs:
     description: "The pull request branch name"
     required: true
   title:
-    description: "The pull request title"
+    description: "The pull request title and, for merge/squash merges, the merged commit title"
     required: true
   body:
     description: "The pull request body"
     required: true
   commit-message:
-    description: "The commit message for the pull request"
+    description: "The commit message for the pull request and, for merge/squash merges, the merged commit body"
     required: true
+  merge-method:
+    description: |
+      Merge strategy for the created pull request.
+      Valid values: `merge`, `rebase`, `squash`.
+    default: rebase
+    required: false
 
 outputs:
   merged-ref:
@@ -82,15 +88,32 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.github-token }}
         PULL_REQUEST_NUMBER: ${{ steps.create-pull-request.outputs.pull-request-number }}
+        MERGE_METHOD: ${{ inputs.merge-method }}
+        PULL_REQUEST_TITLE: ${{ inputs.title }}
+        PULL_REQUEST_COMMIT_MESSAGE: ${{ inputs.commit-message }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
           const maxAttempts = 10;
           const requiredWorkflowsError = 'Required workflow';
           const repository = `${context.repo.owner}/${context.repo.repo}`;
+          const mergeMethod = (process.env.MERGE_METHOD ?? 'rebase').trim();
+          const mergeCommitTitle = (process.env.PULL_REQUEST_TITLE ?? '').trim();
+          const mergeCommitMessage = process.env.PULL_REQUEST_COMMIT_MESSAGE ?? '';
+          const mergeMethodFlags = {
+            merge: '--merge',
+            rebase: '--rebase',
+            squash: '--squash',
+          };
           const getRetryDelayMs = attempt => Math.min(1000 * (2 ** attempt), 10000);
 
           const sleep = delayMs => new Promise(resolve => setTimeout(resolve, delayMs));
+
+          if (!(mergeMethod in mergeMethodFlags)) {
+            throw new Error(
+              `Invalid merge method: ${mergeMethod}. Expected one of: ${Object.keys(mergeMethodFlags).join(', ')}`,
+            );
+          }
 
           const waitFor = async ({
             run,
@@ -154,20 +177,34 @@ runs:
               getTimeoutMessage: () => `Pull request #${pullNumber} is not mergeable after ${maxAttempts} attempts`,
             });
 
+          const getMergeArguments = pullNumber => {
+            const args = [
+              'pr',
+              'merge',
+              '-R',
+              repository,
+              mergeMethodFlags[mergeMethod],
+              '--admin',
+              String(pullNumber),
+            ];
+
+            if (mergeMethod !== 'rebase' && mergeCommitTitle) {
+              args.push('--subject', mergeCommitTitle);
+            }
+
+            if (mergeMethod !== 'rebase' && mergeCommitMessage.trim()) {
+              args.push('--body', mergeCommitMessage);
+            }
+
+            return args;
+          };
+
           const mergePullRequest = async pullNumber => {
-            core.debug(`Merging pull request #${pullNumber} for repository ${repository}...`);
+            core.debug(`Merging pull request #${pullNumber} for repository ${repository} with method ${mergeMethod}...`);
 
             const { exitCode, stdout, stderr } = await exec.getExecOutput(
               'gh',
-              [
-                'pr',
-                'merge',
-                '-R',
-                repository,
-                '--rebase',
-                '--admin',
-                String(pullNumber),
-              ],
+              getMergeArguments(pullNumber),
               {
                 env: process.env,
                 ignoreReturnCode: true,
