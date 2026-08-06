@@ -80,11 +80,9 @@ See <https://docs.github.com/en/repositories/managing-your-repositorys-settings-
 | **`github-token`**   | GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). | **false**    | `${{ github.token }}` |
 |                      | See <https://github.com/peter-evans/create-pull-request#action-inputs>.                                    |              |                       |
 | **`branch`**         | The pull request branch name                                                                               | **true**     | -                     |
-| **`title`**          | The pull request title                                                                                     | **true**     | -                     |
-|                      | Also used as the merged commit title for `merge` and `squash`.                                             |              |                       |
+| **`title`**          | The pull request title and, for merge/squash merges, the merged commit title                               | **true**     | -                     |
 | **`body`**           | The pull request body                                                                                      | **true**     | -                     |
-| **`commit-message`** | The commit message for the pull request                                                                    | **true**     | -                     |
-|                      | Also used as the merged commit body for `merge` and `squash`.                                              |              |                       |
+| **`commit-message`** | The commit message for the pull request and, for merge/squash merges, the merged commit body               | **true**     | -                     |
 | **`merge-method`**   | Merge strategy for the created pull request.                                                               | **false**    | `rebase`              |
 |                      | Valid values: `merge`, `rebase`, `squash`.                                                                 |              |                       |
 
