@@ -31,7 +31,7 @@ Action to resolve and validate a working directory path.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/working-directory@2334d395217f9811699dbd4ace9d8559e4d99e0d # 0.37.3
+- uses: hoverkraft-tech/ci-github-common/actions/working-directory@3a27d31e9ccefbe9609cc9165017ed100ff34a22 # 0.38.0
   with:
     # Relative or absolute working directory path to resolve.
     # Default: `.`
