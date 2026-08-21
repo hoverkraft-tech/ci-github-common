@@ -277,11 +277,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
+      - uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           languages: ${{ matrix.language }}
 
-      - uses: github/codeql-action/analyze@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
+      - uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           category: "/language:${{matrix.language}}"
 
@@ -390,7 +390,7 @@ jobs:
 
       # FIXME: should be updated by dependabot. See https://github.com/dependabot/dependabot-core/issues/8362
       # https://github.com/sethvargo/ratchet/pkgs/container/ratchet
-      - uses: "docker://ghcr.io/sethvargo/ratchet:0.11.4@sha256:242445a1c55430ad7477e6fcf2027c77d03f5760702537bca4cf622e7338fc81" # 0.11.4
+      - uses: "docker://ghcr.io/sethvargo/ratchet:0.12.0@sha256:ba6a286f8a53899714d17f89f45134678577431ca483b8000b5dba9267eee36c" # 0.12.0
         if: ${{ needs.prepare-actions-linting.outputs.action-files }}
         with:
           args: "lint --format human --format actions ${{ needs.prepare-actions-linting.outputs.action-files }}"
