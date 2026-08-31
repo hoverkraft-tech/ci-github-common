@@ -86,7 +86,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      - name: Configure Super-Linter environment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           LINTER_ENV: ${{ inputs.linter-env }}
           JAVASCRIPT_LINTER_TOOLCHAIN: ${{ inputs.javascript-linter-toolchain }}
@@ -139,6 +140,7 @@ jobs:
                 kubeconformSchemaLocations
                   .map((schemaLocation) => `-schema-location ${schemaLocation}`)
                   .join(" "),
+              SAVE_SUPER_LINTER_SUMMARY: "true",
             };
 
             function parseEnvironmentLines(serializedEnvironment) {
@@ -200,14 +202,29 @@ jobs:
               return mergedEnvironment;
             }
 
+            function isTrue(value) {
+              return (value ?? "").toLowerCase() === "true";
+            }
+
+            function normalizeCustomEnvironment(customEnvironment) {
+              const normalizedEnvironment = new Map(customEnvironment);
+              if (isTrue(normalizedEnvironment.get("VALIDATE_GIT_COMMITLINT"))) {
+                normalizedEnvironment.delete("VALIDATE_GIT_COMMITLINT");
+              }
+
+              return normalizedEnvironment;
+            }
+
             const customEnvironment = parseEnvironmentLines(process.env.LINTER_ENV ?? "");
+            const normalizedCustomEnvironment =
+              normalizeCustomEnvironment(customEnvironment);
             const javascriptToolchain = resolveToolchain(
-              customEnvironment,
+              normalizedCustomEnvironment,
               "VALIDATE_JAVASCRIPT_TOOLCHAIN",
               process.env.JAVASCRIPT_LINTER_TOOLCHAIN ?? "",
             );
             const pythonToolchain = resolveToolchain(
-              customEnvironment,
+              normalizedCustomEnvironment,
               "VALIDATE_PYTHON_TOOLCHAIN",
               process.env.PYTHON_LINTER_TOOLCHAIN ?? "",
             );
@@ -226,29 +243,152 @@ jobs:
                 "VALIDATE_PYTHON_TOOLCHAIN",
               ),
             };
-            const mergedEnvironment = mergeEnvironment(customEnvironment, defaultEnvironment);
+            const mergedEnvironment = mergeEnvironment(
+              normalizedCustomEnvironment,
+              defaultEnvironment,
+            );
 
             for (const [key, value] of mergedEnvironment) {
               core.exportVariable(key, value);
             }
 
+      - name: Configure commitlint
+        id: configure-commitlint
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          LINTER_ENV: ${{ inputs.linter-env }}
+        with:
+          script: |
+            const { existsSync, readFileSync, writeFileSync } = require("node:fs");
+            const path = require("node:path");
+
+            const configurationFiles = [
+              ".commitlintrc",
+              ".commitlintrc.json",
+              ".commitlintrc.yaml",
+              ".commitlintrc.yml",
+              ".commitlintrc.js",
+              ".commitlintrc.cjs",
+              ".commitlintrc.mjs",
+              "commitlint.config.js",
+              "commitlint.config.cjs",
+              "commitlint.config.mjs",
+            ];
+            const defaultConfigurationPath = "commitlint.config.cjs";
+            const defaultConfigurationContent = [
+              "module.exports = {",
+              '\trules: {',
+              '\t\t"body-leading-blank": [1, "always"],',
+              '\t\t"footer-leading-blank": [1, "always"],',
+              '\t\t"header-max-length": [2, "always", 100],',
+              '\t\t"subject-case": [',
+              '\t\t\t2,',
+              '\t\t\t"never",',
+              '\t\t\t["sentence-case", "start-case", "pascal-case", "upper-case"],',
+              "\t\t],",
+              '\t\t"subject-empty": [2, "never"],',
+              '\t\t"subject-full-stop": [2, "never", "."],',
+              '\t\t"type-case": [2, "always", "lower-case"],',
+              '\t\t"type-empty": [2, "never"],',
+              '\t\t"type-enum": [',
+              '\t\t\t2,',
+              '\t\t\t"always",',
+              "\t\t\t[",
+              '\t\t\t\t"build",',
+              '\t\t\t\t"chore",',
+              '\t\t\t\t"ci",',
+              '\t\t\t\t"docs",',
+              '\t\t\t\t"feat",',
+              '\t\t\t\t"fix",',
+              '\t\t\t\t"perf",',
+              '\t\t\t\t"refactor",',
+              '\t\t\t\t"revert",',
+              '\t\t\t\t"style",',
+              '\t\t\t\t"test",',
+              "\t\t\t],",
+              "\t\t],",
+              "\t},",
+              "};",
+              "",
+            ].join("\n");
+
+            function hasPackageJsonConfiguration(workspacePath) {
+              const packageJsonPath = path.join(workspacePath, "package.json");
+              if (!existsSync(packageJsonPath)) {
+                return false;
+              }
+
+              const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+              return "commitlint" in packageJson;
+            }
+
+            function hasConfiguration(workspacePath) {
+              if (
+                configurationFiles.some((file) =>
+                  existsSync(path.join(workspacePath, file)),
+                )
+              ) {
+                return true;
+              }
+
+              return hasPackageJsonConfiguration(workspacePath);
+            }
+
+            function getCommitlintValidation(serializedEnvironment) {
+              let validation;
+
+              for (const rawLine of serializedEnvironment.split("\n")) {
+                const line = rawLine.trim();
+                const separatorIndex = line.indexOf("=");
+                if (
+                  separatorIndex > 0 &&
+                  line.slice(0, separatorIndex).trim() === "VALIDATE_GIT_COMMITLINT"
+                ) {
+                  validation = line.slice(separatorIndex + 1);
+                }
+              }
+
+              return validation;
+            }
+
+            const workspacePath = process.env.GITHUB_WORKSPACE ?? process.cwd();
+            const defaultConfigurationAbsolutePath = path.join(
+              workspacePath,
+              defaultConfigurationPath,
+            );
+            const commitlintValidation = getCommitlintValidation(
+              process.env.LINTER_ENV ?? "",
+            );
+            if (
+              (commitlintValidation ?? "").toLowerCase() !== "false" &&
+              !hasConfiguration(workspacePath)
+            ) {
+              writeFileSync(defaultConfigurationAbsolutePath, defaultConfigurationContent);
+              core.setOutput(
+                "generated-configuration-path",
+                defaultConfigurationAbsolutePath,
+              );
+            }
+
       # FIXME: superlinter should auto install required dependencies. See https://github.com/super-linter/super-linter/issues/6089.
-      - id: has-prettier-plugins
+      - name: Find Prettier plugins
+        id: has-prettier-plugins
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { readFileSync } = require("node:fs");
             const { dirname } = require("node:path");
-            const globber = await glob.create('**/package.json');
+            const globber = await glob.create("**/package.json");
             for await (const file of globber.globGenerator()) {
-              const packageJson = JSON.parse(readFileSync(file, 'utf8'));
+              const packageJson = JSON.parse(readFileSync(file, "utf8"));
               if (packageJson?.prettier?.plugins?.length > 0) {
                 core.setOutput("package-json-dir", dirname(file));
                 return;
               }
             }
+
       - uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@df348077afa4e79725151d50606e9dc63f86dcb6 # 0.24.4
-        if: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
+        if: ${{ steps.has-prettier-plugins.outputs.package-json-dir != '' }}
         with:
           working-directory: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
 
@@ -259,6 +399,12 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GITHUB_TOKEN: ${{ secrets.github-token || secrets.GITHUB_TOKEN || github.token }} # zizmor: ignore[secrets-outside-env] reusable workflow token override is intentional
           IGNORE_GITIGNORED_FILES: "true"
+
+      - name: Remove generated commitlint configuration
+        if: ${{ always() && steps.configure-commitlint.outputs.generated-configuration-path != '' }}
+        env:
+          GENERATED_CONFIGURATION_PATH: ${{ steps.configure-commitlint.outputs.generated-configuration-path }}
+        run: rm -f -- "${GENERATED_CONFIGURATION_PATH}"
 
   codeql:
     if: ${{ inputs.codeql-languages }}
