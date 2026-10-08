@@ -1,0 +1,6 @@
+rules:
+  self-repository:
+    # Actionlint 1.7.12 (bundled with Super-Linter v9) rejects the recommended $/ syntax.
+    # FIXME: Re-enable when a supported Actionlint release implements it:
+    # https://github.com/rhysd/actionlint/issues/711
+    disable: true
