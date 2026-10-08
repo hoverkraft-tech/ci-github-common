@@ -10,7 +10,7 @@
    xml:space="preserve"
    xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns="http://www.w3.org/2000/svg"
-   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   xmlns:svg="http://www.w3.org/2000/svg"><title>CI GitHub Common by Hoverkraft</title><defs
      id="defs3658"><rect
        x="275.63507"
        y="20.725599"
@@ -45,14 +45,14 @@
        xml:space="preserve"
        transform="scale(0.26458333)"
        id="text5147"
-       style="font-size:42.6667px;font-family:Inter;-inkscape-font-specification:'Inter, @opsz=32.0,wght=900';font-variation-settings:'opsz' 32, 'wght' 900;white-space:pre;shape-inside:url(#rect5149);fill:#001d20;stroke-width:10.5638;stroke-linecap:round;stroke-linejoin:bevel;paint-order:markers fill stroke" /><text
+       style="font-size:42.6667px;font-family:Inter,sans-serif;font-variation-settings:'opsz' 32, 'wght' 900;white-space:pre;shape-inside:url(#rect5149);fill:#001d20;stroke-width:10.5638;stroke-linecap:round;stroke-linejoin:bevel;paint-order:markers fill stroke" /><text
        xml:space="preserve"
-       style="font-size:28.4729px;font-family:Inter;-inkscape-font-specification:'Inter, @opsz=32.0,wght=900';font-variation-settings:'opsz' 32, 'wght' 900;fill:#001d20;stroke-width:7.04957;stroke-linecap:round;stroke-linejoin:bevel;paint-order:markers fill stroke"
+       style="font-size:28.4729px;font-family:Inter,sans-serif;font-variation-settings:'opsz' 32, 'wght' 900;fill:#001d20;stroke-width:7.04957;stroke-linecap:round;stroke-linejoin:bevel;paint-order:markers fill stroke"
        x="73.198349"
        y="22.445642"
        id="text5155" /><text
        xml:space="preserve"
-       style="font-size:11.2889px;font-family:Inter;-inkscape-font-specification:'Inter, @opsz=32.0,wght=900';font-variation-settings:'opsz' 32, 'wght' 900;fill:#001d20;stroke-width:2.79501;stroke-linecap:round;stroke-linejoin:bevel;paint-order:markers fill stroke"
+       style="font-size:11.2889px;font-family:Inter,sans-serif;font-variation-settings:'opsz' 32, 'wght' 900;fill:#001d20;stroke-width:2.79501;stroke-linecap:round;stroke-linejoin:bevel;paint-order:markers fill stroke"
        x="72.120987"
        y="64.302139"
        id="text5213"><tspan
@@ -63,14 +63,14 @@
        id="g737"
        transform="translate(-3.4794027,9.2738513)"><text
          xml:space="preserve"
-         style="font-size:18.7169px;font-family:Inter;-inkscape-font-specification:'Inter, @opsz=32.0,wght=900';font-variation-settings:'opsz' 32, 'wght' 900;fill:#001d20;stroke-width:4.63409;stroke-linecap:round;stroke-linejoin:bevel;paint-order:markers fill stroke"
+         style="font-size:18.7169px;font-family:Inter,sans-serif;font-variation-settings:'opsz' 32, 'wght' 900;fill:#001d20;stroke-width:4.63409;stroke-linecap:round;stroke-linejoin:bevel;paint-order:markers fill stroke"
          x="75.675797"
          y="37.651783"
          id="text5155-9">Common</text></g><g
        id="g450"
        transform="matrix(0.90927171,0,0,0.90927171,5.4991133,0.37543924)"><text
          xml:space="preserve"
-         style="font-size:27.262px;font-family:Inter;-inkscape-font-specification:'Inter, @opsz=32.0,wght=900';font-variation-settings:'opsz' 32, 'wght' 900;fill:#001d20;stroke-width:6.74977;stroke-linecap:round;stroke-linejoin:bevel;paint-order:markers fill stroke"
+         style="font-size:27.262px;font-family:Inter,sans-serif;font-variation-settings:'opsz' 32, 'wght' 900;fill:#001d20;stroke-width:6.74977;stroke-linecap:round;stroke-linejoin:bevel;paint-order:markers fill stroke"
          x="73.222"
          y="23.137991"
          id="text5155-2">CI - GitHub</text></g><image
