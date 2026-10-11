@@ -89,7 +89,7 @@ jobs:
 
       - name: Act - Run parse-ci-reports action
         id: parse-ci-reports
-        uses: ./actions/parse-ci-reports
+        uses: $/actions/parse-ci-reports
         with:
           report-paths: |
             test-reports/junit.xml

@@ -18,7 +18,7 @@ jobs:
 
       - name: Act - Resolve workspace root directory
         id: working-directory
-        uses: ./actions/working-directory
+        uses: $/actions/working-directory
         with:
           working-directory: .
 
@@ -46,7 +46,7 @@ jobs:
       - name: Act - Run outside-workspace path with enforcement enabled
         id: outside-workspace-disallowed
         continue-on-error: true
-        uses: ./actions/working-directory
+        uses: $/actions/working-directory
         with:
           working-directory: /tmp
           enforce-path-in-workspace: true
@@ -73,7 +73,7 @@ jobs:
 
       - name: Act - Run outside-workspace path with enforcement disabled
         id: outside-workspace-allowed
-        uses: ./actions/working-directory
+        uses: $/actions/working-directory
         with:
           working-directory: /tmp
           enforce-path-in-workspace: false

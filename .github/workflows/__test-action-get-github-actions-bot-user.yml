@@ -18,7 +18,7 @@ jobs:
 
       - name: Act - Run get-github-actions-bot-user action
         id: get-github-actions-bot-user
-        uses: ./actions/get-github-actions-bot-user
+        uses: $/actions/get-github-actions-bot-user
 
       - name: Assert - Check get-github-actions-bot-user outputs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0

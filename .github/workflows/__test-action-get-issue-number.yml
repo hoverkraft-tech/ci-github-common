@@ -19,7 +19,7 @@ jobs:
       - name: Act - Run get-issue-number action
         id: get-issue-number
         continue-on-error: true
-        uses: ./actions/get-issue-number
+        uses: $/actions/get-issue-number
 
       - name: Assert - Check get-issue-number behavior by event type
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0

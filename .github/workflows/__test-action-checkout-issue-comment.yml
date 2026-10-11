@@ -41,7 +41,7 @@ jobs:
 
       - name: Act - Simulate issue_comment event context and checkout
         id: checkout
-        uses: ./actions/checkout
+        uses: $/actions/checkout
         with:
           ref: refs/pull/${{ steps.pr-info.outputs.pr-number }}/head
           persist-credentials: true

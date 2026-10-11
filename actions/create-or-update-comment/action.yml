@@ -34,25 +34,8 @@ inputs:
 runs:
   using: "composite"
   steps:
-    # FIXME: This is a workaround until this issue is resolved: https://github.com/actions/runner/issues/1348.
-    - name: Prepare sibling actions
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-      with:
-        script: |
-          const path = require('node:path');
-
-          const sourcePath = path.resolve(process.env.GITHUB_ACTION_PATH, '..');
-          const destinationPath = path.resolve(process.env.GITHUB_WORKSPACE, '..', 'self-actions');
-
-          await io.rmRF(destinationPath);
-          await io.mkdirP(destinationPath);
-          await io.cp(sourcePath, destinationPath, {
-            recursive: true,
-            copySourceDirectory: false,
-          });
-
     - id: get-issue-number
-      uses: ./../self-actions/get-issue-number
+      uses: $/actions/get-issue-number
 
     - uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4.0.0
       id: find-comment
@@ -73,12 +56,3 @@ runs:
           ${{ inputs.body }}
         reactions: ${{ inputs.reactions }}
         token: ${{ inputs.token || github.token }}
-
-    - name: Cleanup sibling actions
-      if: ${{ always() }}
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-      with:
-        script: |
-          const path = require('node:path');
-
-          await io.rmRF(path.resolve(process.env.GITHUB_WORKSPACE, '..', 'self-actions'));
