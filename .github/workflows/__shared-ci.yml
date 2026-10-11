@@ -15,38 +15,38 @@ jobs:
       pull-requests: write
       security-events: write
       statuses: write
-    uses: ./.github/workflows/linter.yml
+    uses: $/.github/workflows/linter.yml
 
   test-action-matrix-outputs:
     needs: linter
     permissions:
       contents: read
-    uses: ./.github/workflows/__test-action-matrix-outputs.yml
+    uses: $/.github/workflows/__test-action-matrix-outputs.yml
 
   test-action-checkout:
     needs: linter
     permissions:
       contents: read
-    uses: ./.github/workflows/__test-action-checkout.yml
+    uses: $/.github/workflows/__test-action-checkout.yml
 
   test-action-checkout-issue-comment:
     needs: linter
     permissions:
       contents: read
       pull-requests: read
-    uses: ./.github/workflows/__test-action-checkout-issue-comment.yml
+    uses: $/.github/workflows/__test-action-checkout-issue-comment.yml
 
   test-action-get-github-actions-bot-user:
     needs: linter
     permissions:
       contents: read
-    uses: ./.github/workflows/__test-action-get-github-actions-bot-user.yml
+    uses: $/.github/workflows/__test-action-get-github-actions-bot-user.yml
 
   test-action-get-issue-number:
     needs: linter
     permissions:
       contents: read
-    uses: ./.github/workflows/__test-action-get-issue-number.yml
+    uses: $/.github/workflows/__test-action-get-issue-number.yml
 
   test-action-parse-ci-reports:
     needs: linter
@@ -56,22 +56,22 @@ jobs:
       packages: read
       pull-requests: write
       security-events: write
-    uses: ./.github/workflows/__test-action-parse-ci-reports.yml
+    uses: $/.github/workflows/__test-action-parse-ci-reports.yml
 
   test-action-repository-owner-is-organization:
     needs: linter
     permissions:
       contents: read
-    uses: ./.github/workflows/__test-action-repository-owner-is-organization.yml
+    uses: $/.github/workflows/__test-action-repository-owner-is-organization.yml
 
   test-action-slugify:
     needs: linter
     permissions:
       contents: read
-    uses: ./.github/workflows/__test-action-slugify.yml
+    uses: $/.github/workflows/__test-action-slugify.yml
 
   test-action-working-directory:
     needs: linter
     permissions:
       contents: read
-    uses: ./.github/workflows/__test-action-working-directory.yml
+    uses: $/.github/workflows/__test-action-working-directory.yml

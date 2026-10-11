@@ -46,25 +46,8 @@ outputs:
 runs:
   using: "composite"
   steps:
-    # FIXME: This is a workaround until this issue is resolved: https://github.com/actions/runner/issues/1348.
-    - name: Prepare sibling actions
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-      with:
-        script: |
-          const path = require('node:path');
-
-          const sourcePath = path.resolve(process.env.GITHUB_ACTION_PATH, '..');
-          const destinationPath = path.resolve(process.env.GITHUB_WORKSPACE, '..', 'self-actions');
-
-          await io.rmRF(destinationPath);
-          await io.mkdirP(destinationPath);
-          await io.cp(sourcePath, destinationPath, {
-            recursive: true,
-            copySourceDirectory: false,
-          });
-
     - id: github-actions-bot-user
-      uses: ./../self-actions/get-github-actions-bot-user
+      uses: $/actions/get-github-actions-bot-user
 
     - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
       id: create-pull-request
@@ -253,12 +236,3 @@ runs:
           });
 
           await verifyMergedPullRequest(pullNumber, mergeOutputs);
-
-    - name: Cleanup sibling actions
-      if: ${{ always() }}
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-      with:
-        script: |
-          const path = require('node:path');
-
-          await io.rmRF(path.resolve(process.env.GITHUB_WORKSPACE, '..', 'self-actions'));

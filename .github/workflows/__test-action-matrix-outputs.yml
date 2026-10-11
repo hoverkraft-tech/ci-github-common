@@ -21,7 +21,7 @@ jobs:
           persist-credentials: false
 
       - id: set-matrix-output
-        uses: ./actions/set-matrix-output
+        uses: $/actions/set-matrix-output
         with:
           value: |
             { "test": "test content 1" }
@@ -63,7 +63,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./actions/set-matrix-output
+      - uses: $/actions/set-matrix-output
         with:
           value: ""
           artifact-name: "test-matrix-outputs-${{ matrix.os }}"
@@ -81,7 +81,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./actions/set-matrix-output
+      - uses: $/actions/set-matrix-output
         with:
           value: |
             { "test": "test content 3" }
@@ -102,7 +102,7 @@ jobs:
           persist-credentials: false
 
       - id: get-matrix-outputs
-        uses: ./actions/get-matrix-outputs
+        uses: $/actions/get-matrix-outputs
         with:
           artifact-name: test-matrix-outputs-${{ matrix.os }}
 

@@ -19,7 +19,7 @@ jobs:
 
       - name: Act - Run custom checkout action with defaults
         id: custom-checkout-defaults
-        uses: ./actions/checkout
+        uses: $/actions/checkout
 
       - name: Assert - Verify repository is checked out
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -32,7 +32,7 @@ jobs:
 
       - name: Act - Run custom checkout action with fetch-depth 0
         id: custom-checkout-full-history
-        uses: ./actions/checkout
+        uses: $/actions/checkout
         with:
           fetch-depth: "0"
 
@@ -47,7 +47,7 @@ jobs:
 
       - name: Act - Run custom checkout action with LFS disabled (default)
         id: custom-checkout-no-lfs
-        uses: ./actions/checkout
+        uses: $/actions/checkout
         with:
           lfs: "false"
 

@@ -47,6 +47,30 @@ Executes:
 
 <!-- overview:end -->
 
+### Shared linting image
+
+Super-Linter runs in the [Hoverkraft image](https://github.com/hoverkraft-tech/docker-base-images/tree/main/images/super-linter).
+The image owns toolchain selection, Kubernetes schema defaults, and fallback
+commitlint rules. Use the same image release for local linting to share
+these defaults and the bundled linter versions.
+
+The local Dockerfile and workflow reference the same image release. Update both
+references together when updating the image: Dependabot updates Dockerfiles but
+[does not update `docker://` workflow references](https://github.com/dependabot/dependabot-core/issues/8362).
+
+Values in `linter-env` override the toolchain inputs and image defaults. An empty
+`VALIDATE_JAVASCRIPT_TOOLCHAIN` or `VALIDATE_PYTHON_TOOLCHAIN` value disables the
+corresponding automatic toolchain exclusions. `VALIDATE_GIT_COMMITLINT=false`
+disables commitlint. With toolchain selectors enabled, explicit `true` keeps it
+enabled without restricting the other validators. Set both selectors to empty
+strings to use Super-Linter's native `VALIDATE_*=true` allowlist, including
+commitlint. Do not mix `true` and `false` validator flags in that mode.
+
+CI uses Git change detection according to `lint-all` and publishes GitHub
+summaries. Local runs use filesystem discovery by default. The workflow also
+installs project dependencies when `package.json` declares Prettier plugins;
+install those dependencies before running the image locally.
+
 ### GitHub Actions Pinning
 
 **Tips:** To ensure that all GitHub Actions used in your workflows are pinned to a specific version,
