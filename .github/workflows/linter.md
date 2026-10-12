@@ -54,8 +54,8 @@ The image owns toolchain selection, Kubernetes schema defaults, and fallback
 commitlint rules. Use the same image release for local linting to share
 these defaults and the bundled linter versions.
 
-The local Dockerfile and workflow reference the same image release. Update both
-references together when updating the image: Dependabot updates Dockerfiles but
+The local Dockerfile and workflow pin the same image release and SHA256 digest.
+Update both references together when updating the image: Dependabot updates Dockerfiles but
 [does not update `docker://` workflow references](https://github.com/dependabot/dependabot-core/issues/8362).
 
 Values in `linter-env` override the toolchain inputs and image defaults. An empty
