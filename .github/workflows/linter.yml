@@ -142,7 +142,7 @@ jobs:
 
       - name: Run shared Super-Linter image
         # FIXME: Keep aligned with Dockerfile; Dependabot cannot update docker://
-        uses: docker://ghcr.io/hoverkraft-tech/docker-base-images/super-linter:1.1.0
+        uses: docker://ghcr.io/hoverkraft-tech/docker-base-images/super-linter:1.1.0@sha256:f600fdd9c95e222b3831181e206db1a58494c45390b0ee0001e32a3c2ddedc75
         env:
           VALIDATE_ALL_CODEBASE: ${{ inputs.lint-all }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
