@@ -31,7 +31,7 @@
 Reusable workflow that performs linting on the codebase.
 Executes:
 
-- [Super-Linter](https://github.com/super-linter/super-linter), with some opinionated defaults.
+- [Hoverkraft Super-Linter](https://github.com/hoverkraft-tech/docker-base-images/tree/main/images/super-linter), shared with local linting.
 - [CodeQL](https://docs.github.com/en/code-security/code-scanning/introduction-to-code-scanning/about-code-scanning-with-codeql) to analyze the code.
 - [Ratchet](https://github.com/sethvargo/ratchet) to check that GitHub Action versions are pinned.
 
