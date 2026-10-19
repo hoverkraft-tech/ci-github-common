@@ -153,7 +153,6 @@ jobs:
           working-directory: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
 
       - name: Run shared Super-Linter image
-        # FIXME: Keep aligned with Dockerfile; Dependabot cannot update docker://
         uses: docker://ghcr.io/hoverkraft-tech/docker-base-images/super-linter:1.1.0@sha256:f600fdd9c95e222b3831181e206db1a58494c45390b0ee0001e32a3c2ddedc75
         env:
           VALIDATE_ALL_CODEBASE: ${{ inputs.lint-all }}
@@ -288,9 +287,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # FIXME: should be updated by dependabot. See https://github.com/dependabot/dependabot-core/issues/8362
-      # https://github.com/sethvargo/ratchet/pkgs/container/ratchet
-      - uses: "docker://ghcr.io/sethvargo/ratchet:0.12.0@sha256:ba6a286f8a53899714d17f89f45134678577431ca483b8000b5dba9267eee36c" # 0.12.0
+      - uses: "docker://ghcr.io/sethvargo/ratchet:0.12.0@sha256:ba6a286f8a53899714d17f89f45134678577431ca483b8000b5dba9267eee36c"
         if: ${{ needs.prepare-actions-linting.outputs.action-files }}
         with:
           args: "lint --format human --format actions ${{ needs.prepare-actions-linting.outputs.action-files }}"

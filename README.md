@@ -82,6 +82,28 @@ make lint-fix    # Run Super Linter with autofix enabled
 gh act -W .github/workflows/<workflow>.yml  # Exercise workflows locally when needed
 ```
 
+### Dependency updates
+
+[Dependabot](.github/dependabot.yml) is the primary dependency updater for Dockerfile
+images, GitHub Actions, npm, and devcontainer dependencies.
+[Renovate](.github/renovate.json) only updates tags and digests in `uses: docker://…`
+action references, including Ratchet and Super-Linter, which
+[Dependabot does not support](https://github.com/dependabot/dependabot-core/issues/8362).
+Super-Linter's Dockerfile and workflow references receive separate update pull
+requests from their respective bots; review them together to keep the images aligned.
+
+The [Renovate workflow](.github/workflows/__renovate.yml) runs on Fridays at 04:23 UTC
+and supports manual dispatch. A seven-day release delay applies when registry
+timestamps are available. GHCR updates remain eligible because Renovate's
+[Docker datasource](https://docs.renovatebot.com/modules/datasource/docker/)
+only provides release timestamps for Docker Hub.
+
+The workflow uses the `CI_BOT_APP_CLIENT_ID` variable and `CI_BOT_APP_PRIVATE_KEY`
+secret. The GitHub App
+must be installed on this repository with Checks read access and Contents, Issues,
+Pull requests, Commit statuses, and Workflows write access. Renovate opens pull
+requests for review; automatic merging is disabled.
+
 ## File Structure
 
 ```text
