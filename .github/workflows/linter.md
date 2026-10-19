@@ -67,7 +67,10 @@ strings to use Super-Linter's native `VALIDATE_*=true` allowlist, including
 commitlint. Do not mix `true` and `false` validator flags in that mode.
 
 CI uses Git change detection according to `lint-all` and publishes GitHub
-summaries. Local runs use filesystem discovery by default. The workflow also
+summaries. Scheduled (`schedule`) and manual (`workflow_dispatch`) runs disable
+commitlint by default because these events do not provide a commit range.
+Explicit `linter-env` validator settings take precedence.
+Local runs use filesystem discovery by default. The workflow also
 installs project dependencies when `package.json` declares Prettier plugins;
 install those dependencies before running the image locally.
 

@@ -114,6 +114,18 @@ jobs:
               environment.set(key, line.slice(separatorIndex + 1));
             }
 
+            // These events have no commit range for commitlint to validate.
+            // FIXME: https://github.com/super-linter/super-linter/issues/7968
+            if (["schedule", "workflow_dispatch"].includes(context.eventName)) {
+              // An allowlist already excludes commitlint unless explicitly enabled.
+              const hasValidatorAllowlist = [...environment].some(([key, value]) =>
+                key.startsWith("VALIDATE_") && key !== "VALIDATE_ALL_CODEBASE" && value.toLowerCase() === "true"
+              );
+              if (!environment.has("VALIDATE_GIT_COMMITLINT") && !hasValidatorAllowlist) {
+                environment.set("VALIDATE_GIT_COMMITLINT", "false");
+              }
+            }
+
             for (const [key, value] of environment) {
               core.exportVariable(key, value);
             }
