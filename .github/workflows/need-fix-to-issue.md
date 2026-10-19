@@ -29,7 +29,9 @@
 ## Overview
 
 Reusable workflow to convert comments requiring fixes (todo, FIXME) to issues.
-Mainly using [Todo to Issue Action](https://github.com/alstr/todo-to-issue-action), with some opinionated defaults.
+Uses the [Need fix to Issue action](../../actions/need-fix-to-issue/README.md) to create, categorize, and deduplicate issues.
+Generated issues receive the `need-fix` label and the `Bug` issue type when available.
+Duplicate issues with the same title and source file are closed.
 
 ### Permissions
 
@@ -70,6 +72,14 @@ jobs:
 ```
 
 <!-- usage:end -->
+
+### Issue management
+
+- Both `TODO` and `FIXME` issues receive the `need-fix` label, in addition to their `help wanted` or `bug` label. Only issues with `need-fix` are managed. Add it to an existing generated issue to include it in categorization and duplicate detection. Pull requests are excluded.
+- Untyped generated issues receive the organization's `Bug` issue type. Existing types are preserved. Personal repositories skip typing; organizations without an enabled `Bug` type receive a warning while duplicate detection continues. See [managing issue types](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/managing-issue-types-in-an-organization).
+- Duplicate detection keeps the oldest open issue with the exact same title and source file, ignoring commit and line changes in the generated source link. Newer duplicates are closed with a `Duplicate of #...` comment and linked to the original. Different files and issues without a recognized source link are not matched.
+
+Repositories that need inactivity management can use the separate [Stale workflow](stale.md).
 
 **Tips:**
 

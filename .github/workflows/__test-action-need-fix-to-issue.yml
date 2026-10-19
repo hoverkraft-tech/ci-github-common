@@ -1,0 +1,22 @@
+name: Internal - Tests for need-fix-to-issue action
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  continuous-integration:
+    uses: hoverkraft-tech/ci-github-nodejs/.github/workflows/continuous-integration.yml@81a4bca8445b7b273455ff26a9a5c3c31c86b2a1 # 0.25.0
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: write
+      security-events: write
+    with:
+      working-directory: ./actions/need-fix-to-issue
+      build: null
+      lint: null
+      test: '{ "coverage": null }'

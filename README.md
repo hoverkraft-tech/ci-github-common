@@ -25,6 +25,7 @@ Opinionated GitHub Actions and reusable workflows for foundational continuous-in
 - [Create or update comment](actions/create-or-update-comment/README.md) - adds or updates comments on issues and pull requests idempotently.
 - [Get GitHub Actions bot user](actions/get-github-actions-bot-user/README.md) - retrieves the profile information for the GitHub Actions bot.
 - [Get issue number](actions/get-issue-number/README.md) - extracts the relevant issue number from the current workflow context.
+- [Need fix to Issue](actions/need-fix-to-issue/README.md) - creates and categorizes TODO/FIXME issues and closes duplicates.
 
 ### Matrix & workflow data helpers
 
@@ -43,7 +44,7 @@ Opinionated GitHub Actions and reusable workflows for foundational continuous-in
 ### Community & issue hygiene
 
 - [Greetings](.github/workflows/greetings.md) - welcomes first-time issue reporters and pull request authors.
-- [Need fix to Issue](.github/workflows/need-fix-to-issue.md) - labels issues that require follow-up fixes.
+- [Need fix to Issue](.github/workflows/need-fix-to-issue.md) - creates and categorizes TODO/FIXME issues and closes duplicates.
 - [Stale](.github/workflows/stale.md) - automatically marks and closes stale issues and pull requests.
 
 ### Quality gates

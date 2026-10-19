@@ -1,5 +1,7 @@
 # Reusable workflow to convert comments requiring fixes (todo, FIXME) to issues.
-# Mainly using [Todo to Issue Action](https://github.com/alstr/todo-to-issue-action), with some opinionated defaults.
+# Uses the [Need fix to Issue action](../../actions/need-fix-to-issue/README.md) to create, categorize, and deduplicate issues.
+# Generated issues receive the need-fix label and the Bug issue type when available.
+# Duplicate issues with the same title and source file are closed.
 
 name: "Need fix to Issue"
 on:
@@ -35,7 +37,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions: {}
 
@@ -51,14 +53,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: "TODO to Issue"
-        uses: "alstr/todo-to-issue-action@37bb7b56e58569ef273b60678048030a7f0c261a" # v5.1.15
+      - name: Create and manage need-fix issues
+        uses: $/actions/need-fix-to-issue
         with:
-          IDENTIFIERS: |
-            [
-                {"name": "TODO:", "labels": ["help wanted"]},
-                {"name": "FIXME:", "labels": ["bug"]}
-            ]
-        env:
-          MANUAL_COMMIT_REF: ${{ inputs.manual-commit-ref }}
-          MANUAL_BASE_REF: ${{ inputs.manual-base-ref }}
+          manual-commit-ref: ${{ inputs.manual-commit-ref }}
+          manual-base-ref: ${{ inputs.manual-base-ref }}

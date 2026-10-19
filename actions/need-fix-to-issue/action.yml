@@ -1,0 +1,41 @@
+name: Need fix to Issue
+description: Create issues from TODO/FIXME comments, assign the Bug issue type, and close duplicates.
+author: hoverkraft
+branding:
+  icon: check-circle
+  color: blue
+
+inputs:
+  manual-commit-ref:
+    description: "The SHA of the commit to get the diff for."
+    required: false
+  manual-base-ref:
+    description: "By default, the commit entered above is compared to the one directly before it; to go back further, enter an earlier SHA here."
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: TODO to Issue
+      uses: alstr/todo-to-issue-action@37bb7b56e58569ef273b60678048030a7f0c261a # v5.1.15
+      with:
+        IDENTIFIERS: |
+          [
+            {"name": "TODO:", "labels": ["help wanted", "need-fix"]},
+            {"name": "FIXME:", "labels": ["bug", "need-fix"]}
+          ]
+      env:
+        MANUAL_COMMIT_REF: ${{ inputs.manual-commit-ref }}
+        MANUAL_BASE_REF: ${{ inputs.manual-base-ref }}
+
+    - name: Categorize issues and close duplicates
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      with:
+        script: |
+          const { pathToFileURL } = require('node:url');
+          const { join } = require('node:path');
+          const moduleUrl = pathToFileURL(join(process.env.ACTION_PATH, 'src', 'IssueManager.js'));
+          const { IssueManager } = await import(moduleUrl.href);
+          await new IssueManager({ github, context, core }).run();
