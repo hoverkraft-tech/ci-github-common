@@ -30,7 +30,7 @@
 
 Reusable workflow to convert comments requiring fixes (todo, FIXME) to issues.
 Uses the [Need fix to Issue action](../../actions/need-fix-to-issue/README.md) to create, categorize, and deduplicate issues.
-Generated issues receive the `need-fix` label and the `Bug` issue type when available.
+Generated issues receive the need-fix label and the Bug issue type when available.
 Duplicate issues with the same title and source file are closed.
 
 ### Permissions
@@ -53,7 +53,7 @@ on:
 permissions: {}
 jobs:
   need-fix-to-issue:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/need-fix-to-issue.yml@3a27d31e9ccefbe9609cc9165017ed100ff34a22 # 0.38.0
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/need-fix-to-issue.yml@ab69f41f76e77ec84e733dedb03492b3ee95a05f # 0.39.0
     permissions:
       contents: read
       issues: write
