@@ -4,6 +4,10 @@
 # - [Hoverkraft Super-Linter](https://github.com/hoverkraft-tech/docker-base-images/tree/main/images/super-linter), shared with local linting.
 # - [CodeQL](https://docs.github.com/en/code-security/code-scanning/introduction-to-code-scanning/about-code-scanning-with-codeql) to analyze the code.
 # - [Ratchet](https://github.com/sethvargo/ratchet) to check that GitHub Action versions are pinned.
+#
+# Commitlint is disabled by default for scheduled and manual runs, and for pushes
+# with no commits (such as creating a tag on an existing commit).
+# Explicit `linter-env` validator settings take precedence.
 
 name: "Linter"
 on:
@@ -114,9 +118,10 @@ jobs:
               environment.set(key, line.slice(separatorIndex + 1));
             }
 
-            // These events have no commit range for commitlint to validate.
+            // Pushes without commits (such as tag creation) also have no range to validate.
             // FIXME: https://github.com/super-linter/super-linter/issues/7968
-            if (["schedule", "workflow_dispatch"].includes(context.eventName)) {
+            const isPushWithoutCommits = context.eventName === "push" && context.payload.commits?.length === 0;
+            if (["schedule", "workflow_dispatch"].includes(context.eventName) || isPushWithoutCommits) {
               // An allowlist already excludes commitlint unless explicitly enabled.
               const hasValidatorAllowlist = [...environment].some(([key, value]) =>
                 key.startsWith("VALIDATE_") && key !== "VALIDATE_ALL_CODEBASE" && value.toLowerCase() === "true"
