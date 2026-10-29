@@ -35,6 +35,10 @@ Executes:
 - [CodeQL](https://docs.github.com/en/code-security/code-scanning/introduction-to-code-scanning/about-code-scanning-with-codeql) to analyze the code.
 - [Ratchet](https://github.com/sethvargo/ratchet) to check that GitHub Action versions are pinned.
 
+Commitlint is disabled by default for scheduled and manual runs, and for pushes
+with no commits (such as creating a tag on an existing commit).
+Explicit `linter-env` validator settings take precedence.
+
 ### Permissions
 
 - **`actions`**: `read`
