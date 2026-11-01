@@ -48,7 +48,7 @@ permissions:
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/checkout@3a27d31e9ccefbe9609cc9165017ed100ff34a22 # 0.38.0
+- uses: hoverkraft-tech/ci-github-common/actions/checkout@4a6ed33ba735d57ebbcd89fe8ed35134de599a67 # 0.39.2
   with:
     # Number of commits to fetch. 0 indicates all history for all branches and tags.
     # See https://github.com/actions/checkout#usage
