@@ -1,0 +1,199 @@
+name: "Codecov"
+description: |
+  Action to upload coverage to Codecov.
+
+  - **Automatic dependency management**: Automatically detects and installs missing dependencies (Git, cURL, gnupg) using pkgxdev
+  - **Configuration fixes**: Automatically fixes pkgxdev configuration issues with unexpanded environment variables in gpgconf.ctl and .curlrc files
+  - **Cleanup**: Uninstalls dependencies after Codecov upload is complete
+  - **OIDC support**: Uses OIDC authentication with Codecov for secure uploads
+
+  Note that this action must have write permission for id-token for this to work:
+
+  ```yml
+  permissions:
+    id-token: write
+  ```
+
+author: hoverkraft
+branding:
+  icon: upload-cloud
+  color: blue
+
+inputs:
+  working-directory:
+    description: |
+      Working directory where coverage files are located.
+      Can be absolute or relative to the repository root.
+    required: false
+    default: "."
+
+  files:
+    description: Optional comma-separated coverage report files. When supplied, only these files are uploaded and automatic discovery is disabled.
+    default: ""
+  fail-ci-if-error:
+    description: Fail the job when Codecov upload fails. Enable when coverage publication is required.
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    # jscpd:ignore-start
+    - id: working-directory
+      uses: $/actions/working-directory
+      with:
+        working-directory: ${{ inputs.working-directory }}
+        enforce-path-in-workspace: "false"
+    # jscpd:ignore-end
+
+    # Check and install dependencies for codecov
+    - name: Check Codecov dependencies
+      id: check-codecov-deps
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      with:
+        script: |
+          // Check which dependencies are missing
+          const deps = {"git": "git", "curl": "curl", "gpg": "gnupg.org"};
+          const missingDeps = [];
+
+          for (const [dep, pkg] of Object.entries(deps)) {
+            try {
+              await io.which(dep, true);
+            } catch {
+              missingDeps.push(pkg);
+            }
+          }
+
+          if (missingDeps.length > 0) {
+            core.setOutput('missing-deps', missingDeps.join(' '));
+          }
+
+    - name: Install missing Codecov dependencies
+      if: steps.check-codecov-deps.outputs.missing-deps
+      uses: pkgxdev/setup@4d4ae97af87ccb39ab8be4e073dea697fef2c6f7 # v5.0.0
+      with:
+        +: ${{ steps.check-codecov-deps.outputs.missing-deps }}
+
+    - name: Fix unexpanded environment variables
+      if: steps.check-codecov-deps.outputs.missing-deps
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      with:
+        script: |
+          const templatePattern = /\$\{([^}:]+)(?::-([^}]*))?\}/g;
+          const unsafeSyntaxPattern = /`|\$\(/;
+          const resolving = new Set();
+          const resolvedCache = new Map();
+
+          const hasTemplate = (value) => {
+            if (typeof value !== 'string') {
+              return false;
+            }
+
+            templatePattern.lastIndex = 0;
+            return templatePattern.test(value);
+          };
+
+          const getReferencedVariables = (value) => {
+            templatePattern.lastIndex = 0;
+            return Array.from(value.matchAll(templatePattern), (match) => match[1]);
+          };
+
+          const sanitizeForDoubleQuotes = (value) => value.replace(/(["\\])/g, '\\$1');
+
+          const resolveEnvVariable = async (envKey) => {
+            const rawValue = process.env[envKey];
+
+            if (!hasTemplate(rawValue)) {
+              core.debug(`Skipping ${envKey} because it does not match the template pattern.`);
+              return rawValue;
+            }
+
+            if (unsafeSyntaxPattern.test(rawValue)) {
+              core.debug(`Skipping ${envKey} because it contains unsupported command substitution syntax.`);
+              return rawValue;
+            }
+
+            if (resolvedCache.has(envKey)) {
+              return resolvedCache.get(envKey);
+            }
+
+            if (resolving.has(envKey)) {
+              core.debug(`Detected circular reference while resolving ${envKey}, falling back to defaults.`);
+              return rawValue;
+            }
+
+            resolving.add(envKey);
+
+            const referencedVariables = getReferencedVariables(rawValue);
+            for (const variableName of referencedVariables) {
+              if (variableName === envKey) {
+                continue;
+              }
+
+              await resolveEnvVariable(variableName);
+            }
+
+            const envForBash = { ...process.env };
+            delete envForBash[envKey];
+
+            const scriptLines = [
+              'set -eo pipefail',
+              `resolved_value="${sanitizeForDoubleQuotes(rawValue)}"`,
+              "printf '%s' \"${resolved_value}\"",
+            ];
+
+            let resolvedValue = rawValue;
+            try {
+              const { stdout } = await exec.getExecOutput(
+                'bash',
+                ['-c', scriptLines.join('\n')],
+                { env: envForBash, silent: true }
+              );
+
+              resolvedValue = stdout.replace(/\r?\n$/, '');
+            } catch (error) {
+              core.warning(`Failed to resolve ${envKey}: ${error.message}`);
+            }
+
+            resolving.delete(envKey);
+            resolvedCache.set(envKey, resolvedValue);
+
+            if (resolvedValue !== rawValue) {
+              core.debug(`Resolved ${envKey}: "${rawValue}" -> "${resolvedValue}"`);
+              process.env[envKey] = resolvedValue;
+              core.exportVariable(envKey, resolvedValue);
+            } else {
+              core.debug(`No changes for ${envKey}, skipping update.`);
+            }
+
+            return resolvedValue;
+          };
+
+          for (const envKey of Object.keys(process.env)) {
+            await resolveEnvVariable(envKey);
+          }
+
+    - name: 📊 Upload coverage to Codecov
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+      with:
+        directory: ${{ steps.working-directory.outputs.workspace-relative-path }}
+        root_dir: ${{ steps.working-directory.outputs.workspace-relative-path }}
+        working-directory: ${{ steps.working-directory.outputs.workspace-relative-path }}
+        files: ${{ inputs.files }}
+        disable_search: ${{ inputs.files != '' }}
+        use_oidc: true
+        disable_telem: true
+        fail_ci_if_error: ${{ inputs.fail-ci-if-error }}
+
+    # Uninstall pkgxdev dependencies after codecov is done
+    - name: Uninstall Codecov dependencies
+      if: always() && steps.check-codecov-deps.outputs.missing-deps
+      shell: bash
+      env:
+        MISSING_DEPS: ${{ steps.check-codecov-deps.outputs.missing-deps }}
+      run: |
+        if command -v pkgx &> /dev/null; then
+          for dep in $MISSING_DEPS; do
+            echo "Uninstalling $dep..."
+            pkgx uninstall "$dep" 2>/dev/null || true
+          done
+        fi
