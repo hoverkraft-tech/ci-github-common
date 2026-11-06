@@ -27,7 +27,7 @@ permissions:
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/codecov@<commit-sha>
+- uses: hoverkraft-tech/ci-github-common/actions/quality/codecov@<commit-sha>
   with:
     # Working directory where coverage files are located.
     # Can be absolute or relative to the repository root.

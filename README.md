@@ -34,7 +34,7 @@ Opinionated GitHub Actions and reusable workflows for foundational continuous-in
 
 ### Repository insights & utilities
 
-- [Codecov](actions/codecov/README.md) - uploads coverage from any language using OIDC, with optional explicit report selection.
+- [Codecov](actions/quality/codecov/README.md) - uploads coverage from any language using OIDC, with optional explicit report selection.
 - [Parse CI reports](actions/parse-ci-reports/README.md) - parses CI reports (tests, linting, coverage) into GitHub summaries and Markdown for PR comments.
 - [Repository owner is organization](actions/repository-owner-is-organization/README.md) - checks whether the repository owner is an organization.
 - [Working directory](actions/working-directory/README.md) - resolves and validates a working directory path, exposing absolute and workspace-relative outputs.
@@ -59,7 +59,8 @@ Contributions are welcome! Please see the [contributing guidelines](https://gith
 
 ### Action structure pattern
 
-All actions follow a consistent structure:
+Actions follow the structure below. Related quality actions are grouped under
+`actions/quality/` using the same structure.
 
 ```text
 actions/{action-name}/
