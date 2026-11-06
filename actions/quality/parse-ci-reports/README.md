@@ -31,7 +31,7 @@ and the [development guide](../../../docs/development/parse-ci-reports.md).
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@4a6ed33ba735d57ebbcd89fe8ed35134de599a67 # 0.39.2
+- uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@5fbb531db839a26ebcc35c4946be279f945f7633 # 1.0.0
   with:
     # Paths to report files (glob patterns supported, one per line or comma-separated).
     # Set to `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all` for automatic detection.
