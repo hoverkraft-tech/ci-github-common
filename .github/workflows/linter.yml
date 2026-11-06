@@ -152,10 +152,12 @@ jobs:
               }
             }
 
-      - uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@81a4bca8445b7b273455ff26a9a5c3c31c86b2a1 # 0.25.0
+      - uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@31cd29bfb95f6bc6490d6abe5d66690431b518e3 # 2.0.0
         if: ${{ steps.has-prettier-plugins.outputs.package-json-dir != '' }}
         with:
           working-directory: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
+          # Consumer Prettier plugins may require installation hooks.
+          ignore-scripts: "false"
 
       - name: Run shared Super-Linter image
         uses: docker://ghcr.io/hoverkraft-tech/docker-base-images/super-linter:2.0.0@sha256:a37519f1afdc1c239254fe3d9a3e76ee9f114990f09bba123c96b1737737d43e
@@ -181,11 +183,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           languages: ${{ matrix.language }}
 
-      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: "/language:${{matrix.language}}"
 
