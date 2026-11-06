@@ -16,7 +16,7 @@ jobs:
       pull-requests: write
       security-events: write
     with:
-      working-directory: ./actions/parse-ci-reports
+      working-directory: ./actions/quality/parse-ci-reports
       build: null
       lint: null
       test: '{ "coverage": null }'
@@ -89,7 +89,7 @@ jobs:
 
       - name: Act - Run parse-ci-reports action
         id: parse-ci-reports
-        uses: $/actions/parse-ci-reports
+        uses: $/actions/quality/parse-ci-reports
         with:
           report-paths: |
             test-reports/junit.xml
