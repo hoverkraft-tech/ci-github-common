@@ -16,6 +16,8 @@
 
 Opinionated GitHub Actions and reusable workflows for foundational continuous-integration automation that can be shared across Hoverkraft projects.
 
+See the [documentation](docs/README.md) for detailed guides.
+
 ## Actions
 
 ### Workflow & repository automation
@@ -32,10 +34,13 @@ Opinionated GitHub Actions and reusable workflows for foundational continuous-in
 - [Get matrix outputs](actions/get-matrix-outputs/README.md) - aggregates outputs across matrix jobs for downstream steps.
 - [Set matrix output](actions/set-matrix-output/README.md) - writes structured outputs that can be consumed by other matrix jobs.
 
-### Repository insights & utilities
+### Quality checks & reporting
 
 - [Codecov](actions/quality/codecov/README.md) - uploads coverage from any language using OIDC, with optional explicit report selection.
-- [Parse CI reports](actions/parse-ci-reports/README.md) - parses CI reports (tests, linting, coverage) into GitHub summaries and Markdown for PR comments.
+- [Parse CI reports](actions/quality/parse-ci-reports/README.md) - parses CI reports (tests, linting, coverage) into GitHub summaries and Markdown for PR comments.
+
+### Repository insights & utilities
+
 - [Repository owner is organization](actions/repository-owner-is-organization/README.md) - checks whether the repository owner is an organization.
 - [Working directory](actions/working-directory/README.md) - resolves and validates a working directory path, exposing absolute and workspace-relative outputs.
 - [Slugify](actions/slugify/README.md) - converts free-form strings into GitHub-friendly slugs.

@@ -8,6 +8,9 @@ description: |
   - GitHub Annotations for failed tests and linting issues
 
   It supports multiple common report standards out of the box.
+
+  See the [formats and examples guide](../../../docs/usage/parse-ci-reports.md)
+  and the [development guide](../../../docs/development/parse-ci-reports.md).
 author: hoverkraft
 branding:
   icon: check-circle
