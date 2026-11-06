@@ -1,0 +1,18 @@
+---
+name: Internal - Prepare release
+
+on: # yamllint disable-line rule:truthy
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited]
+
+permissions: {}
+
+jobs:
+  release:
+    uses: hoverkraft-tech/ci-github-publish/.github/workflows/prepare-release.yml@f06e0e72a76bfca57c34d08d03e5c1914275fd4c # 2.0.0
+    permissions:
+      contents: read
+      pull-requests: write
