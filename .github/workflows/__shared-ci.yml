@@ -95,3 +95,10 @@ jobs:
     permissions:
       contents: read
     uses: $/.github/workflows/__test-action-working-directory.yml
+
+  test-workflow-ci-reports:
+    needs: linter
+    uses: $/.github/workflows/__test-workflow-ci-reports.yml
+    permissions:
+      contents: read
+      pull-requests: write

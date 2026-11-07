@@ -1,0 +1,104 @@
+name: Internal - Tests for CI reports workflow
+
+on:
+  workflow_call:
+
+permissions: {}
+
+jobs:
+  fixtures:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        package: [frontend, backend]
+    steps:
+      - name: Arrange - Create independent native reports
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PACKAGE: ${{ matrix.package }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            await io.mkdirP('reports');
+            const name = process.env.PACKAGE;
+            const messages = name === 'frontend' ? [
+              { severity: 2, ruleId: 'fixture-error', message: 'synthetic lint error' },
+              { severity: 1, ruleId: 'fixture-warning', message: 'synthetic lint warning' },
+            ] : [];
+            fs.writeFileSync('reports/eslint.json', JSON.stringify([{ filePath: name + '/index.js', messages }]));
+            fs.writeFileSync('reports/super-linter-summary.md', '| Linter | Status |\n| --- | --- |\n| Fixture linter | ' + (name === 'frontend' ? '❌' : '✅') + ' |\n');
+            const failure = name === 'frontend' ? '<failure message="synthetic failure"/>' : '';
+            fs.writeFileSync('reports/junit.xml', `<testsuite name="${name}"><testcase name="example">${failure}</testcase></testsuite>`);
+            fs.writeFileSync('reports/lcov.info', `SF:src/index.js\nDA:1,1\nDA:2,${name === 'frontend' ? 0 : 1}\nLF:2\nLH:${name === 'frontend' ? 1 : 2}\nend_of_record\n`);
+      - name: Arrange - Upload current reports
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-reports-${{ github.run_attempt }}-${{ matrix.package }}-fixture
+          path: reports/
+          retention-days: 1
+      - name: Arrange - Upload stale reports that must be excluded
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-reports-0-stale-${{ matrix.package }}
+          path: reports/
+          overwrite: true
+          retention-days: 1
+
+  reports:
+    name: Act - Consolidate reports
+    needs: fixtures
+    if: always()
+    uses: $/.github/workflows/ci-reports.yml
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      job-results: '{"frontend":{"result":"failure"},"backend":{"result":"success"},"missing":{"result":"skipped"}}'
+
+  assert:
+    name: Assert - Both packages, failures and missing results remain visible
+    needs: reports
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          LINT: ${{ needs.reports.outputs.lint-markdown }}
+          TESTS: ${{ needs.reports.outputs.test-markdown }}
+          COVERAGE: ${{ needs.reports.outputs.coverage-markdown }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            for (const text of [process.env.TESTS, process.env.COVERAGE, process.env.LINT]) {
+              assert.match(text, /frontend/);
+              assert.match(text, /backend/);
+              assert.match(text, /missing \| skipped/);
+              assert.match(text, /missing \| skipped \| \*\*Unavailable\*\*/);
+              assert.match(text, /backend \| success \| 1/);
+              assert.doesNotMatch(text, /stale/);
+              assert.ok(text.includes('<summary>Job results and report availability</summary>'));
+              assert.doesNotMatch(text, /<details[^>]*open/);
+              assert.equal((text.match(/<details>/g) || []).length, (text.match(/<\/details>/g) || []).length);
+              const visible = text.split('<details>')[0];
+              assert.match(visible, /1 failure/);
+              assert.match(visible, /Reports unavailable for 1 job/);
+              assert.ok(visible.length < 900, 'Visible summary should stay compact');
+            }
+            assert.match(process.env.LINT, /synthetic lint error/);
+            assert.match(process.env.LINT, /synthetic lint warning/);
+            assert.match(process.env.LINT, /Fixture linter/);
+            assert.doesNotMatch(process.env.LINT, /Test Results|### Coverage/);
+            assert.match(process.env.TESTS.split('<details>')[0], /1 passed · 1 failed/);
+            assert.match(process.env.TESTS, /synthetic failure/);
+            assert.match(process.env.COVERAGE, /50\.00%/);
+            assert.match(process.env.COVERAGE, /100\.00%/);
+            assert.doesNotMatch(process.env.COVERAGE, /Test Results/);
+            const pr = context.payload.pull_request;
+            if (context.eventName !== 'pull_request' || pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}` || context.actor === 'dependabot[bot]') return;
+            const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: pr.number, per_page: 100 });
+            for (const title of ['Test results', 'Code coverage', 'Lint results']) {
+              assert.equal(comments.filter(comment => comment.user.login === 'github-actions[bot]' && comment.body.startsWith(`${context.workflow} - ${title}\n`)).length, 1);
+            }

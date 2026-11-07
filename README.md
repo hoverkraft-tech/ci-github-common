@@ -56,6 +56,7 @@ See the [documentation](docs/README.md) for detailed guides.
 
 ### Quality gates
 
+- [CI reports](.github/workflows/ci-reports.md) - consolidates tests, coverage and lint into three compact PR comments.
 - [Linter](.github/workflows/linter.md) - runs Super Linter and shared formatting checks across the repository.
 - [Semantic pull request](.github/workflows/semantic-pull-request.md) - enforces semantic pull request titles before merging.
 

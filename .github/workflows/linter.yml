@@ -8,11 +8,21 @@
 # Commitlint is disabled by default for scheduled and manual runs, and for pushes
 # with no commits (such as creating a tag on an existing commit).
 # Explicit `linter-env` validator settings take precedence.
+#
+# For consolidated reporting, call this workflow from a job named `lint`, set
+# `comment: false`, and include that job in the CI reports workflow dependencies.
+# The native Super-Linter summary is uploaded even after lint failures. CodeQL
+# findings remain in code scanning; Ratchet diagnostics remain in workflow logs.
 
 name: "Linter"
 on:
   workflow_call:
     inputs:
+      comment:
+        description: Publish the Super-Linter PR comment. Disable when using the CI reports workflow.
+        type: boolean
+        required: false
+        default: true
       runs-on:
         description: |
           JSON array of runner(s) to use.
@@ -91,6 +101,7 @@ jobs:
           persist-credentials: false
 
       - name: Configure Super-Linter environment
+        id: configure
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           LINTER_ENV: ${{ inputs.linter-env }}
@@ -98,6 +109,8 @@ jobs:
           PYTHON_LINTER_TOOLCHAIN: ${{ inputs.python-linter-toolchain }}
         with:
           script: |
+            const { randomUUID } = require("node:crypto");
+            core.setOutput("artifact-name", `ci-reports-${process.env.GITHUB_RUN_ATTEMPT}-${context.job}-${randomUUID()}`);
             const environment = new Map([
               ["VALIDATE_JAVASCRIPT_TOOLCHAIN", process.env.JAVASCRIPT_LINTER_TOOLCHAIN],
               ["VALIDATE_PYTHON_TOOLCHAIN", process.env.PYTHON_LINTER_TOOLCHAIN],
@@ -162,9 +175,22 @@ jobs:
       - name: Run shared Super-Linter image
         uses: docker://ghcr.io/hoverkraft-tech/docker-base-images/super-linter:2.0.1@sha256:7fbeb0e47711e939db09027b64d2b4f405dd271dad056fe42dc05ac15a6ddab0
         env:
+          ENABLE_GITHUB_PULL_REQUEST_SUMMARY_COMMENT: ${{ inputs.comment && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+          SAVE_SUPER_LINTER_SUMMARY: true
+          SUPER_LINTER_OUTPUT_DIRECTORY_NAME: super-linter-output
+          SUPER_LINTER_SUMMARY_FILE_NAME: super-linter-summary.md
           VALIDATE_ALL_CODEBASE: ${{ inputs.lint-all }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GITHUB_TOKEN: ${{ secrets.github-token || secrets.GITHUB_TOKEN || github.token }} # zizmor: ignore[secrets-outside-env] reusable workflow token override is intentional
+
+      - name: Upload native lint summary
+        if: always() && steps.configure.outputs.artifact-name != '' && hashFiles('super-linter-output/super-linter-summary.md') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.configure.outputs.artifact-name }}
+          path: super-linter-output/super-linter-summary.md
+          if-no-files-found: error
+          retention-days: 7
 
   codeql:
     if: ${{ inputs.codeql-languages }}

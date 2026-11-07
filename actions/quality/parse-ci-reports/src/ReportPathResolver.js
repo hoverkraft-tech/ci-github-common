@@ -1,5 +1,5 @@
-import { ParserFactory } from "./parsers/ParserFactory.js";
 import { ReportCategory } from "./parsers/BaseParser.js";
+import { ParserFactory } from "./parsers/ParserFactory.js";
 
 const AUTO_MODE_ALL = "all";
 
@@ -79,7 +79,9 @@ export class ReportPathResolver {
 	 */
 	async findFiles(patterns, globModule) {
 		const normalizedPatterns = patterns.map((pattern) =>
-			this.fileSystemService.normalizeFilePath(pattern),
+			pattern.startsWith("!")
+				? `!${this.fileSystemService.normalizeFilePath(pattern.slice(1))}`
+				: this.fileSystemService.normalizeFilePath(pattern),
 		);
 
 		// Add exclusion pattern for node_modules
@@ -87,6 +89,7 @@ export class ReportPathResolver {
 
 		const globber = await globModule.create(normalizedPatterns.join("\n"), {
 			followSymbolicLinks: false,
+			matchDirectories: false,
 		});
 
 		const files = new Set();

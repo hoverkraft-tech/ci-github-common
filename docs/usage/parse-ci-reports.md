@@ -1,5 +1,24 @@
 # Parse CI reports
 
+The `test-markdown`, `coverage-markdown` and `lint-markdown` outputs separate
+report types for consolidated publication. Each shows a short summary and
+collapsed details. Independent coverage files retain their source labels and
+percentages; they are not summed or averaged. Test details include suite counts
+with failing suites first. A clean lint report shows zero findings; absent lint
+reports leave `lint-markdown` empty.
+
+Use the [CI reports workflow](../../.github/workflows/ci-reports.md) after lint
+and test jobs to update three persistent comments from their native artifacts.
+The shared [linter workflow](../../.github/workflows/linter.md) uploads its native
+Super-Linter summary. Call it from a job named `lint`, set `comment: false`, and
+include `lint` in the publisher's `needs`. The publisher reuses the summary
+without translating linter statuses into diagnostic counts. CodeQL findings stay
+in code scanning and Ratchet diagnostics stay in the workflow logs.
+
+Job outcomes and missing reports remain visible above the collapsed report and
+job details. Oversized sections link to full artifacts instead of producing
+incomplete Markdown. Per-job summaries and merge checks remain available.
+
 ## Supported Formats
 
 ### Test Reports
