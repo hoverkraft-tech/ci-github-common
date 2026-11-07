@@ -175,7 +175,7 @@ jobs:
       - name: Run shared Super-Linter image
         uses: docker://ghcr.io/hoverkraft-tech/docker-base-images/super-linter:2.0.1@sha256:7fbeb0e47711e939db09027b64d2b4f405dd271dad056fe42dc05ac15a6ddab0
         env:
-          ENABLE_GITHUB_PULL_REQUEST_SUMMARY_COMMENT: ${{ inputs.comment && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+          ENABLE_GITHUB_PULL_REQUEST_SUMMARY_COMMENT: ${{ inputs.comment && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
           SAVE_SUPER_LINTER_SUMMARY: true
           SUPER_LINTER_OUTPUT_DIRECTORY_NAME: super-linter-output
           SUPER_LINTER_SUMMARY_FILE_NAME: super-linter-summary.md

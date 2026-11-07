@@ -16,7 +16,7 @@
 # complete report. Missing reports never imply successful tests. Coverage stays
 # separate per source report; percentages are never averaged.
 #
-# Grant contents: read and pull-requests: write. Fork and Dependabot runs retain
+# Grant contents: read and pull-requests: write. Fork PRs retain
 # summaries without commenting. Use the caller's concurrency to cancel superseded
 # runs. This workflow serializes publication and rejects an outdated PR head.
 name: CI reports
@@ -140,7 +140,7 @@ jobs:
               await core.summary.addRaw(body + '\n\n').write();
             }
             const pr = context.payload.pull_request;
-            if (context.eventName !== 'pull_request' || pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}` || context.actor === 'dependabot[bot]') return;
+            if (context.eventName !== 'pull_request' || pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) return;
             const { data: current } = await github.rest.pulls.get({ ...context.repo, pull_number: pr.number });
             core.setOutput('comment', current.state === 'open' && current.head.sha === pr.head.sha);
       - name: Update test results comment

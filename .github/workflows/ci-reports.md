@@ -40,7 +40,7 @@ from jobs that did not rerun are explicitly unavailable; rerun all jobs for a
 complete report. Missing reports never imply successful tests. Coverage stays
 separate per source report; percentages are never averaged.
 
-Grant contents: read and pull-requests: write. Fork and Dependabot runs retain
+Grant contents: read and pull-requests: write. Fork PRs retain
 summaries without commenting. Use the caller's concurrency to cancel superseded
 runs. This workflow serializes publication and rejects an outdated PR head.
 
@@ -63,7 +63,7 @@ on:
 permissions: {}
 jobs:
   ci-reports:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@5fbb531db839a26ebcc35c4946be279f945f7633 # 1.0.0
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@f0baf63a8aa2bcfe9847aee00d1fdfa5e32a749a # 2.0.0
     permissions:
       contents: read
       pull-requests: write

@@ -97,7 +97,7 @@ jobs:
             assert.match(process.env.COVERAGE, /100\.00%/);
             assert.doesNotMatch(process.env.COVERAGE, /Test Results/);
             const pr = context.payload.pull_request;
-            if (context.eventName !== 'pull_request' || pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}` || context.actor === 'dependabot[bot]') return;
+            if (context.eventName !== 'pull_request' || pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) return;
             const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: pr.number, per_page: 100 });
             for (const title of ['Test results', 'Code coverage', 'Lint results']) {
               assert.equal(comments.filter(comment => comment.user.login === 'github-actions[bot]' && comment.body.startsWith(`${context.workflow} - ${title}\n`)).length, 1);
