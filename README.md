@@ -37,6 +37,7 @@ See the [documentation](docs/README.md) for detailed guides.
 ### Quality checks & reporting
 
 - [Codecov](actions/quality/codecov/README.md) - uploads coverage from any language using OIDC, with optional explicit report selection.
+- [Lint pull request title](actions/quality/lint-pull-request-title/README.md) - checks pull request titles against the common Conventional Commits policy.
 - [Parse CI reports](actions/quality/parse-ci-reports/README.md) - parses CI reports (tests, linting, coverage) into GitHub summaries and Markdown for PR comments.
 
 ### Repository insights & utilities

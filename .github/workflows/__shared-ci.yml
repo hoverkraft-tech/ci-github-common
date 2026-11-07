@@ -23,6 +23,16 @@ jobs:
       contents: read
     uses: $/.github/workflows/__test-action-matrix-outputs.yml
 
+  test-action-lint-pull-request-title:
+    needs: linter
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: write
+      security-events: write
+    uses: $/.github/workflows/__test-action-lint-pull-request-title.yml
+
   test-action-checkout:
     needs: linter
     permissions:
