@@ -2,6 +2,12 @@
 
 # GitHub Reusable Workflow: Semantic Pull Request
 
+<div align="center">
+  <img src="../logo.svg" width="60px" align="center" alt="Semantic Pull Request" />
+</div>
+
+---
+
 <!-- header:end -->
 
 <!-- jscpd:ignore-start -->
@@ -54,7 +60,7 @@ on:
 permissions: {}
 jobs:
   semantic-pull-request:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@deba829171da15c448db4affbd2ece840a0de809 # feat/shared-commit-policy
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@d92fc45447587bab1daef3834b6596fb09a76292 # 2.0.1
     permissions:
       contents: read
     with:
