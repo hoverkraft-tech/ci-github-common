@@ -11,10 +11,10 @@
 	"author": "hoverkraft",
 	"license": "MIT",
 	"dependencies": {
-		"@commitlint/config-conventional": "21.2.3",
+		"@commitlint/config-conventional": "21.2.4",
 		"@commitlint/format": "21.2.3",
-		"@commitlint/lint": "21.2.3",
-		"@commitlint/load": "21.2.3"
+		"@commitlint/lint": "21.2.4",
+		"@commitlint/load": "21.2.4"
 	},
 	"engines": {
 		"node": ">=24.0.0"
