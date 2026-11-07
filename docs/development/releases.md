@@ -29,6 +29,11 @@ The GitHub App token lets the new tag trigger
 [main CI](../../.github/workflows/__main-ci.yml), which regenerates action and
 workflow documentation and sends its artifact to the public documentation site.
 
+Documentation pull requests use squash merging so GitHub signs the resulting
+commit to satisfy the default branch's signature requirement. The pull request
+commits must also be signed and verified. Keep squash merging enabled in the
+repository settings; GitHub cannot sign commits rewritten by a rebase merge.
+
 To release manually, open **Actions → Internal - Release → Run workflow** and
 select `main`. Leave `force` disabled for normal releases. Enable it only to bypass
 the no-changes check; the default-branch restriction, CI checks, and planned-tag
