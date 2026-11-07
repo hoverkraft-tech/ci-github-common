@@ -37,7 +37,7 @@ Create issues from TODO/FIXME comments, assign the Bug issue type, and close dup
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/need-fix-to-issue@5fbb531db839a26ebcc35c4946be279f945f7633 # 1.0.0
+- uses: hoverkraft-tech/ci-github-common/actions/need-fix-to-issue@d92fc45447587bab1daef3834b6596fb09a76292 # 2.0.1
   with:
     # The SHA of the commit to get the diff for.
     manual-commit-ref: ""
