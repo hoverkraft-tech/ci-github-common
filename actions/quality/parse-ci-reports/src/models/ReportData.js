@@ -87,7 +87,9 @@ export class ReportData {
 	constructor() {
 		this.tests = [];
 		this.lintIssues = [];
+		this.lintReportCount = 0;
 		this.coverage = null;
+		this.coverageReports = [];
 		this.reportType = "unknown"; // 'test', 'lint', 'coverage', 'mixed'
 	}
 

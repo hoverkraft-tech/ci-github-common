@@ -33,6 +33,7 @@ export async function run({ core, glob: globModule, inputs }) {
 		// Find report files
 		const uniqueFiles = await pathResolver.findFiles(patternList, globModule);
 		logger.info(`Found ${uniqueFiles.length} report file(s)`);
+		core.setOutput("parsed-files", JSON.stringify(uniqueFiles));
 
 		if (uniqueFiles.length === 0) {
 			logger.warning("No report files found");
@@ -48,12 +49,13 @@ export async function run({ core, glob: globModule, inputs }) {
 		}
 
 		// Generate outputs using core
-		const { markdown, summary } = parserCore.generateOutput(
-			aggregatedData,
-			inputs.reportName,
-			inputs.includePassed,
-			inputs.outputFormat,
-		);
+		const { markdown, summary, testMarkdown, coverageMarkdown, lintMarkdown } =
+			parserCore.generateOutput(
+				aggregatedData,
+				inputs.reportName,
+				inputs.includePassed,
+				inputs.outputFormat,
+			);
 
 		// Write to GitHub Step Summary if needed
 		if (outputFormats.includes("summary")) {
@@ -62,8 +64,11 @@ export async function run({ core, glob: globModule, inputs }) {
 
 		// Set outputs
 		core.setOutput("markdown", markdown);
+		core.setOutput("test-markdown", testMarkdown);
+		core.setOutput("coverage-markdown", coverageMarkdown);
+		core.setOutput("lint-markdown", lintMarkdown);
+		core.setOutput("has-errors", aggregatedData.hasErrors());
 		core.setOutput("summary", summary);
-		core.setOutput("parsed-files", JSON.stringify(uniqueFiles));
 
 		// Log summary
 		logger.info("\n--- Summary ---");

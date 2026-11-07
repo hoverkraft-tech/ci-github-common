@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it, suite, test } from "node:test";
 import { ReportPathResolver } from "./ReportPathResolver.js";
 
 const createFileSystemStub = () => {
@@ -268,5 +268,33 @@ describe("ReportPathResolver", () => {
 			"resolved:src/test.xml",
 			"resolved:coverage/report.xml",
 		]);
+	});
+});
+
+suite("Report exclusions", () => {
+	test("preserves exclusions when resolving report paths against the workspace", async () => {
+		// Arrange
+		let patterns;
+		const resolver = new ReportPathResolver(
+			{
+				normalizeFilePath: (pattern) => `/reports/${pattern}`,
+			},
+			{ info() {} },
+		);
+		const glob = {
+			create: async (value) => {
+				patterns = value;
+				return { async *globGenerator() {} };
+			},
+		};
+
+		// Act
+		await resolver.findFiles(["**/*", "!**/super-linter-summary.md"], glob);
+
+		// Assert
+		assert.equal(
+			patterns,
+			"/reports/**/*\n!/reports/**/super-linter-summary.md\n!**/node_modules/**",
+		);
 	});
 });

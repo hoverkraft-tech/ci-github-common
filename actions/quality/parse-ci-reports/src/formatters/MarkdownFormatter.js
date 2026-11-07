@@ -23,6 +23,7 @@ export class MarkdownFormatter extends BaseFormatter {
 		let output = "### Test Results\n\n";
 		output += this._buildTestSummaryTable(reportData);
 		output += "\n";
+		output += this._buildSuiteTable(reportData);
 
 		output += `> ${statusEmoji} **Pass Rate:** ${passRate.toFixed(1)}%\n\n`;
 
@@ -120,7 +121,42 @@ export class MarkdownFormatter extends BaseFormatter {
 	}
 
 	_escapeMarkdown(text) {
-		return text.replace(/[\\`*_{}[\]()#+\-.!]/g, "\\$&");
+		return text
+			.replace(/[\r\n]+/g, " ")
+			.replace(/[\\`*_{}[\]()#+\-.!|<>]/g, "\\$&");
+	}
+
+	_buildSuiteTable(reportData) {
+		const suites = Map.groupBy(
+			reportData.tests,
+			(test) => test.suite || "Unnamed suite",
+		);
+		if (suites.size < 2) return "";
+		const rows = [...suites]
+			.map(([name, tests]) => ({
+				name,
+				passed: tests.filter((test) => test.isPassed()).length,
+				failed: tests.filter((test) => test.isFailed()).length,
+				skipped: tests.filter((test) => test.isSkipped()).length,
+			}))
+			.sort(
+				(left, right) =>
+					right.failed - left.failed || left.name.localeCompare(right.name),
+			);
+		return [
+			"| Suite | Passed | Failed | Skipped |",
+			"| --- | --- | --- | --- |",
+			...rows
+				.slice(0, 50)
+				.map(
+					(row) =>
+						`| ${this._escapeMarkdown(row.name)} | ${row.passed} | ${row.failed} | ${row.skipped} |`,
+				),
+			rows.length > 50
+				? `\n${rows.length - 50} additional suites are available in the native reports.`
+				: "",
+			"\n",
+		].join("\n");
 	}
 
 	_buildTestSummaryTable(reportData) {

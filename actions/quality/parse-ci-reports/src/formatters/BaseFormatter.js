@@ -20,7 +20,13 @@ export class BaseFormatter {
 			sections.push(this._formatLintIssues(reportData));
 		}
 
-		if (this._shouldIncludeCoverage(reportData)) {
+		if (reportData.coverageReports?.length > 1) {
+			for (const report of reportData.coverageReports) {
+				sections.push(
+					`#### ${this._escapeMarkdown(report.name)}\n\n${this._formatCoverage(report.coverage)}`,
+				);
+			}
+		} else if (this._shouldIncludeCoverage(reportData)) {
 			sections.push(this._formatCoverage(reportData.coverage));
 		}
 
@@ -36,7 +42,7 @@ export class BaseFormatter {
 	}
 
 	_shouldIncludeLint(reportData) {
-		return reportData.lintIssues.length > 0;
+		return reportData.lintReportCount > 0 || reportData.lintIssues.length > 0;
 	}
 
 	_shouldIncludeCoverage(reportData) {

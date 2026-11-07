@@ -1,0 +1,166 @@
+# Collect native reports after lint and test jobs and update one PR comment per report type.
+#
+# Call once with `needs` listing the lint and test jobs, `if: always()` and
+# `job-results: ${{ toJSON(needs) }}`. Keep producer jobs as required checks.
+# Producers must disable individual comments and upload only report files in
+# artifacts named `ci-reports-<run_attempt>-<job ID>-<unique name>`. Use the same
+# job IDs in the caller and its reusable workflows. Directories are kept
+# separate so identically named reports cannot overwrite one another.
+# The shared linter uploads its native `super-linter-summary.md`; call it from
+# a job named `lint` with `comment: false`. Other lint producers can upload any
+# lint format supported by parse-ci-reports (ESLint, SARIF, Checkstyle, etc.).
+# Comments show concise totals with report and job details collapsed by default.
+#
+# Only this run's current attempt is read. When rerunning failed jobs, reports
+# from jobs that did not rerun are explicitly unavailable; rerun all jobs for a
+# complete report. Missing reports never imply successful tests. Coverage stays
+# separate per source report; percentages are never averaged.
+#
+# Grant contents: read and pull-requests: write. Fork and Dependabot runs retain
+# summaries without commenting. Use the caller's concurrency to cancel superseded
+# runs. This workflow serializes publication and rejects an outdated PR head.
+name: CI reports
+
+on:
+  workflow_call:
+    inputs:
+      job-results:
+        description: JSON needs context containing lint and test jobs and their results.
+        type: string
+        required: true
+    outputs:
+      lint-markdown:
+        description: Consolidated lint report, including native Super-Linter summaries and parsed diagnostics.
+        value: ${{ jobs.reports.outputs.lint-markdown }}
+      test-markdown:
+        description: Consolidated test report, including job status and missing-report information.
+        value: ${{ jobs.reports.outputs.test-markdown }}
+      coverage-markdown:
+        description: Consolidated coverage report with separate source sections.
+        value: ${{ jobs.reports.outputs.coverage-markdown }}
+
+permissions: {}
+
+jobs:
+  reports:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    concurrency:
+      group: ci-reports-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: false
+    outputs:
+      lint-markdown: ${{ steps.compose.outputs.lint }}
+      test-markdown: ${{ steps.compose.outputs.tests }}
+      coverage-markdown: ${{ steps.compose.outputs.coverage }}
+    steps:
+      - name: Prepare report directory
+        id: directory
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { mkdtemp } = require('node:fs/promises');
+            const path = require('node:path');
+            core.setOutput('path', await mkdtemp(path.join(process.env.RUNNER_TEMP, 'ci-reports-')));
+      - name: Download reports from this attempt
+        id: download
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ci-reports-${{ github.run_attempt }}-*
+          path: ${{ steps.directory.outputs.path }}
+      - name: Parse reports
+        id: parse
+        uses: $/actions/quality/parse-ci-reports
+        with:
+          working-directory: ${{ steps.directory.outputs.path }}
+          report-paths: |
+            **/*
+            !**/super-linter-summary.md
+          report-name: CI results
+          output-format: markdown
+      - name: Compose reports and check publication eligibility
+        id: compose
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          JOB_RESULTS: ${{ inputs.job-results }}
+          LINT_MARKDOWN: ${{ steps.parse.outputs.lint-markdown }}
+          TEST_MARKDOWN: ${{ steps.parse.outputs.test-markdown }}
+          COVERAGE_MARKDOWN: ${{ steps.parse.outputs.coverage-markdown }}
+          PARSE_OUTCOME: ${{ steps.parse.outcome }}
+          DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
+          REPORT_DIRECTORY: ${{ steps.directory.outputs.path }}
+        with:
+          script: |
+            const jobs = Object.entries(JSON.parse(process.env.JOB_RESULTS));
+            if (!jobs.length || jobs.some(([name, job]) => !/^[\w-]+$/.test(name) || !['success', 'failure', 'cancelled', 'skipped'].includes(job?.result))) {
+              throw new Error('job-results must contain job IDs and their completed results');
+            }
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/attempts/${process.env.GITHUB_RUN_ATTEMPT}`;
+            const header = `[Workflow run and full reports](${run}) · Commit ${context.sha.slice(0, 7)}\n\n`;
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const directory = process.env.REPORT_DIRECTORY;
+            const artifacts = fs.existsSync(directory) ? fs.readdirSync(directory) : [];
+            let missing = 0;
+            const status = '| Job | Result | Report artifacts |\n| --- | --- | --- |\n' + jobs.map(([name, job]) => {
+              const prefix = `ci-reports-${process.env.GITHUB_RUN_ATTEMPT}-${name}-`;
+              const count = artifacts.filter(artifact => artifact.startsWith(prefix)).length;
+              if (!count) missing++;
+              return `| ${name} | ${job.result} | ${count || '**Unavailable**'} |`;
+            }).join('\n');
+            const outcomes = ['success', 'failure', 'cancelled', 'skipped'].map(result => `${jobs.filter(([, job]) => job.result === result).length} ${result}`).join(' · ');
+            const warning = missing ? `\n\n⚠️ Reports unavailable for ${missing} job(s). Missing reports do not mean passing checks.` : '';
+            const notice = 'Only this attempt is included. On partial reruns, rerun all producer jobs for complete reports. CodeQL findings remain in code scanning; other diagnostics remain in the job logs.';
+            const jobDetails = `<details>\n<summary>Job results and report availability</summary>\n\n${status}\n\n${notice}\n\n</details>`;
+            const available = process.env.PARSE_OUTCOME === 'success' && process.env.DOWNLOAD_OUTCOME === 'success';
+            const lintReports = available && process.env.LINT_MARKDOWN ? [process.env.LINT_MARKDOWN] : [];
+            if (process.env.DOWNLOAD_OUTCOME === 'success') {
+              const summaries = await glob.create(path.join(directory, '**/super-linter-summary.md'), { followSymbolicLinks: false, matchDirectories: false });
+              for (const file of await summaries.glob()) {
+                const summary = fs.readFileSync(file, 'utf8');
+                if (!summary.trim()) continue;
+                const details = summary.length > 45000 ? `Summary exceeds the comment limit. [Read the artifact](${run}).` : summary;
+                lintReports.push(`<details>\n<summary>Super-Linter details</summary>\n\n${details}\n\n</details>`);
+              }
+            }
+            const lint = lintReports.length ? `**Lint:** Collected diagnostics and Super-Linter summaries. Execution status is included in the job outcomes.\n\n${lintReports.join('\n\n')}` : '';
+            for (const [type, report] of [['tests', available && process.env.TEST_MARKDOWN], ['coverage', available && process.env.COVERAGE_MARKDOWN], ['lint', lint]]) {
+              const prefix = `${header}**Jobs:** ${outcomes}.${warning}\n\n`;
+              let content = report || `No ${type} reports available for this attempt. See the job results and workflow logs.`;
+              if (!available) content = `⚠️ Report collection or parsing did not complete; results may be incomplete.\n\n${content}`;
+              if ((prefix + content + jobDetails).length > 60000) {
+                // Omit whole sections instead of cutting HTML or Markdown in the middle.
+                content = `${content.split('\n')[0]}\n\nDetails exceed the comment limit. [Read the full report artifacts](${run}).`;
+              }
+              const body = `${prefix}${content}\n\n${jobDetails}`;
+              core.setOutput(type, body);
+              await core.summary.addRaw(body + '\n\n').write();
+            }
+            const pr = context.payload.pull_request;
+            if (context.eventName !== 'pull_request' || pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}` || context.actor === 'dependabot[bot]') return;
+            const { data: current } = await github.rest.pulls.get({ ...context.repo, pull_number: pr.number });
+            core.setOutput('comment', current.state === 'open' && current.head.sha === pr.head.sha);
+      - name: Update test results comment
+        if: always() && steps.compose.outputs.comment == 'true'
+        uses: $/actions/create-or-update-comment
+        with:
+          title: "${{ github.workflow }} - Test results"
+          token: ${{ github.token }}
+          body: ${{ steps.compose.outputs.tests }}
+      - name: Update coverage comment
+        if: always() && steps.compose.outputs.comment == 'true'
+        uses: $/actions/create-or-update-comment
+        with:
+          title: "${{ github.workflow }} - Code coverage"
+          token: ${{ github.token }}
+          body: ${{ steps.compose.outputs.coverage }}
+      - name: Update lint comment
+        if: always() && steps.compose.outputs.comment == 'true'
+        uses: $/actions/create-or-update-comment
+        with:
+          title: "${{ github.workflow }} - Lint results"
+          token: ${{ github.token }}
+          body: ${{ steps.compose.outputs.lint }}

@@ -1,8 +1,9 @@
-import { ParserFactory } from "./parsers/ParserFactory.js";
-import { SummaryFormatter } from "./formatters/SummaryFormatter.js";
+import path from "node:path";
 import { MarkdownFormatter } from "./formatters/MarkdownFormatter.js";
+import { SummaryFormatter } from "./formatters/SummaryFormatter.js";
 import { ReportData } from "./models/ReportData.js";
 import { PathRewriter } from "./PathRewriter.js";
+import { ParserFactory } from "./parsers/ParserFactory.js";
 
 /**
  * Core report parsing logic shared between CLI and Action
@@ -53,10 +54,18 @@ export class ReportParserCore {
 			// Merge data
 			aggregatedData.tests.push(...reportData.tests);
 			aggregatedData.lintIssues.push(...reportData.lintIssues);
+			if (reportData.reportType === "lint") aggregatedData.lintReportCount++;
 
 			if (reportData.coverage) {
-				aggregatedData.setCoverage(reportData.coverage);
+				aggregatedData.coverageReports.push({
+					name: path.relative(this.fileSystemService.workingDirectory, file),
+					coverage: reportData.coverage,
+				});
 			}
+		}
+		// A single report has an overall percentage; independent reports do not.
+		if (aggregatedData.coverageReports.length === 1) {
+			aggregatedData.setCoverage(aggregatedData.coverageReports[0].coverage);
 		}
 
 		return aggregatedData;
@@ -89,7 +98,46 @@ export class ReportParserCore {
 			);
 		}
 
-		return { markdown, summary };
+		const tests = new ReportData();
+		tests.tests = reportData.tests;
+		const coverage = new ReportData();
+		coverage.coverage = reportData.coverage;
+		coverage.coverageReports = reportData.coverageReports;
+		const lint = new ReportData();
+		lint.lintIssues = reportData.lintIssues;
+		lint.lintReportCount = reportData.lintReportCount;
+		return {
+			markdown,
+			summary,
+			testMarkdown: tests.tests.length
+				? this.formatComment(
+						tests,
+						"Test",
+						`${tests.getPassedCount()} passed · ${tests.getFailedCount()} failed · ${tests.getSkippedCount()} skipped`,
+					)
+				: "",
+			lintMarkdown:
+				lint.lintReportCount || lint.lintIssues.length
+					? this.formatComment(
+							lint,
+							"Lint",
+							`${lint.getErrors().length} errors · ${lint.getWarnings().length} warnings in ${lint.lintReportCount} diagnostic report(s)`,
+						)
+					: "",
+			coverageMarkdown:
+				coverage.coverage || coverage.coverageReports.length
+					? this.formatComment(
+							coverage,
+							"Coverage",
+							`${coverage.coverageReports.length || 1} source report(s); percentages remain separate`,
+						)
+					: "",
+		};
+	}
+
+	formatComment(data, title, summary) {
+		const details = this.markdownFormatter.format(data, `${title} results`);
+		return `**${title}:** ${summary}.\n\n<details>\n<summary>${title} details</summary>\n\n${details}\n\n</details>\n`;
 	}
 
 	/**

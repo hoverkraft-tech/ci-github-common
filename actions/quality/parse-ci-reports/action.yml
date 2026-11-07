@@ -61,6 +61,15 @@ inputs:
     default: "."
 
 outputs:
+  test-markdown:
+    description: "Compact test-only Markdown with collapsed details. Empty when no test results were parsed."
+    value: ${{ steps.parse-reports.outputs.test-markdown }}
+  coverage-markdown:
+    description: "Compact coverage-only Markdown with collapsed per-source details. Empty when no coverage was parsed."
+    value: ${{ steps.parse-reports.outputs.coverage-markdown }}
+  lint-markdown:
+    description: "Compact lint-only Markdown with collapsed diagnostics. Empty when no lint reports were parsed; clean reports explicitly show zero findings."
+    value: ${{ steps.parse-reports.outputs.lint-markdown }}
   markdown:
     description: "Generated Markdown output for PR comments"
     value: ${{ steps.parse-reports.outputs.markdown }}
