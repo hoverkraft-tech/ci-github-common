@@ -160,7 +160,7 @@ jobs:
           ignore-scripts: "false"
 
       - name: Run shared Super-Linter image
-        uses: docker://ghcr.io/hoverkraft-tech/docker-base-images/super-linter:2.0.0@sha256:a37519f1afdc1c239254fe3d9a3e76ee9f114990f09bba123c96b1737737d43e
+        uses: docker://ghcr.io/hoverkraft-tech/docker-base-images/super-linter:2.0.1@sha256:7fbeb0e47711e939db09027b64d2b4f405dd271dad056fe42dc05ac15a6ddab0
         env:
           VALIDATE_ALL_CODEBASE: ${{ inputs.lint-all }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}

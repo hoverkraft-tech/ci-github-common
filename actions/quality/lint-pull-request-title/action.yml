@@ -1,0 +1,35 @@
+name: Lint pull request title
+description: |
+  Validate the event's pull request title using the checked-out repository's commitlint config.
+  Fall back to `@commitlint/config-conventional` when no rules are configured.
+  The same repository rules apply to people and bots; warnings produce annotations.
+  Requires a pull request event and a repository checkout.
+  Dependencies are installed from the action's lockfile with lifecycle scripts disabled.
+
+  See the [common commit process](../../../docs/usage/commits.md).
+author: hoverkraft
+branding:
+  icon: check-circle
+  color: blue
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@31cd29bfb95f6bc6490d6abe5d66690431b518e3 # 2.0.0
+      with:
+        working-directory: ${{ github.action_path }}
+
+    - name: Validate title
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        # Resolve the bundled preset when the repository has no Node.js dependencies installed.
+        NODE_PATH: ${{ github.action_path }}/node_modules
+      with:
+        script: |
+          const { pathToFileURL } = require('node:url');
+          const { join } = require('node:path');
+          const moduleUrl = pathToFileURL(join(process.env.ACTION_PATH, 'src', 'index.js'));
+          const { run } = await import(moduleUrl.href);
+          await run({ core, context });

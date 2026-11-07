@@ -2,12 +2,6 @@
 
 # GitHub Reusable Workflow: Semantic Pull Request
 
-<div align="center">
-  <img src="../logo.svg" width="60px" align="center" alt="Semantic Pull Request" />
-</div>
-
----
-
 <!-- header:end -->
 
 <!-- jscpd:ignore-start -->
@@ -28,16 +22,20 @@
 
 ## Overview
 
-Workflow to ensure Pull Request provides semantic versioning assets:
+Validate pull request titles with the same commitlint policy as the shared linter.
 
-- "Squash and merge" Pull Request strategy provides a valid commit message.
-  Check that the title follows the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
-  Mainly using [action-semantic-pull-request](https://github.com/amannn/action-semantic-pull-request#installation), with some opinionated defaults.
+The lint-pull-request-title action runs on Node.js and reads the repository's root commitlint config.
+It falls back to `@commitlint/config-conventional` when no rules are configured.
+Contributor and bot titles use the same repository rules; warnings produce annotations.
+The action owns its dependencies and installs them from its lockfile with lifecycle scripts disabled.
+Git-generated messages are not exempt by default; repository ignore settings take precedence.
+This workflow requires contents: read and checks out the event's revision without persisted credentials.
+For pull_request_target callers, checkout uses the trusted base revision, never the PR head.
+See [the common commit process](../../docs/usage/commits.md) for local validation and bot configuration.
 
 ### Permissions
 
-- **`contents`**: `write`
-- **`pull-requests`**: `write`
+- **`contents`**: `read`
 
 <!-- overview:end -->
 
@@ -56,14 +54,9 @@ on:
 permissions: {}
 jobs:
   semantic-pull-request:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@5fbb531db839a26ebcc35c4946be279f945f7633 # 1.0.0
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/semantic-pull-request.yml@deba829171da15c448db4affbd2ece840a0de809 # feat/shared-commit-policy
     permissions:
-      contents: write
-      pull-requests: write
-    secrets:
-      # Token for the repository.
-      # Default: GITHUB_TOKEN.
-      github-token: ""
+      contents: read
     with:
       # JSON array of runner(s) to use.
       # See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job.
@@ -90,14 +83,6 @@ jobs:
 <!-- jscpd:ignore-start -->
 
 <!-- secrets:start -->
-
-## Secrets
-
-| **Secret**         | **Description**           | **Required** |
-| ------------------ | ------------------------- | ------------ |
-| **`github-token`** | Token for the repository. | **false**    |
-|                    | Default: GITHUB_TOKEN.    |              |
-
 <!-- secrets:end -->
 
 <!-- outputs:start -->
