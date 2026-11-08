@@ -23,7 +23,7 @@ on:
           index.js
           licenses.txt
       pull-request-authors:
-        description: JSON array of dependabot or renovate presets, or objects with login, numeric id and optional branch-prefix and commit-message-suffix.
+        description: JSON array of dependabot or renovate presets, or objects with login, numeric account ID and optional branch-prefix and commit-message-suffix.
         type: string
         default: '["dependabot","renovate"]'
       artifact-name:

@@ -39,7 +39,7 @@ on:
 permissions: {}
 jobs:
   commit-action-distributions:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/commit-action-distributions.yml@d9dabed080a27cdf01428c11595524d606fa4123 # perf/475-p2-report-parser-bundle
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/commit-action-distributions.yml@283b16c9f0d0a7c92875d0660be31d12dc923651 # perf/475-p2-report-parser-bundle
     permissions:
       actions: read
       contents: read
@@ -65,7 +65,7 @@ jobs:
         index.js
         licenses.txt
 
-      # JSON array of dependabot or renovate presets, or objects with login, numeric id and optional branch-prefix and commit-message-suffix.
+      # JSON array of dependabot or renovate presets, or objects with login, numeric account ID and optional branch-prefix and commit-message-suffix.
       # Default: `["dependabot","renovate"]`
       pull-request-authors: '["dependabot","renovate"]'
 
@@ -93,16 +93,16 @@ jobs:
 
 ### Workflow Call Inputs
 
-| **Input**                  | **Description**                                                                                                                       | **Required** | **Type**   | **Default**                                                                                       |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------- | ------------------------------------------------------------------------------------------------- |
-| **`working-directories`**  | Newline-separated package directories relative to the repository root. Use . for a root package.                                      | **false**    | **string** | `.`                                                                                               |
-| **`output-directory`**     | Generated directory relative to each package. Only files inside it may be committed.                                                  | **false**    | **string** | `dist`                                                                                            |
-| **`required-files`**       | Newline-separated files required in every generated directory. Empty accepts any nonempty output.                                     | **false**    | **string** | <!-- textlint-disable --><pre lang="text">index.js&#13;licenses.txt</pre><!-- textlint-enable --> |
-| **`pull-request-authors`** | JSON array of dependabot or renovate presets, or objects with login, numeric id and optional branch-prefix and commit-message-suffix. | **false**    | **string** | `["dependabot","renovate"]`                                                                       |
-| **`artifact-name`**        | Artifact name prefix. The run attempt is appended automatically. Must match in both callers.                                          | **false**    | **string** | `action-distributions`                                                                            |
-| **`build-workflow`**       | Repository-relative path of the pull_request caller workflow that produced the artifact.                                              | **true**     | **string** | -                                                                                                 |
-| **`commit-message`**       | Single-line commit headline. Per-author suffixes and a loop-prevention body trailer are appended.                                     | **false**    | **string** | `build: regenerate action distributions`                                                          |
-| **`github-app-client-id`** | Client ID of the GitHub App installed on the caller repository with contents write and actions and pull requests read access.         | **true**     | **string** | -                                                                                                 |
+| **Input**                  | **Description**                                                                                                                               | **Required** | **Type**   | **Default**                                                                                       |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------- | ------------------------------------------------------------------------------------------------- |
+| **`working-directories`**  | Newline-separated package directories relative to the repository root. Use . for a root package.                                              | **false**    | **string** | `.`                                                                                               |
+| **`output-directory`**     | Generated directory relative to each package. Only files inside it may be committed.                                                          | **false**    | **string** | `dist`                                                                                            |
+| **`required-files`**       | Newline-separated files required in every generated directory. Empty accepts any nonempty output.                                             | **false**    | **string** | <!-- textlint-disable --><pre lang="text">index.js&#13;licenses.txt</pre><!-- textlint-enable --> |
+| **`pull-request-authors`** | JSON array of dependabot or renovate presets, or objects with login, numeric account ID and optional branch-prefix and commit-message-suffix. | **false**    | **string** | `["dependabot","renovate"]`                                                                       |
+| **`artifact-name`**        | Artifact name prefix. The run attempt is appended automatically. Must match in both callers.                                                  | **false**    | **string** | `action-distributions`                                                                            |
+| **`build-workflow`**       | Repository-relative path of the pull_request caller workflow that produced the artifact.                                                      | **true**     | **string** | -                                                                                                 |
+| **`commit-message`**       | Single-line commit headline. Per-author suffixes and a loop-prevention body trailer are appended.                                             | **false**    | **string** | `build: regenerate action distributions`                                                          |
+| **`github-app-client-id`** | Client ID of the GitHub App installed on the caller repository with contents write and actions and pull requests read access.                 | **true**     | **string** | -                                                                                                 |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
