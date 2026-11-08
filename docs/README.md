@@ -5,3 +5,5 @@
 - [Developing the CI report parser](development/parse-ci-reports.md)
 - [ADR 0001: Bundle the CI report parser](adr/0001-bundle-ci-report-parser.md)
 - [ADR 0002: Audit action dependency distributions](adr/0002-audit-action-dependency-distributions.md)
+- [Automatic action distribution updates](usage/action-distributions.md)
+- [ADR 0003: Automate action distribution updates](adr/0003-automate-action-distribution-updates.md)
