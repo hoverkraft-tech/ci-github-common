@@ -31,7 +31,24 @@ src/
 cd actions/quality/parse-ci-reports
 npm ci --ignore-scripts
 npm test
+npm run check:dist
 ```
+
+## Distribution
+
+The action loads the committed `dist/index.js` through `github-script`; it does
+not install packages or change the caller's Node version. Maintainers use Node
+24 or later and `npm ci --ignore-scripts`, then `npm run build` after changing
+source or dependencies. Commit the complete `dist/` directory, including its
+third-party licenses. Do not edit generated files.
+
+`npm run check:dist` rebuilds from the lockfile installation and fails if the
+distribution differs from Git, including added or removed files. CI runs this
+build gate before tests and exercises the action on a host and in a container.
+The distribution tests copy only `dist/` to a temporary directory and compare
+its outputs with source across every supported report format.
+
+See [ADR 0001](../adr/0001-bundle-ci-report-parser.md) for the decision and evidence.
 
 ## Adding New Parsers
 

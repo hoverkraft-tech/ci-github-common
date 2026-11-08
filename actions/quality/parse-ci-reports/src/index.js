@@ -1,12 +1,10 @@
-// Dynamically import ES modules
+import { FileSystemService } from "./FileSystemService.js";
+import { LoggerService } from "./LoggerService.js";
+import { ReportParserCore } from "./ReportParserCore.js";
+import { ReportPathResolver } from "./ReportPathResolver.js";
+
 export async function run({ core, glob: globModule, inputs }) {
 	try {
-		// Import the core parser and path resolver
-		const { FileSystemService } = await import("./FileSystemService.js");
-		const { ReportParserCore } = await import("./ReportParserCore.js");
-		const { ReportPathResolver } = await import("./ReportPathResolver.js");
-		const { LoggerService } = await import("./LoggerService.js");
-
 		const fileSystemService = new FileSystemService(inputs.workingDirectory);
 		const logger = new LoggerService(core);
 
@@ -34,6 +32,7 @@ export async function run({ core, glob: globModule, inputs }) {
 		const uniqueFiles = await pathResolver.findFiles(patternList, globModule);
 		logger.info(`Found ${uniqueFiles.length} report file(s)`);
 		core.setOutput("parsed-files", JSON.stringify(uniqueFiles));
+		await pathResolver.assertExplicitMatches(inputs.reportPaths, globModule);
 
 		if (uniqueFiles.length === 0) {
 			logger.warning("No report files found");

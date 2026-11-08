@@ -100,6 +100,29 @@ export class ReportPathResolver {
 
 		return Array.from(files);
 	}
+
+	/** Require explicit positive patterns to match after applying exclusions. */
+	async assertExplicitMatches(reportPaths, globModule) {
+		const segments = reportPaths
+			.split(/[,\n]/)
+			.map((pattern) => pattern.trim());
+		const exclusions = segments.filter((pattern) => pattern.startsWith("!"));
+		const explicit = new Set(
+			segments.filter(
+				(pattern) =>
+					pattern && !pattern.startsWith("auto:") && !pattern.startsWith("!"),
+			),
+		);
+		for (const pattern of explicit) {
+			const matches = await this.findFiles(
+				[pattern, ...exclusions],
+				globModule,
+			);
+			if (matches.length === 0) {
+				throw new Error(`No report files matched explicit pattern: ${pattern}`);
+			}
+		}
+	}
 }
 
 // Export ReportCategory for convenience

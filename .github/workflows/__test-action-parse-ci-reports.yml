@@ -17,13 +17,17 @@ jobs:
       security-events: write
     with:
       working-directory: ./actions/quality/parse-ci-reports
-      build: null
+      build: check:dist
       lint: null
       test: '{ "coverage": null }'
 
   integration-tests:
     name: Tests for parse-ci-reports action
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: [null, "node:24-bookworm-slim"]
+    container: ${{ matrix.container }}
     steps:
       - name: Arrange - Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -86,6 +90,7 @@ jobs:
             );
 
             core.info('Created test report files under test-reports');
+            writeFileSync('test-reports/failing-junit.xml', '<testsuite tests="1" failures="1"><testcase name="failure"><failure message="expected"/></testcase></testsuite>');
 
       - name: Act - Run parse-ci-reports action
         id: parse-ci-reports
@@ -122,3 +127,57 @@ jobs:
             }
 
             core.info('All outputs are valid');
+
+      - name: Act - Missing explicit reports fail
+        id: missing-report
+        continue-on-error: true
+        uses: $/actions/quality/parse-ci-reports
+        with:
+          report-paths: test-reports/junit.xml,test-reports/missing.xml
+
+      - name: Arrange - A failed test command
+        id: failed-test
+        continue-on-error: true
+        shell: sh
+        run: exit 1
+
+      - name: Act - Reporting preserves the test failure
+        id: failed-test-report
+        if: always()
+        uses: $/actions/quality/parse-ci-reports
+        with:
+          report-paths: test-reports/failing-junit.xml
+
+      - name: Act - Fail on report errors when requested
+        id: fail-on-error
+        continue-on-error: true
+        uses: $/actions/quality/parse-ci-reports
+        with:
+          report-paths: test-reports/failing-junit.xml
+          fail-on-error: "true"
+
+      - name: Act - Empty auto-detection is optional
+        uses: $/actions/quality/parse-ci-reports
+        with:
+          working-directory: actions/quality/parse-ci-reports/src
+          report-paths: auto:all
+
+      - name: Assert - No installed parser dependencies and missing report rejected
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          MISSING_REPORT_OUTCOME: ${{ steps.missing-report.outcome }}
+          TEST_OUTCOME: ${{ steps.failed-test.outcome }}
+          REPORT_OUTCOME: ${{ steps.failed-test-report.outcome }}
+          REPORT_HAS_ERRORS: ${{ steps.failed-test-report.outputs.has-errors }}
+          FAIL_ON_ERROR_OUTCOME: ${{ steps.fail-on-error.outcome }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const fs = require('node:fs');
+            assert.equal(process.env.MISSING_REPORT_OUTCOME, 'failure');
+            assert.equal(process.env.TEST_OUTCOME, 'failure');
+            assert.equal(process.env.REPORT_OUTCOME, 'success');
+            assert.equal(process.env.REPORT_HAS_ERRORS, 'true');
+            assert.equal(process.env.FAIL_ON_ERROR_OUTCOME, 'failure');
+            assert.equal(fs.existsSync('actions/quality/parse-ci-reports/node_modules'), false);

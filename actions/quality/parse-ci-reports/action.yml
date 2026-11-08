@@ -20,6 +20,8 @@ inputs:
   report-paths:
     description: |
       Paths to report files (glob patterns supported, one per line or comma-separated).
+      Each explicit path or glob must match a file after exclusions; missing reports fail the action.
+      Auto-detection may match no files. Exclusion patterns do not require a match.
       Set to `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all` for automatic detection.
       Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `reports/results.sarif`, `auto:all`, `auto:test,coverage/lcov.info`, `auto:test,auto:coverage`
     required: false
@@ -86,16 +88,10 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Setup Node.js
-      uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@02a04ad25ceaacdf3b7200e45fb7fec07fadf4fa # 2.1.0
-      with:
-        working-directory: ${{ github.action_path }}
-
     - name: Parse reports
       id: parse-reports
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
-        NODE_PATH: ${{ github.action_path }}/node_modules
         REPORT_PATHS: ${{ inputs.report-paths }}
         REPORT_NAME: ${{ inputs.report-name }}
         INCLUDE_PASSED: ${{ inputs.include-passed }}
@@ -107,7 +103,7 @@ runs:
         script: |
           const path = require('path');
           const { pathToFileURL } = require('url');
-          const actionModulePath = path.join(process.env.ACTION_PATH, 'src', 'index.js');
+          const actionModulePath = path.join(process.env.ACTION_PATH, 'dist', 'index.js');
           const { run } = await import(pathToFileURL(actionModulePath));
 
           const inputs = {
