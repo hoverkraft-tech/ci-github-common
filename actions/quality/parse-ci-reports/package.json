@@ -5,7 +5,9 @@
 	"scripts": {
 		"test": "node --test",
 		"test:watch": "node --test --watch",
-		"test:ci": "node --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test"
+		"test:ci": "node --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test",
+		"build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && ncc build src/index.js --out dist --target es2022 --no-cache --license licenses.txt",
+		"check:dist": "npm run build && git diff --exit-code -- dist && test -z \"$(git ls-files --others --exclude-standard -- dist)\""
 	},
 	"keywords": [
 		"github-action",
@@ -29,5 +31,9 @@
 	},
 	"engines": {
 		"node": ">=24.0.0"
+	},
+	"devDependencies": {
+		"@actions/glob": "0.7.0",
+		"@vercel/ncc": "0.45.0"
 	}
 }

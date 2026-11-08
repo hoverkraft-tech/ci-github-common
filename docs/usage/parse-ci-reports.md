@@ -19,6 +19,12 @@ Job outcomes and missing reports remain visible above the collapsed report and
 job details. Oversized sections link to full artifacts instead of producing
 incomplete Markdown. Per-job summaries and merge checks remain available.
 
+Explicit positive paths and glob patterns must each match at least one file
+after exclusions. A missing report fails the action even when `fail-on-error`
+is false; that option controls failures found inside reports. Use `auto:*` for
+optional discovery, which warns when no files are found. Exclusion patterns do
+not require a match.
+
 ## Supported Formats
 
 ### Test Reports
