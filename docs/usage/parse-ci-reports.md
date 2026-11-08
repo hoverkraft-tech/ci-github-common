@@ -103,7 +103,7 @@ Auto-detection modes:
     output-format: "markdown"
 
 - name: Comment PR
-  uses: peter-evans/create-or-update-comment@v3
+  uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
   with:
     issue-number: ${{ github.event.pull_request.number }}
     body: ${{ steps.parse-reports.outputs.markdown }}
@@ -338,7 +338,7 @@ Only comment on PRs if there are failures:
 
 - name: Comment on PR
   if: steps.parse-reports.outputs.has-errors == 'true'
-  uses: peter-evans/create-or-update-comment@v3
+  uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
   with:
     issue-number: ${{ github.event.pull_request.number }}
     body: |
