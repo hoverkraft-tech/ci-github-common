@@ -19,4 +19,5 @@ jobs:
       working-directory: ./actions/need-fix-to-issue
       build: null
       lint: null
+      code-ql: '{"languages":"typescript","config-file":".github/codeql/config.yml"}'
       test: '{ "coverage": null }'
