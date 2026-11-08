@@ -122,8 +122,8 @@ describe("ReportPathResolver", () => {
 			);
 		}
 
-		// Verify total count matches expected (5 test + 8 coverage)
-		assert.strictEqual(patterns.length, 13);
+		// Verify total count matches expected (5 test + 9 coverage)
+		assert.strictEqual(patterns.length, 14);
 	});
 
 	it("deduplicates overlapping auto modes", () => {
@@ -197,8 +197,8 @@ describe("ReportPathResolver", () => {
 			);
 		}
 
-		// Verify deduplication - total should be 28 lint + 5 test + 8 coverage = 41
-		assert.strictEqual(patterns.length, 41);
+		// Verify deduplication - total should be 28 lint + 5 test + 9 coverage = 42
+		assert.strictEqual(patterns.length, 42);
 	});
 
 	it("gets patterns from parsers via getAutoPatterns", () => {

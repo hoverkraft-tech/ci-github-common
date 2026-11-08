@@ -1,6 +1,43 @@
-import { describe, it } from "node:test";
+import { describe, it, suite, test } from "node:test";
 import assert from "node:assert";
 import { JUnitParser } from "./JUnitParser.js";
+
+suite("Nested JUnit suites", () => {
+	test("collects leaf tests once across PHPUnit aggregate and sibling suites", () => {
+		// Arrange
+		const parser = new JUnitParser();
+		const content = `<testsuites>
+      <testsuite name="PHPUnit" tests="4" failures="1" skipped="1">
+        <testsuite name="Unit" tests="3" failures="1">
+          <testcase name="direct" time="0.1"/>
+          <testsuite name="SampleTest" tests="2" failures="1">
+            <testcase name="passes" file="tests/SampleTest.php" time="0.2"/>
+            <testcase name="fails" file="tests/SampleTest.php" time="0.3">
+              <failure type="AssertionError">Expected value differs</failure>
+            </testcase>
+          </testsuite>
+        </testsuite>
+        <testsuite name="Integration" tests="1" skipped="1">
+          <testcase name="skips"><skipped message="Not available"/></testcase>
+        </testsuite>
+      </testsuite>
+    </testsuites>`;
+
+		// Act
+		const result = parser.parse(content);
+
+		// Assert
+		assert.strictEqual(result.getTotalTests(), 4);
+		assert.strictEqual(result.getPassedCount(), 2);
+		assert.strictEqual(result.getFailedCount(), 1);
+		assert.strictEqual(result.getSkippedCount(), 1);
+		const failure = result.getFailedTests()[0];
+		assert.strictEqual(failure.suite, "SampleTest");
+		assert.strictEqual(failure.file, "tests/SampleTest.php");
+		assert.strictEqual(failure.message, "Expected value differs");
+		assert.strictEqual(failure.duration, 0.3);
+	});
+});
 
 describe("JUnitParser", () => {
 	const parser = new JUnitParser();
