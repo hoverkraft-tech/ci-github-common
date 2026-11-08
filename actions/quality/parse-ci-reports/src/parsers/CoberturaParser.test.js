@@ -1,6 +1,21 @@
-import { describe, it } from "node:test";
+import { describe, it, suite, test } from "node:test";
 import assert from "node:assert/strict";
 import { CoberturaParser } from "./CoberturaParser.js";
+
+suite("Cobertura auto-detection", () => {
+	for (const file of ["cobertura.xml", ".reports/cobertura.xml"]) {
+		test(`discovers ${file} outside a coverage directory`, () => {
+			// Arrange
+			const parser = new CoberturaParser();
+
+			// Act
+			const detected = parser.matchesAutoPatterns(file);
+
+			// Assert
+			assert.ok(detected);
+		});
+	}
+});
 
 const SAMPLE_COBERTURA_XML = `<?xml version="1.0"?>
 <coverage line-rate="0.75" branch-rate="0.5">

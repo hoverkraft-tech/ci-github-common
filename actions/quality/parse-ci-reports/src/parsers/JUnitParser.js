@@ -83,15 +83,17 @@ export class JUnitParser extends BaseParser {
 		if (!testsuite) return;
 
 		const suiteName = testsuite["@_name"] || "Unknown Suite";
-		const testcases = testsuite.testcase;
-
-		if (!testcases) return;
+		const testcases = testsuite.testcase || [];
 
 		const cases = Array.isArray(testcases) ? testcases : [testcases];
 
 		for (const testcase of cases) {
 			const test = this._parseTestCase(testcase, suiteName);
 			reportData.addTest(test);
+		}
+
+		for (const nestedSuite of this._normalizeTestSuites(testsuite)) {
+			this._parseTestSuite(nestedSuite, reportData);
 		}
 	}
 

@@ -39,6 +39,7 @@ export class CoberturaParser extends BaseParser {
 
 	getAutoPatterns() {
 		return [
+			...this.buildBasenamePatterns(["cobertura.xml"]),
 			...this.buildScopedBasenamePatterns("coverage.xml", ["coverage"], {
 				includePrefixed: true,
 			}),

@@ -88,8 +88,8 @@ describe("ParserFactory", () => {
 		assert.ok(allPatterns.includes("**/eslint-report.json")); // lint
 
 		// Should have the total expected count
-		// Test: 5, Coverage: 8, Lint: 28
-		assert.strictEqual(allPatterns.length, 41);
+		// Test: 5, Coverage: 9, Lint: 28
+		assert.strictEqual(allPatterns.length, 42);
 	});
 
 	it("returns patterns grouped by category", () => {

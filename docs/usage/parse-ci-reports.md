@@ -23,7 +23,7 @@ incomplete Markdown. Per-job summaries and merge checks remain available.
 
 ### Test Reports
 
-- **JUnit XML** - Standard format used by many testing frameworks (Java, Python pytest, JavaScript Jest, etc.)
+- **JUnit XML** - Standard format used by many testing frameworks, including nested PHPUnit suites. Aggregate suite totals are not counted as additional tests.
 - **TAP (Test Anything Protocol)** - Popular in Perl and Node.js testing
 
 ### Coverage Reports
@@ -47,7 +47,7 @@ When `report-paths` uses `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **JUnit XML**           | `**/junit*.xml`, `**/test-results/**/*.xml`, `**/test-reports/**/*.xml`, `**/*test*.xml`                                                                                                                           |
 | **TAP**                 | `**/*.tap`                                                                                                                                                                                                         |
-| **Cobertura XML**       | `**/coverage/*-coverage.xml`, `**/coverage/*-cobertura.xml`, `**/coverage/coverage.xml`, `**/coverage/cobertura.xml`                                                                                               |
+| **Cobertura XML**       | `**/cobertura.xml`, `**/coverage/*-coverage.xml`, `**/coverage/*-cobertura.xml`, `**/coverage/coverage.xml`, `**/coverage/cobertura.xml`                                                                           |
 | **LCOV**                | `**/coverage/lcov.info`, `**/lcov.info`, `**/coverage/*-lcov.info`, `**/*-lcov.info`                                                                                                                               |
 | **ESLint JSON**         | `**/eslint-report.json`, `**/eslint.json`, `**/*-eslint-report.json`, `**/*-eslint.json`                                                                                                                           |
 | **CheckStyle XML**      | `**/checkstyle-result.xml`, `**/checkstyle.xml`, `**/*-checkstyle-result.xml`, `**/*-checkstyle.xml`                                                                                                               |
