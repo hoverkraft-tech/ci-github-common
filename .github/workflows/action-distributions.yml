@@ -1,5 +1,7 @@
 # Rebuild committed Node.js action distributions in Dependabot PRs.
-# See docs/usage/action-distributions.md for the two event wrappers and package allowlist.
+# Follow the [setup guide](../../docs/usage/action-distributions.md) for the two
+# event wrappers and package allowlist. The generated Usage block lists the call
+# inputs; execution requires the pull_request and workflow_run wrappers in the guide.
 # The pull_request caller passes no secrets. Only the trusted workflow_run caller
 # passes the CI bot App key; its writer never executes code from the PR.
 name: Action distributions
@@ -20,7 +22,8 @@ permissions: {}
 
 jobs:
   rebuild:
-    if: >- # zizmor: ignore[bot-conditions] PR author and origin are checked too; actor check prevents bot commit loops.
+    if:
+      >- # zizmor: ignore[bot-conditions] PR author and origin are checked too; actor check prevents bot commit loops.
       github.event_name == 'pull_request' &&
       github.actor_id == '49699333' &&
       github.event.pull_request.user.id == 49699333 &&
