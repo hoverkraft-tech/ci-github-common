@@ -14,7 +14,9 @@
 ## Overview
 
 Rebuild committed Node.js action distributions in Dependabot PRs.
-See docs/usage/action-distributions.md for the two event wrappers and package allowlist.
+Follow the [setup guide](../../docs/usage/action-distributions.md) for the two
+event wrappers and package allowlist. The generated Usage block lists the call
+inputs; execution requires the pull_request and workflow_run wrappers in the guide.
 The pull_request caller passes no secrets. Only the trusted workflow_run caller
 passes the CI bot App key; its writer never executes code from the PR.
 
@@ -38,7 +40,7 @@ on:
 permissions: {}
 jobs:
   action-distributions:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/action-distributions.yml@e8380ee0d09c5a1da6cbd95c03b23a94cfa29ba0 # perf/475-p2-report-parser-bundle
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/action-distributions.yml@b3dad890ccbb9333b886f68716805073a3cf738c # perf/475-p2-report-parser-bundle
     permissions:
       actions: read
       contents: read
