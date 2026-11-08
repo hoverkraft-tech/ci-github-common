@@ -87,3 +87,20 @@ Adopt a reviewed immutable upstream release through the Node actions before
 changing Pleey's consumer pin. This independent upstream work does not require
 Pleey PR #553 to merge. Rollback restores the parser/consumer pins; no cache
 migration is necessary.
+
+### Generated-code analysis
+
+The first full workflow passed, but its separate CodeQL check reported
+`js/bad-tag-filter` in the generated copy of `is-unsafe` 2.0.3's
+`src/contexts/xml.js`. The pattern detects the XML comment terminator `-->`;
+the query expects HTML's additional `--!>` terminator. This is an existing
+transitive dependency of the unchanged `fast-xml-parser` lock entry, newly
+visible to source analysis because the bundle is committed.
+
+Use a shared CodeQL configuration to exclude only this generated distribution
+from the three existing JavaScript scans. Maintained source remains scanned with
+the default queries; dependency review remains enabled for locked packages, and
+the build gate verifies generated output against source. Do not hand-edit vendor
+code, dismiss alerts globally or disable a security query. This does not claim to
+repair or certify the upstream dependency. Revalidate the standalone CodeQL check
+as well as the workflow result before handing over the PR.

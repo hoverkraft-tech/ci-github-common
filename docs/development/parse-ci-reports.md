@@ -46,7 +46,9 @@ third-party licenses. Do not edit generated files.
 distribution differs from Git, including added or removed files. CI runs this
 build gate before tests and exercises the action on a host and in a container.
 The distribution tests copy only `dist/` to a temporary directory and compare
-its outputs with source across every supported report format.
+its outputs with source across every supported report format. CodeQL scans the
+maintained source and excludes the generated copy; dependency review checks the
+lockfile. The repository package commands also skip distribution metadata.
 
 See [ADR 0001](../adr/0001-bundle-ci-report-parser.md) for the decision and evidence.
 
