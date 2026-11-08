@@ -4,7 +4,12 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { test } = require("node:test");
-const { ActionDistributions } = require("./action-distributions.cjs");
+const {
+	ActionDistributions,
+	GENERATED_BY,
+} = require("./action-distributions.cjs");
+
+const { DistributionOptions } = require("./distribution-options.cjs");
 
 const PACKAGE = "actions/example";
 const SHA = "a".repeat(40);
@@ -27,13 +32,13 @@ const blob = (entry) => {
 	};
 };
 
-function fixture(t) {
+function fixture(t, options = {}) {
 	const temporary = fs.mkdtempSync(
 		path.join(os.tmpdir(), "action-distributions-"),
 	);
 	t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 	const state = {
-		packages: [PACKAGE],
+		message: "build(deps): update dependencies",
 		pr: {
 			number: 1,
 			state: "open",
@@ -71,9 +76,9 @@ function fixture(t) {
 	const github = {
 		rest: {
 			repos: {
-				getContent: async (input) => {
+				getCommit: async (input) => {
 					state.reads.push(input);
-					return { data: { content: encode(JSON.stringify(state.packages)) } };
+					return { data: { commit: { message: state.message } } };
 				},
 			},
 			pulls: {
@@ -99,11 +104,17 @@ function fixture(t) {
 		eventName: "workflow_run",
 		payload: {
 			repository: { default_branch: "main" },
+			sender: structuredClone(state.pr.user),
 			workflow_run: { id: 10, run_attempt: 2 },
 			pull_request: structuredClone(state.pr),
 		},
 	};
 	const automation = new ActionDistributions({
+		options: {
+			workingDirectories: PACKAGE,
+			buildWorkflow: ".github/workflows/__rebuild-action-distributions.yml",
+			...options,
+		},
 		github,
 		context,
 		core: {
@@ -135,6 +146,7 @@ test("commits additions, changes and deletions together with an atomic head guar
 			expectedHeadOid: SHA,
 			message: {
 				headline: "build: regenerate action distributions [dependabot skip]",
+				body: GENERATED_BY,
 			},
 			fileChanges: {
 				additions: [file("index.js"), file("chunk.js")],
@@ -142,7 +154,7 @@ test("commits additions, changes and deletions together with an atomic head guar
 			},
 		},
 	]);
-	assert(state.reads.every((read) => read.ref === "main"));
+	assert(state.reads.every((read) => read.ref === SHA));
 });
 
 test("unchanged distributions do not create a commit", async (t) => {
@@ -356,7 +368,7 @@ test("propagates an atomic commit conflict without retrying or forcing", async (
 
 test("grouped lockfile and bundler updates select all affected configured packages", async (t) => {
 	const { automation, state } = fixture(t);
-	state.packages.push("actions/other", "actions/unaffected");
+	automation.options.directories.push("actions/other", "actions/unaffected");
 	state.files = [
 		{ filename: `${PACKAGE}/package-lock.json` },
 		{ filename: "actions/other/package.json" },
@@ -367,27 +379,14 @@ test("grouped lockfile and bundler updates select all affected configured packag
 	]);
 });
 
-for (const packages of [
-	["../actions/example"],
-	[PACKAGE, PACKAGE],
-	[PACKAGE, `${PACKAGE}/nested`],
-	[],
-]) {
-	test(`rejects invalid package configuration ${JSON.stringify(packages)}`, async (t) => {
-		const { automation, state } = fixture(t);
-		state.packages = packages;
-		await assert.rejects(automation.configuration());
-	});
-}
-
 test("requires complete output for every package in a grouped update", async (t) => {
 	const { automation, state, filename, write } = fixture(t);
-	state.packages.push("actions/other");
+	automation.options.directories.push("actions/other");
 	state.files.push({ filename: "actions/other/package-lock.json" });
 	write();
 	await assert.rejects(
 		automation.commit(filename),
-		/Missing bundle or licenses/,
+		/Missing required distribution files/,
 	);
 	write([
 		file("index.js"),
@@ -403,10 +402,10 @@ test("requires complete output for every package in a grouped update", async (t)
 test("a human update and stale build do not execute dependency code", async (t) => {
 	const { automation, context, state, temporary, filename } = fixture(t);
 	context.eventName = "pull_request";
-	context.actor = "human";
+	context.payload.sender.login = "human";
 	const execute = () => assert.fail("Unexpected execution");
 	await automation.build({ workspace: temporary, output: filename, execute });
-	context.actor = "dependabot[bot]";
+	context.payload.sender.login = "dependabot[bot]";
 	state.pr.head.sha = "b".repeat(40);
 	await automation.build({ workspace: temporary, output: filename, execute });
 	assert(!fs.existsSync(filename));
@@ -479,4 +478,163 @@ test("builds a real package and supports no-change reruns", async (t) => {
 	const first = fs.readFileSync(filename, "utf8");
 	await automation.build({ workspace: temporary, output: filename });
 	assert.equal(fs.readFileSync(filename, "utf8"), first);
+});
+
+for (const [name, options] of [
+	["traversal", { workingDirectories: "../actions/example" }],
+	["duplicates", { workingDirectories: `${PACKAGE}\n${PACKAGE}` }],
+	["overlap", { workingDirectories: `${PACKAGE}\n${PACKAGE}/nested` }],
+	["root overlap", { workingDirectories: `.\n${PACKAGE}` }],
+	["empty directories", { workingDirectories: "" }],
+	["absolute output", { outputDirectory: "/tmp/bundle" }],
+	["unsafe output", { outputDirectory: "../.github" }],
+	["unsafe required file", { requiredFiles: "../package.json" }],
+	["npm flags", { buildScript: "--help" }],
+	["shell command", { buildScript: "build && echo bad" }],
+	["artifact traversal", { artifactName: "../bundle" }],
+	["workflow traversal", { buildWorkflow: ".github/workflows/../ci.yml" }],
+	["unknown preset", { pullRequestAuthors: '["unknown"]' }],
+	["missing author ID", { pullRequestAuthors: '[{"login":"example[bot]"}]' }],
+	["empty authors", { pullRequestAuthors: "[]" }],
+	["multiline headline", { commitMessage: "build: bundles\n[skip ci]" }],
+	[
+		"multiline suffix",
+		{
+			pullRequestAuthors:
+				'[{"login":"example","id":123,"commit-message-suffix":"\\nbody"}]',
+		},
+	],
+]) {
+	test(`rejects ${name} workflow input`, () => {
+		assert.throws(() => new DistributionOptions(options));
+	});
+}
+
+const CUSTOM_AUTHOR = {
+	login: "example[bot]",
+	id: 123456,
+	"branch-prefix": "updates/",
+};
+for (const author of [
+	{ login: "renovate[bot]", id: 29139614, "branch-prefix": "renovate/" },
+	CUSTOM_AUTHOR,
+]) {
+	test(`${author.login} builds and commits with its configured policy`, async (t) => {
+		const { automation, state, context, filename, write } = fixture(t, {
+			pullRequestAuthors: JSON.stringify([
+				"dependabot",
+				"renovate",
+				CUSTOM_AUTHOR,
+			]),
+			artifactName: "custom-bundle",
+			buildWorkflow: ".github/workflows/custom-build.yml",
+			commitMessage: "build: update bundles",
+		});
+		state.pr.user = { login: author.login, id: author.id };
+		state.run.actor = structuredClone(state.pr.user);
+		context.payload.sender = structuredClone(state.pr.user);
+		state.pr.head.ref =
+			state.run.head_branch = `${author["branch-prefix"]}example`;
+		context.payload.pull_request = structuredClone(state.pr);
+		state.workflow.path = ".github/workflows/custom-build.yml";
+		state.artifacts[0].name = "custom-bundle-2";
+		context.eventName = "pull_request";
+		await automation.prepareBuild();
+		assert.equal(state.outputs["head-sha"], SHA);
+		context.eventName = "workflow_run";
+		await automation.prepare();
+		assert.equal(state.outputs["artifact-id"], 20);
+		write();
+		await automation.commit(filename);
+		assert.equal(state.commits[0].message.headline, "build: update bundles");
+		assert.equal(state.commits[0].message.body, GENERATED_BY);
+		state.message = `${state.commits[0].message.headline}\n\n${GENERATED_BY}`;
+		state.outputs = {};
+		context.eventName = "pull_request";
+		await automation.prepareBuild();
+		assert.equal(state.outputs["head-sha"], undefined);
+		context.eventName = "workflow_run";
+		await automation.prepare();
+		await automation.commit(filename);
+		assert.equal(state.outputs["artifact-id"], undefined);
+		assert.equal(
+			state.commits.length,
+			1,
+			"same-App generated commits cannot loop",
+		);
+	});
+}
+
+for (const target of ["author", "actor"]) {
+	test(`rejects a matching login with the wrong ${target} ID`, async (t) => {
+		const { automation, state, context, filename } = fixture(t);
+		if (target === "author") state.pr.user.id = 123;
+		else {
+			state.run.actor.id = 123;
+			context.payload.sender.id = 123;
+		}
+		await automation.prepare();
+		await automation.commit(filename);
+		context.eventName = "pull_request";
+		await automation.prepareBuild();
+		assert.deepEqual(state.outputs, {});
+		assert.equal(state.commits.length, 0);
+	});
+}
+
+test("builds and commits a root action using custom script, output and required files", async (t) => {
+	const { automation, context, state, temporary, filename } = fixture(t, {
+		workingDirectories: ".",
+		outputDirectory: "lib/bundle",
+		requiredFiles: "main.cjs\nNOTICE",
+		buildScript: "bundle:ci",
+	});
+	context.eventName = "pull_request";
+	const calls = [];
+	await automation.build({
+		workspace: temporary,
+		output: filename,
+		execute: (_command, args, { cwd }) => {
+			calls.push(args);
+			assert.equal(cwd, temporary);
+			if (args[0] !== "run") return;
+			const destination = path.join(cwd, "lib/bundle");
+			fs.mkdirSync(destination, { recursive: true });
+			fs.writeFileSync(
+				path.join(destination, "main.cjs"),
+				"export default 42;",
+			);
+			fs.writeFileSync(path.join(destination, "NOTICE"), "MIT");
+		},
+	});
+	assert.deepEqual(calls[1], ["run", "bundle:ci"]);
+	context.eventName = "workflow_run";
+	await automation.commit(filename);
+	assert.deepEqual(
+		state.commits[0].fileChanges.additions.map((entry) => entry.path),
+		["lib/bundle/NOTICE", "lib/bundle/main.cjs"],
+	);
+	state.files = [{ filename: "lib/bundle/main.cjs" }];
+	assert.deepEqual(await automation.affectedPackages(state.pr), []);
+});
+
+test("an artifact cannot expand the trusted writer's output directory", async (t) => {
+	const { automation, state, filename, write } = fixture(t, {
+		outputDirectory: "bundle",
+	});
+	write();
+	await assert.rejects(automation.commit(filename), /outside allowed/);
+	assert.equal(state.commits.length, 0);
+});
+
+test("an empty required-files input still requires output for each affected package", async (t) => {
+	const { automation, state, filename, write } = fixture(t, {
+		requiredFiles: "",
+	});
+	write([file("custom.cjs")]);
+	await automation.commit(filename);
+	assert.equal(state.commits.length, 1);
+	automation.options.directories.push("actions/other");
+	state.files.push({ filename: "actions/other/package.json" });
+	await assert.rejects(automation.commit(filename), /Missing required/);
 });

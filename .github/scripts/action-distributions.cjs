@@ -4,14 +4,18 @@ const { createHash } = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const CONFIG = ".github/action-distributions.json";
-const BUILDER = ".github/workflows/__rebuild-action-distributions.yml";
-const BOT = "dependabot[bot]";
-const BOT_ID = 49699333;
+const { DistributionOptions } = require("./distribution-options.cjs");
+const GENERATED_BY = "Generated-by: ci-github-common/action-distributions";
 const MAX_BYTES = 20 * 1024 * 1024;
 
 class ActionDistributions {
-	constructor({ github, context, core }) {
+	constructor({
+		github,
+		context,
+		core,
+		options = DistributionOptions.environment(),
+	}) {
+		this.options = new DistributionOptions(options);
 		this.github = github;
 		this.context = context;
 		this.core = core;
@@ -19,46 +23,12 @@ class ActionDistributions {
 		this.fullName = `${this.repo.owner}/${this.repo.repo}`;
 	}
 
-	async configuration() {
-		const { data } = await this.github.rest.repos.getContent({
-			...this.repo,
-			path: CONFIG,
-			ref: this.context.payload.repository.default_branch,
-		});
-		const packages = JSON.parse(Buffer.from(data.content, "base64").toString());
-		assert(
-			Array.isArray(packages) && packages.length > 0,
-			"Expected package directories",
-		);
-		assert.equal(
-			new Set(packages).size,
-			packages.length,
-			"Duplicate package directory",
-		);
-		for (const directory of packages) {
-			assert(
-				typeof directory === "string" &&
-					/^actions\/(?:[a-z0-9][a-z0-9-]*\/)*[a-z0-9][a-z0-9-]*$/.test(
-						directory,
-					),
-				"Invalid package directory",
-			);
-			assert(
-				!packages.some(
-					(other) => other !== directory && directory.startsWith(`${other}/`),
-				),
-				"Overlapping package directories",
-			);
-		}
-		return packages;
-	}
-
 	async affectedPackages(pr) {
 		assert(
 			pr.changed_files <= 3000,
 			"PR file list exceeds GitHub's supported limit",
 		);
-		const packages = await this.configuration();
+		const packages = this.options.directories;
 		const files = await this.github.paginate(this.github.rest.pulls.listFiles, {
 			...this.repo,
 			pull_number: pr.number,
@@ -68,38 +38,59 @@ class ActionDistributions {
 			files.some((file) =>
 				[file.filename, file.previous_filename].some(
 					(name) =>
-						name?.startsWith(`${directory}/`) &&
-						!name.startsWith(`${directory}/dist/`),
+						typeof name === "string" &&
+						(directory === "." || name.startsWith(`${directory}/`)) &&
+						!name.startsWith(`${this.options.outputPath(directory)}/`),
 				),
 			),
 		);
 	}
 
-	eligible(pr, sha, branch) {
+	eligible(pr, sha, branch, actor) {
 		return (
 			pr.state === "open" &&
-			pr.user.login === BOT &&
-			pr.user.id === BOT_ID &&
+			this.options.author(pr, actor) &&
 			pr.head.repo?.full_name === this.fullName &&
 			pr.base.repo?.full_name === this.fullName &&
 			pr.base.ref === this.context.payload.repository.default_branch &&
 			pr.head.sha === sha &&
-			pr.head.ref === branch &&
-			branch.startsWith("dependabot/")
+			pr.head.ref === branch
 		);
 	}
 
-	async build({ workspace, output, execute = execFileSync }) {
-		const { pull_request: original } = this.context.payload;
-		if (this.context.eventName !== "pull_request" || this.context.actor !== BOT)
-			return;
+	async generatedHead(sha) {
+		const { data } = await this.github.rest.repos.getCommit({
+			...this.repo,
+			ref: sha,
+		});
+		return data.commit.message.split(/\r?\n/).includes(GENERATED_BY);
+	}
+
+	async buildSource() {
+		const { pull_request: original, sender } = this.context.payload;
+		if (this.context.eventName !== "pull_request") return null;
 		const { data: pr } = await this.github.rest.pulls.get({
 			...this.repo,
 			pull_number: original.number,
 		});
-		if (!this.eligible(pr, original.head.sha, original.head.ref)) return;
+		if (
+			!this.eligible(pr, original.head.sha, original.head.ref, sender) ||
+			(await this.generatedHead(pr.head.sha))
+		)
+			return null;
 		const packages = await this.affectedPackages(pr);
-		if (!packages.length) return;
+		return packages.length ? { pr, packages } : null;
+	}
+
+	async prepareBuild() {
+		const source = await this.buildSource();
+		if (source) this.core.setOutput("head-sha", source.pr.head.sha);
+	}
+
+	async build({ workspace, output, execute = execFileSync }) {
+		const source = await this.buildSource();
+		if (!source) return;
+		const { packages } = source;
 		const files = [];
 		for (const directory of packages) {
 			const cwd = path.join(workspace, directory);
@@ -107,8 +98,11 @@ class ActionDistributions {
 				cwd,
 				stdio: "inherit",
 			});
-			execute("npm", ["run", "build"], { cwd, stdio: "inherit" });
-			this.collect(workspace, `${directory}/dist`, files);
+			execute("npm", ["run", this.options.buildScript], {
+				cwd,
+				stdio: "inherit",
+			});
+			this.collect(workspace, this.options.outputPath(directory), files);
 		}
 		const payload = JSON.stringify(files);
 		assert(
@@ -117,6 +111,7 @@ class ActionDistributions {
 		);
 		fs.mkdirSync(path.dirname(output), { recursive: true });
 		fs.writeFileSync(output, payload);
+		this.readPayload(output, packages);
 		this.core.setOutput("built", "true");
 	}
 
@@ -147,9 +142,7 @@ class ActionDistributions {
 			run.conclusion !== "success" ||
 			run.event !== "pull_request" ||
 			run.head_repository?.full_name !== this.fullName ||
-			run.actor.login !== BOT ||
-			run.actor.id !== BOT_ID ||
-			!run.head_branch?.startsWith("dependabot/") ||
+			!run.head_branch ||
 			run.run_attempt !== event.run_attempt
 		)
 			return null;
@@ -157,7 +150,12 @@ class ActionDistributions {
 			...this.repo,
 			workflow_id: run.workflow_id,
 		});
-		assert.equal(workflow.path, BUILDER, "Unexpected builder workflow");
+		assert(this.options.buildWorkflow, "Expected builder workflow path");
+		assert.equal(
+			workflow.path,
+			this.options.buildWorkflow,
+			"Unexpected builder workflow",
+		);
 		const prs = await this.github.paginate(this.github.rest.pulls.list, {
 			...this.repo,
 			state: "open",
@@ -169,9 +167,15 @@ class ActionDistributions {
 			...this.repo,
 			pull_number: prs[0].number,
 		});
-		if (!this.eligible(pr, run.head_sha, run.head_branch)) return null;
+		if (
+			!this.eligible(pr, run.head_sha, run.head_branch, run.actor) ||
+			(await this.generatedHead(pr.head.sha))
+		)
+			return null;
 		const packages = await this.affectedPackages(pr);
-		return packages.length ? { run, pr, packages } : null;
+		return packages.length
+			? { run, pr, packages, author: this.options.author(pr, run.actor) }
+			: null;
 	}
 
 	async prepare() {
@@ -187,7 +191,7 @@ class ActionDistributions {
 			},
 		);
 		const matching = artifacts.filter(
-			(artifact) => artifact.name === `action-distributions-${run.run_attempt}`,
+			(artifact) => artifact.name === this.options.artifact(run.run_attempt),
 		);
 		assert.equal(
 			matching.length,
@@ -225,7 +229,7 @@ class ActionDistributions {
 			);
 			assert(
 				packages.some((directory) =>
-					file.path.startsWith(`${directory}/dist/`),
+					file.path.startsWith(`${this.options.outputPath(directory)}/`),
 				),
 				"File outside allowed distributions",
 			);
@@ -238,10 +242,13 @@ class ActionDistributions {
 			names.add(file.path);
 		}
 		for (const directory of packages) {
+			const prefix = `${this.options.outputPath(directory)}/`;
 			assert(
-				names.has(`${directory}/dist/index.js`) &&
-					names.has(`${directory}/dist/licenses.txt`),
-				"Missing bundle or licenses",
+				[...names].some((name) => name.startsWith(prefix)) &&
+					this.options.requiredFiles.every((name) =>
+						names.has(`${prefix}${name}`),
+					),
+				"Missing required distribution files",
 			);
 		}
 		return files;
@@ -259,7 +266,7 @@ class ActionDistributions {
 		for (const entry of tree.tree) {
 			if (
 				!source.packages.some((directory) =>
-					entry.path.startsWith(`${directory}/dist/`),
+					entry.path.startsWith(`${this.options.outputPath(directory)}/`),
 				)
 			)
 				continue;
@@ -306,15 +313,15 @@ class ActionDistributions {
 					},
 					expectedHeadOid: source.pr.head.sha,
 					message: {
-						headline:
-							"build: regenerate action distributions [dependabot skip]",
+						headline: this.options.headline(source.author),
+						body: GENERATED_BY,
 					},
 					fileChanges,
 				},
 			},
 		);
-		this.core.info("Committed regenerated distributions to the Dependabot PR.");
+		this.core.info("Committed regenerated distributions to the automation PR.");
 	}
 }
 
-module.exports = { ActionDistributions };
+module.exports = { ActionDistributions, GENERATED_BY };
