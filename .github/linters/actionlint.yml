@@ -1,0 +1,7 @@
+# actionlint 1.7.12 predates GitHub.com's reusable-job identity fields.
+# Keep every other expression check enabled; hosted tests exercise these fields.
+# https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#job-context
+paths:
+  .github/workflows/{action-distributions,__test-workflow-action-distributions}.yml:
+    ignore:
+      - '^property "workflow_(repository|sha)" is not defined in object type '

@@ -1,0 +1,20 @@
+name: Internal - Commit action distributions
+
+on: # zizmor: ignore[dangerous-triggers] Trusted writer validates origin, actor, PR head and paths; it never executes PR code.
+  workflow_run:
+    workflows: [Internal - Rebuild action distributions]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  distributions:
+    uses: $/.github/workflows/action-distributions.yml
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    with:
+      github-app-client-id: ${{ vars.CI_BOT_APP_CLIENT_ID }}
+    secrets:
+      github-app-key: ${{ secrets.CI_BOT_APP_PRIVATE_KEY }}

@@ -1,0 +1,19 @@
+name: Internal - Rebuild action distributions
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: rebuild-distributions-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  distributions:
+    uses: $/.github/workflows/action-distributions.yml
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read

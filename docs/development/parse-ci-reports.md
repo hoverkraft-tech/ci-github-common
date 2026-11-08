@@ -50,6 +50,10 @@ its outputs with source across every supported report format. CodeQL scans the
 maintained source and excludes the generated copy; dependency review checks the
 lockfile. The repository package commands also skip distribution metadata.
 
+Dependabot updates use the shared [distribution automation](../usage/action-distributions.md)
+to commit regenerated bundles into the same PR. Human source changes still include
+their rebuilt distribution.
+
 See [ADR 0001](../adr/0001-bundle-ci-report-parser.md) for the decision and evidence.
 
 ## Adding New Parsers
