@@ -54,7 +54,12 @@ distribution. Existing dependency automation remains responsible for updates.
 Local validation on 2026-11-08 passed 120 tests on Node 24.22.2, including
 source/distribution parity for all nine formats, malformed and missing reports,
 path mapping and isolated distribution loading. The distribution rebuild check,
-workflow syntax and repository lint passed. Hosted action validation is pending.
+workflow syntax and repository lint passed.
+[Hosted validation](https://github.com/hoverkraft-tech/ci-github-common/actions/runs/42509255618)
+on implementation commit `cf0077159296a1897650eb2c1ea910c9ee534606` passed the
+source tests, distribution rebuild, host/container action probes and consolidated
+reporting integration. The probes verify missing explicit reports,
+`fail-on-error`, optional auto-detection and the preserved failed producer outcome.
 
 Five consecutive local pairs after priming compared source at
 `979e86fa119f625fa9be3eed7342462cb450c285` with this distribution. Each pair ran
