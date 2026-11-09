@@ -5,7 +5,7 @@ publish GitHub releases, and generate release summaries.
 
 ## Release preparation
 
-[Prepare release](../../.github/workflows/__prepare-release.yml) runs on pushes to
+[Prepare release](https://github.com/hoverkraft-tech/ci-github-common/blob/main/.github/workflows/__prepare-release.yml) runs on pushes to
 `main` and when pull requests targeting `main` are opened, reopened, updated, or
 edited. It applies the shared Conventional Commit labels to pull requests.
 
@@ -16,7 +16,7 @@ for these defaults.
 
 ## Publishing
 
-[Release](../../.github/workflows/__release.yml) runs every Monday at 08:25 UTC and
+[Release](https://github.com/hoverkraft-tech/ci-github-common/blob/main/.github/workflows/__release.yml) runs every Monday at 08:25 UTC and
 supports manual dispatch. It runs only on the default branch and:
 
 1. Runs the shared CI workflow.
@@ -26,8 +26,10 @@ supports manual dispatch. It runs only on the default branch and:
 
 Failed or skipped CI prevents publication. Concurrent release runs are serialized.
 The GitHub App token lets the new tag trigger
-[main CI](../../.github/workflows/__main-ci.yml), which regenerates action and
+[main CI](https://github.com/hoverkraft-tech/ci-github-common/blob/main/.github/workflows/__main-ci.yml), which regenerates action and
 workflow documentation and sends its artifact to the public documentation site.
+The `documentation-files: docs/**/*.md` input includes the guides and ADRs linked
+from generated readmes, preserving their relative paths in the published artifact.
 
 Documentation pull requests use squash merging so GitHub signs the resulting
 commit to satisfy the default branch's signature requirement. The pull request

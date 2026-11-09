@@ -65,6 +65,12 @@ If your reports are written elsewhere, pass explicit paths or glob patterns inst
 
 ## Examples
 
+The snippets assume repository checkout and installation of the tools they run.
+Use `if: ${{ !cancelled() }}` on reporting steps after test or lint commands so
+reports remain visible when a command fails. Keep the producer failure as a job
+failure; reporting must not turn a failed check into a passing job. See GitHub's
+[status check functions](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#status-check-functions).
+
 ### Auto-Detection Mode
 
 Let the action automatically find common report files:
@@ -128,16 +134,17 @@ Auto-detection modes:
 
 ### Prettier Formatting Check
 
-Capture the output of `prettier --check` and feed it to the parser to surface
-
-formatting issues alongside other lint results:
+Capture `prettier --check` output for the parser. Explicit `shell: bash` enables
+`pipefail`, preserving a failing check's exit status when piping through `tee`:
 
 ```yaml
 - name: Run Prettier check
+  shell: bash
   run: |
     npx prettier --check "src/**/*.{js,ts,tsx}" | tee prettier-check.log
 
 - name: Parse Prettier report
+  if: ${{ !cancelled() }}
   uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@<commit-sha>
   with:
     report-paths: "prettier-check.log"
@@ -148,19 +155,17 @@ formatting issues alongside other lint results:
 ### Astro Type Checking
 
 `astro check` reports diagnostics for `.astro` files, TypeScript code, and
-
-content collections. Capture the CLI output and feed it to the parser to surface
-
-errors (or warnings when `--minimumFailingSeverity` is relaxed) alongside other
-
-linting tools:
+content collections. Capture the CLI output to report errors and warnings.
+Explicit `shell: bash` preserves the check's failure when piping through `tee`:
 
 ```yaml
 - name: Run astro check
+  shell: bash
   run: |
     npx astro check --minimumFailingSeverity warning | tee astro-check.log
 
 - name: Parse astro diagnostics
+  if: ${{ !cancelled() }}
   uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@<commit-sha>
   with:
     report-paths: "astro-check.log"
@@ -177,6 +182,7 @@ Parse SARIF output from tools such as CodeQL or other static analyzers:
   run: codeql database analyze db javascript-security-extended --format=sarif-latest --output=reports/results.sarif
 
 - name: Parse SARIF report
+  if: ${{ !cancelled() }}
   uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@<commit-sha>
   with:
     report-paths: "reports/results.sarif"
@@ -241,9 +247,11 @@ Parse test results, coverage, and linting in one action:
   run: npm test
 
 - name: Run linter
+  if: ${{ !cancelled() }}
   run: npm run lint -- --format json --output-file eslint-report.json
 
 - name: Parse all reports
+  if: ${{ !cancelled() }}
   uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@<commit-sha>
   with:
     report-paths: |
@@ -278,6 +286,7 @@ When running tests in a container or different directory, use path-mapping to en
     docker run --rm -v ${{ github.workspace }}:/app myimage npm test
 
 - name: Parse test reports
+  if: ${{ !cancelled() }}
   uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@<commit-sha>
   with:
     report-paths: "test-results/junit.xml"
@@ -360,9 +369,11 @@ Only comment on PRs if there are failures:
   run: pytest --junit-xml=pytest-results.xml
 
 - name: Run Java tests
+  if: ${{ !cancelled() }}
   run: mvn test
 
 - name: Parse all test reports
+  if: ${{ !cancelled() }}
   uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@<commit-sha>
   with:
     report-paths: |
