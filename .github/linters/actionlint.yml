@@ -2,6 +2,6 @@
 # Keep every other expression check enabled; hosted tests exercise these fields.
 # https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#job-context
 paths:
-  .github/workflows/{build-action-distributions,commit-action-distributions,__test-workflow-action-distributions}.yml:
+  .github/workflows/__test-action-distributions.yml:
     ignore:
       - '^property "workflow_(repository|sha)" is not defined in object type '

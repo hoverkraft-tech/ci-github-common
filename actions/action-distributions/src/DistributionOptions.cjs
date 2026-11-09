@@ -165,7 +165,7 @@ class DistributionOptions {
 			pullRequestAuthors: process.env.PULL_REQUEST_AUTHORS,
 			buildScript: process.env.BUILD_SCRIPT,
 			artifactName: process.env.ARTIFACT_NAME,
-			buildWorkflow: process.env.BUILD_WORKFLOW,
+			buildWorkflow: process.env.BUILD_WORKFLOW || undefined,
 			commitMessage: process.env.COMMIT_MESSAGE,
 		};
 	}

@@ -6,10 +6,11 @@ on:
 permissions: {}
 
 jobs:
-  test-workflow-action-distributions:
+  test-action-distributions:
     permissions:
       contents: read
-    uses: $/.github/workflows/__test-workflow-action-distributions.yml
+      pull-requests: read
+    uses: $/.github/workflows/__test-action-distributions.yml
 
   linter:
     permissions:
