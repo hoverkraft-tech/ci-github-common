@@ -1,0 +1,49 @@
+name: Internal - Tests for action-distributions action
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout reusable workflow implementation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Validate build and publication contracts
+        run: npm test --prefix actions/action-distributions
+      - name: Exercise public action on an unrelated package
+        id: prepare-build
+        uses: $/actions/action-distributions
+        with:
+          operation: prepare-build
+          working-directories: fixtures/unrelated-action
+      - name: Exercise public writer action outside workflow_run
+        if: github.event_name != 'workflow_run'
+        id: prepare-commit
+        uses: $/actions/action-distributions
+        with:
+          operation: prepare-commit
+          build-workflow: .github/workflows/__action-distributions.yml
+      - name: Check public no-op outputs
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          HEAD_SHA: ${{ steps.prepare-build.outputs.head-sha }}
+          ARTIFACT_ID: ${{ steps.prepare-commit.outputs.artifact-id }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            assert.equal(process.env.HEAD_SHA, '');
+            assert.equal(process.env.ARTIFACT_ID, '');

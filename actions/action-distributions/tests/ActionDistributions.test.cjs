@@ -7,9 +7,9 @@ const { test } = require("node:test");
 const {
 	ActionDistributions,
 	GENERATED_BY,
-} = require("./action-distributions.cjs");
+} = require("../src/ActionDistributions.cjs");
 
-const { DistributionOptions } = require("./distribution-options.cjs");
+const { DistributionOptions } = require("../src/DistributionOptions.cjs");
 
 const PACKAGE = "actions/example";
 const SHA = "a".repeat(40);
@@ -58,7 +58,7 @@ function fixture(t, options = {}) {
 			head_repository: { full_name: "owner/repo" },
 			actor: { login: "dependabot[bot]", id: 49699333 },
 		},
-		workflow: { path: ".github/workflows/__rebuild-action-distributions.yml" },
+		workflow: { path: ".github/workflows/__action-distributions.yml" },
 		files: [{ filename: `${PACKAGE}/package-lock.json` }],
 		artifacts: [
 			{
@@ -112,7 +112,7 @@ function fixture(t, options = {}) {
 	const automation = new ActionDistributions({
 		options: {
 			workingDirectories: PACKAGE,
-			buildWorkflow: ".github/workflows/__rebuild-action-distributions.yml",
+			buildWorkflow: ".github/workflows/__action-distributions.yml",
 			...options,
 		},
 		github,
@@ -474,9 +474,15 @@ test("builds a real package and supports no-change reruns", async (t) => {
 		path.join(directory, "build.cjs"),
 		"const fs = require('node:fs'); fs.mkdirSync('dist', {recursive:true}); fs.writeFileSync('dist/index.js', 'example'); fs.writeFileSync('dist/licenses.txt', 'MIT');",
 	);
-	await automation.build({ workspace: temporary, output: filename });
+	await automation.run("build", {
+		workspace: temporary,
+		artifactPath: filename,
+	});
 	const first = fs.readFileSync(filename, "utf8");
-	await automation.build({ workspace: temporary, output: filename });
+	await automation.run("build", {
+		workspace: temporary,
+		artifactPath: filename,
+	});
 	assert.equal(fs.readFileSync(filename, "utf8"), first);
 });
 
@@ -637,4 +643,44 @@ test("an empty required-files input still requires output for each affected pack
 	automation.options.directories.push("actions/other");
 	state.files.push({ filename: "actions/other/package.json" });
 	await assert.rejects(automation.commit(filename), /Missing required/);
+});
+
+test("the action entrypoint prepares and commits the validated artifact", async (t) => {
+	const { automation, state, filename, write } = fixture(t);
+	await automation.run("prepare-commit");
+	assert.equal(state.outputs["artifact-id"], 20);
+	write();
+	await automation.run("commit", { artifactPath: filename });
+	assert.equal(state.commits.length, 1);
+	assert.equal(state.commits[0].expectedHeadOid, SHA);
+});
+
+test("the action entrypoint skips publication for a writer completion", async (t) => {
+	const { automation, state, filename } = fixture(t);
+	state.run.event = "workflow_run";
+	await automation.run("prepare-commit");
+	await automation.run("commit", { artifactPath: filename });
+	assert.deepEqual(state.outputs, {});
+	assert.equal(state.commits.length, 0);
+});
+
+test("the action rejects unknown operations without executing dependency or writer code", async (t) => {
+	const { automation, state } = fixture(t);
+	await assert.rejects(
+		automation.run("unknown"),
+		/Unsupported distribution operation/,
+	);
+	assert.deepEqual(state.reads, []);
+	assert.deepEqual(state.commits, []);
+});
+
+test("an omitted composite builder workflow input is accepted until publication", (t) => {
+	const previous = process.env.BUILD_WORKFLOW;
+	t.after(() => {
+		if (previous === undefined) delete process.env.BUILD_WORKFLOW;
+		else process.env.BUILD_WORKFLOW = previous;
+	});
+	process.env.BUILD_WORKFLOW = "";
+	const options = new DistributionOptions(DistributionOptions.environment());
+	assert.equal(options.buildWorkflow, undefined);
 });

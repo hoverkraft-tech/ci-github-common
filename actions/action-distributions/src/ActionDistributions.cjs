@@ -4,7 +4,7 @@ const { createHash } = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { DistributionOptions } = require("./distribution-options.cjs");
+const { DistributionOptions } = require("./DistributionOptions.cjs");
 const GENERATED_BY = "Generated-by: ci-github-common/action-distributions";
 const MAX_BYTES = 20 * 1024 * 1024;
 
@@ -21,6 +21,21 @@ class ActionDistributions {
 		this.core = core;
 		this.repo = context.repo;
 		this.fullName = `${this.repo.owner}/${this.repo.repo}`;
+	}
+
+	async run(operation, { workspace, artifactPath } = {}) {
+		switch (operation) {
+			case "prepare-build":
+				return this.prepareBuild();
+			case "build":
+				return this.build({ workspace, output: artifactPath });
+			case "prepare-commit":
+				return this.prepare();
+			case "commit":
+				return this.commit(artifactPath);
+			default:
+				throw new Error(`Unsupported distribution operation: ${operation}`);
+		}
 	}
 
 	async affectedPackages(pr) {

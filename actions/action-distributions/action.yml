@@ -1,0 +1,103 @@
+name: Action distributions
+description: |
+  Build or commit generated Node.js action distributions using validated PR policy.
+  The [reusable workflow](../../.github/workflows/action-distributions.md) handles
+  runner setup, artifacts, App tokens and event routing; use it for repository setup.
+
+  This dependency-free composite action owns the build and publication logic. Its
+  operations are `prepare-build`, `build`, `prepare-commit` and `commit`. Preparation
+  validates the originating event and selects affected packages before execution.
+  Build operations require a read-only PR job. Commit operations require a trusted
+  default-branch workflow_run job and never execute or check out PR code.
+
+  ### Development
+
+  Run `npm test` in `actions/action-distributions` with Node.js 24 or later. Tests
+  cover bot identities, custom inputs, grouped updates, artifact validation, stale
+  heads, atomic commits and same-App loop prevention. No npm installation is needed.
+  Keep tests beside the action and maintain the security contract in
+  [ADR 0002](../../docs/adr/0002-audit-action-dependency-distributions.md).
+author: hoverkraft
+branding:
+  icon: package
+  color: blue
+
+inputs:
+  operation:
+    description: Operation to execute (prepare-build, build, prepare-commit or commit).
+    required: true
+  working-directories:
+    description: Newline-separated package directories relative to the repository root. Use . for a root package.
+    default: .
+  output-directory:
+    description: Generated directory relative to each package. Only files inside it may be committed.
+    default: dist
+  required-files:
+    description: Newline-separated files required in every generated directory. Empty accepts any nonempty output.
+    default: |
+      index.js
+      licenses.txt
+  pull-request-authors:
+    description: JSON array of dependabot or renovate presets, or objects with login, numeric account ID and optional branch-prefix and commit-message-suffix.
+    default: '["dependabot","renovate"]'
+  artifact-name:
+    description: Artifact name prefix. The run attempt is appended automatically. Use the same value for build and commit.
+    default: action-distributions
+  build-script:
+    description: npm script name to run after npm ci with dependency lifecycle scripts disabled.
+    default: build
+  build-workflow:
+    description: Repository-relative path of the pull_request caller workflow that produced the artifact.
+    required: false
+  commit-message:
+    description: Single-line commit headline. Per-author suffixes and a loop-prevention body trailer are appended.
+    default: "build: regenerate action distributions"
+  workspace:
+    description: Absolute path of the exact PR head checkout, required for build.
+    default: ${{ github.workspace }}
+  artifact-path:
+    description: Absolute JSON artifact path to write for build or read for commit.
+    default: ${{ runner.temp }}/action-distributions/distributions.json
+  github-token:
+    description: GitHub token for API calls. Use a read-only token for building and an App token only for committing.
+    default: ${{ github.token }}
+
+outputs:
+  head-sha:
+    description: Eligible current PR head selected by prepare-build; empty when skipped.
+    value: ${{ steps.distributions.outputs.head-sha }}
+  built:
+    description: Whether build produced a validated distribution artifact.
+    value: ${{ steps.distributions.outputs.built }}
+  artifact-id:
+    description: Validated artifact selected by prepare-commit; empty when skipped.
+    value: ${{ steps.distributions.outputs.artifact-id }}
+
+runs:
+  using: composite
+  steps:
+    - name: Execute distribution operation
+      id: distributions
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        DISTRIBUTION_OPERATION: ${{ inputs.operation }}
+        DISTRIBUTION_WORKSPACE: ${{ inputs.workspace }}
+        DISTRIBUTION_ARTIFACT_PATH: ${{ inputs.artifact-path }}
+        WORKING_DIRECTORIES: ${{ inputs.working-directories }}
+        OUTPUT_DIRECTORY: ${{ inputs.output-directory }}
+        REQUIRED_FILES: ${{ inputs.required-files }}
+        PULL_REQUEST_AUTHORS: ${{ inputs.pull-request-authors }}
+        ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        BUILD_SCRIPT: ${{ inputs.build-script }}
+        BUILD_WORKFLOW: ${{ inputs.build-workflow }}
+        COMMIT_MESSAGE: ${{ inputs.commit-message }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const { join } = require('node:path');
+          const { ActionDistributions } = require(join(process.env.ACTION_PATH, 'src', 'ActionDistributions.cjs'));
+          await new ActionDistributions({ github, context, core }).run(process.env.DISTRIBUTION_OPERATION, {
+            workspace: process.env.DISTRIBUTION_WORKSPACE,
+            artifactPath: process.env.DISTRIBUTION_ARTIFACT_PATH,
+          });

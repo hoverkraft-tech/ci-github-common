@@ -1,4 +1,4 @@
-# ADR 0002: Distribute action-owned dependencies before execution
+# ADR 0002: Distribute and maintain action-owned dependencies
 
 - Status: Proposed
 - Date: 2026-11-08
@@ -49,6 +49,92 @@ in PR #643; submit implementation in each other owning repository for its CI.
 | publish: deploy/jampack                 | Retain platform-aware installation for native dependencies.                         |
 | container: helm/generate-docs           | Retain the configurable documentation toolchain pending plugin distribution.        |
 
+## Automated distribution maintenance
+
+Follow the split-permission pattern in `actions/attest`. Expose one public reusable
+`action-distributions.yml` workflow backed by the dedicated
+`actions/action-distributions` composite action. The action owns the helper,
+validated inputs and focused tests. Its implementation uses Node.js built-ins and
+runs through github-script, so it needs no dependency installation or bundle.
+
+Consumers use one event caller for both `pull_request` and `workflow_run`, and
+pass settings once through workflow inputs. The reusable workflow still uses
+separate read-only build and privileged writer jobs, selected by the event. Pass
+the App secret only on `workflow_run`; the PR execution receives an empty value.
+
+The caller listens for its own completion, excluding the default branch through
+`workflow_run.branches-ignore`. PR builds run on the PR branch; the privileged
+workflow_run execution runs on the default branch and is excluded from triggering
+another execution. Also reject non-PR originating runs in the reusable workflow
+and helper. Keep event-specific concurrency groups so a new PR build cannot cancel
+its writer. The caller name, originating workflow path and default-branch filters
+must agree. Live event routing remains a post-merge acceptance check.
+
+Workflow inputs configure package directories, npm script, Node.js version, output
+paths, required files, artifact retention, author rules and commit headline. No
+separate repository configuration file is introduced.
+Support Dependabot and hosted Renovate presets, plus explicit login/ID and optional
+branch-prefix rules for custom automation accounts. Common and container use
+`hoverkraft-bot[bot]` for self-hosted Renovate, so checking only `renovate[bot]` is
+insufficient. The PR author and originating actor must match the configured rule;
+a branch prefix or label alone never authorizes a write.
+
+The `pull_request` builder uses its caller inputs and builds the exact PR head
+without write credentials. It installs locked dependencies with
+lifecycle scripts disabled. Grouped, lockfile-only and build-tool updates produce
+one artifact. Each package's existing script owns bundling and license generation.
+
+The `workflow_run` writer validates GitHub-provided run metadata, the configured
+originating workflow, repository, author, actor, branch and unchanged open PR. Its
+policy inputs come from the trusted default-branch caller. The artifact contains
+file bytes only and cannot select the branch or expand the allowed output paths. The writer
+never checks out or executes PR code. Origin checks and atomic head validation are
+mandatory and have no disable switch.
+
+Use GitHub's commit API with an expected head to reject stale writes atomically.
+Only changed generated files, including additions and removals, enter one commit.
+A repository-scoped CI bot App token triggers normal CI. Dependabot's preset adds
+`[dependabot skip]`; Renovate uses its documented `gitIgnoredAuthors` integration
+for the writer's verified email. A fixed generated-commit trailer prevents loops
+when self-hosted Renovate and the writer share an App identity. Identical output
+and stale runs do not write. Keep independent distribution checks and review.
+
+Use `$/actions/action-distributions` in the reusable workflow. GitHub resolves it
+to the workflow's own repository and immutable revision without a checkout, even
+when another repository calls it. The hosted tests check out the same revision to
+run the action's test package. This targets GitHub.com; self-repository action
+references are unavailable on GitHub Enterprise Server.
+
+The current actionlint 1.7.12 release does not recognize `job.workflow_repository`
+and `job.workflow_sha`. Limit its exception to these two properties in the hosted
+action test; keep all other expression and security checks enabled.
+
+## Automation alternatives
+
+- Check-only workflows, as in GitHub's TypeScript template, leave manual rebuilding.
+- Docker's same-job rebuild and push is smaller, but exposes write credentials in
+  the job executing updated dependencies.
+- A separate distribution PR after merging creates another review and permits
+  source/distribution drift on the default branch.
+- Copying the complete workflow to every repository duplicates security fixes.
+- Release-only bundles would change the supported source refs and release model.
+
+## Automation rollout
+
+Consumers retain one event caller, App credential wiring and explicit workflow inputs.
+Packages without committed bundles need no workflow. Build failures remain visible
+and block merging through existing checks; automation does not bypass review.
+
+The writer and its policy inputs must reach each default branch before automatic
+writes can run. Common's shared implementation must be published before consumers can
+adopt a stable release; PRs can validate immutable implementation commits first.
+The App needs contents write, actions read and pull requests read for the selected
+repository.
+Hosted tests must validate action checkout, its public interface and consumer calls.
+Actual Dependabot and Renovate updates after rollout must validate the event
+handoff, App permissions, automatic CI retrigger and rebasing; local mocks cannot
+establish those facts. Existing Renovate manager coverage is unchanged.
+
 ## Compatibility evidence
 
 Probes on 2026-11-08 used the audited lockfiles and ncc 0.45.0. Build output was
@@ -98,3 +184,15 @@ sources and dependency review on lockfiles; generated exclusions must be scoped.
 - [ncc asset relocation caveat](https://github.com/vercel/ncc#caveats)
 - [Release distributions decision](https://github.com/hoverkraft-tech/ci-github-publish/blob/perf/bundle-action-dependencies/docs/adr/0002-bundle-action-dependencies.md)
 - [Chart distribution decision](https://github.com/hoverkraft-tech/ci-github-container/blob/perf/bundle-chart-release-dependencies/docs/adr/0002-bundle-chart-release-dependencies.md)
+
+- [Official builder](https://github.com/actions/attest/blob/main/.github/workflows/rebuild-dist.yml)
+- [Official writer](https://github.com/actions/attest/blob/main/.github/workflows/commit-dist.yml)
+- [Artifact metadata vulnerability and correction](https://securitylab.github.com/advisories/GHSL-2026-225_actions_attest/)
+- [Docker's same-PR automation](https://github.com/docker/build-push-action/blob/master/.github/workflows/update-dist.yml)
+- [Dependabot generated-commit marker](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/manage-your-dependency-security/manage-dependabot-prs)
+- [Renovate generated-commit authors](https://docs.renovatebot.com/configuration-options/#gitignoredauthors)
+- [GitHub token workflow triggers](https://docs.github.com/en/actions/concepts/security/github_token)
+- [Reusable job identity](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#job-context)
+- [workflow_run branch and permission semantics](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run)
+- [Filtering workflow_run branches](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow#using-filters-to-target-specific-branches-for-workflow-run-events)
+- [Self-repository action references](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#example-using-an-action-in-the-same-repository-as-the-workflow-at-the-running-commit-recommended)

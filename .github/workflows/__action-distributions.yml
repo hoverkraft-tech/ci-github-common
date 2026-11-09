@@ -1,0 +1,29 @@
+name: Internal - Action distributions
+
+on: # zizmor: ignore[dangerous-triggers] The trusted writer validates origin and paths; PR builds receive no App secret.
+  pull_request:
+    branches: [main]
+  workflow_run:
+    workflows: [Internal - Action distributions]
+    types: [completed]
+    # workflow_run executes on the default branch; exclude its own completion.
+    branches-ignore: [main]
+
+permissions: {}
+
+jobs:
+  distributions:
+    uses: $/.github/workflows/action-distributions.yml
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    with:
+      working-directories: |
+        actions/quality/parse-ci-reports
+      pull-request-authors: |
+        ["dependabot", "renovate", {"login":"hoverkraft-bot[bot]","id":128996893,"branch-prefix":"renovate/"}]
+      build-workflow: .github/workflows/__action-distributions.yml
+      github-app-client-id: ${{ vars.CI_BOT_APP_CLIENT_ID }}
+    secrets:
+      github-app-key: ${{ github.event_name == 'workflow_run' && secrets.CI_BOT_APP_PRIVATE_KEY || '' }}
