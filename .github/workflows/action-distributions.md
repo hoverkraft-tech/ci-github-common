@@ -25,8 +25,8 @@ tests. Existing CI must check bundle consistency before merging.
    `npm run build`, and `dist/index.js` plus `dist/licenses.txt`. Dependency
    installation uses `npm ci --ignore-scripts`; packages requiring install
    lifecycle scripts are outside this contract.
-2. Copy the [build caller](__rebuild-action-distributions.yml) and
-   [writer caller](__commit-action-distributions.yml). Both call
+2. Copy the [build caller](https://github.com/hoverkraft-tech/ci-github-common/blob/main/.github/workflows/__rebuild-action-distributions.yml) and
+   [writer caller](https://github.com/hoverkraft-tech/ci-github-common/blob/main/.github/workflows/__commit-action-distributions.yml). Both call
    `hoverkraft-tech/ci-github-common/.github/workflows/action-distributions.yml`
    pinned to the same reviewed commit. Configure package directories and author
    rules in both callers. Repeat other shared settings when overriding defaults.
