@@ -39,7 +39,8 @@ To add a report format:
    before a more general parser.
 2. Register the parser in `ParserFactory`.
 3. Add parsing and source/distribution parity tests, then rebuild the distribution.
-4. Update the [formats and examples guide](../usage/parse-ci-reports.md).
+4. Update the action's `action.yml` description and regenerate its
+   [usage documentation](../../actions/quality/parse-ci-reports/README.md#supported-formats).
 
 See [ADR 0001](../adr/0001-bundle-ci-report-parser.md) for the bundle decision and
 dated validation evidence.
