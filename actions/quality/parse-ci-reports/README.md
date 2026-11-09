@@ -2,12 +2,6 @@
 
 # ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItY2hlY2stY2lyY2xlIiBjb2xvcj0iYmx1ZSI+PHBhdGggZD0iTTIyIDExLjA4VjEyYTEwIDEwIDAgMSAxLTUuOTMtOS4xNCI+PC9wYXRoPjxwb2x5bGluZSBwb2ludHM9IjIyIDQgMTIgMTQuMDEgOSAxMS4wMSI+PC9wb2x5bGluZT48L3N2Zz4=) GitHub Action: Parse CI Reports
 
-<div align="center">
-  <img src="../../../.github/logo.svg" width="60px" align="center" alt="Parse CI Reports" />
-</div>
-
----
-
 <!-- header:end -->
 <!-- overview:start -->
 
@@ -22,8 +16,70 @@ This action parses various report formats from testing, linting, and coverage to
 
 It supports multiple common report standards out of the box.
 
-See the [formats and examples guide](../../../docs/usage/parse-ci-reports.md)
-and the [development guide](../../../docs/development/parse-ci-reports.md).
+See the [formats and examples guide](../../../docs/usage/parse-ci-reports.md).
+
+### Architecture
+
+This action follows SOLID principles with clear separation of concerns:
+
+```text
+src/
+├── models/          # Data models (ReportData, TestResult, LintIssue, Coverage)
+├── parsers/         # Parser implementations (Strategy pattern)
+│   ├── BaseParser.js
+│   ├── JUnitParser.js
+│   ├── TAPParser.js
+│   ├── CoberturaParser.js
+│   ├── LCOVParser.js
+│   ├── ESLintParser.js
+│   ├── CheckStyleParser.js
+│   ├── SarifParser.js
+│   └── ParserFactory.js  # Factory pattern for parser selection
+├── formatters/      # Output formatters
+│   ├── SummaryFormatter.js
+│   └── MarkdownFormatter.js
+├── ReportParserCore.js  # Core parsing logic
+├── ReportPathResolver.js # Path resolution and auto-detection
+└── index.js             # GitHub Actions entrypoint
+```
+
+### Running Tests
+
+```bash
+cd actions/quality/parse-ci-reports
+npm ci --ignore-scripts
+npm test
+npm run check:dist
+```
+
+### Distribution
+
+The action loads the committed `dist/index.js` through `github-script`; it does
+not install packages or change the caller's Node version. Maintainers use Node
+24 or later and `npm ci --ignore-scripts`, then `npm run build` after changing
+source or dependencies. Commit the complete `dist/` directory, including its
+third-party licenses. Do not edit generated files.
+
+`npm run check:dist` rebuilds from the lockfile installation and fails if the
+distribution differs from Git, including added or removed files. CI runs this
+build gate before tests and exercises the action on a host and in a container.
+The distribution tests copy only `dist/` to a temporary directory and compare
+its outputs with source across every supported report format. CodeQL scans the
+maintained source and excludes the generated copy; dependency review checks the
+lockfile. The repository package commands also skip distribution metadata.
+
+Allowed dependency updates use the shared [distribution automation](../../../.github/workflows/action-distributions.md)
+to commit regenerated bundles into the same PR. Human source changes still include
+their rebuilt distribution.
+
+See [ADR 0001](../../../docs/adr/0001-bundle-ci-report-parser.md) for the decision and evidence.
+
+### Adding New Parsers
+
+1. Create a new parser class extending `BaseParser`
+2. Implement `canParse()`, `parse()`, and `getPriority()` methods
+3. Add the parser to `ParserFactory`
+4. Add tests for the new parser
 
 <!-- overview:end -->
 <!-- usage:start -->
@@ -31,9 +87,11 @@ and the [development guide](../../../docs/development/parse-ci-reports.md).
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@90211d735aa0289702ddbd7eb95b218020ccadad # 2.0.2
+- uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@3370e0d18bdfeeaff1ffb8151f46332d935dab0f # perf/475-p2-report-parser-bundle
   with:
     # Paths to report files (glob patterns supported, one per line or comma-separated).
+    # Each explicit path or glob must match a file after exclusions; missing reports fail the action.
+    # Auto-detection may match no files. Exclusion patterns do not require a match.
     # Set to `auto:test`, `auto:coverage`, `auto:lint`, or `auto:all` for automatic detection.
     # Examples: `**/junit.xml`, `coverage/lcov.info`, `eslint-report.json`, `reports/results.sarif`, `auto:all`, `auto:test,coverage/lcov.info`, `auto:test,auto:coverage`
     #
@@ -128,35 +186,16 @@ and the [development guide](../../../docs/development/parse-ci-reports.md).
 
 [![Marketplace](https://img.shields.io/badge/Marketplace-parse--ci--reports-blue?logo=github-actions)](https://github.com/marketplace/actions/parse-ci-reports)
 [![Release](https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-common)](https://github.com/hoverkraft-tech/ci-github-common/releases)
-[![License](https://img.shields.io/github/license/hoverkraft-tech/ci-github-common)](http://choosealicense.com/licenses/mit/)
 [![Stars](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-common?style=social)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md)
-![GitHub Verified Creator](https://img.shields.io/badge/GitHub-Verified%20Creator-4493F8?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiIgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSJyZ2IoNjgsIDE0NywgMjQ4KSI+CiAgPHBhdGggZD0ibTkuNTg1LjUyLjkyOS42OGMuMTUzLjExMi4zMzEuMTg2LjUxOC4yMTVsMS4xMzguMTc1YTIuNjc4IDIuNjc4IDAgMCAxIDIuMjQgMi4yNGwuMTc0IDEuMTM5Yy4wMjkuMTg3LjEwMy4zNjUuMjE1LjUxOGwuNjguOTI4YTIuNjc3IDIuNjc3IDAgMCAxIDAgMy4xN2wtLjY4LjkyOGExLjE3NCAxLjE3NCAwIDAgMC0uMjE1LjUxOGwtLjE3NSAxLjEzOGEyLjY3OCAyLjY3OCAwIDAgMS0yLjI0MSAyLjI0MWwtMS4xMzguMTc1YTEuMTcgMS4xNyAwIDAgMC0uNTE4LjIxNWwtLjkyOC42OGEyLjY3NyAyLjY3NyAwIDAgMS0zLjE3IDBsLS45MjgtLjY4YTEuMTc0IDEuMTc0IDAgMCAwLS41MTgtLjIxNUwzLjgzIDE0LjQxYTIuNjc4IDIuNjc4IDAgMCAxLTIuMjQtMi4yNGwtLjE3NS0xLjEzOGExLjE3IDEuMTcgMCAwIDAtLjIxNS0uNTE4bC0uNjgtLjkyOGEyLjY3NyAyLjY3NyAwIDAgMSAwLTMuMTdsLjY4LS45MjhjLjExMi0uMTUzLjE4Ni0uMzMxLjIxNS0uNTE4bC4xNzUtMS4xNGEyLjY3OCAyLjY3OCAwIDAgMSAyLjI0LTIuMjRsMS4xMzktLjE3NWMuMTg3LS4wMjkuMzY1LS4xMDMuNTE4LS4yMTVsLjkyOC0uNjhhMi42NzcgMi42NzcgMCAwIDEgMy4xNyAwWk03LjMwMyAxLjcyOGwtLjkyNy42OGEyLjY3IDIuNjcgMCAwIDEtMS4xOC40ODlsLTEuMTM3LjE3NGExLjE3OSAxLjE3OSAwIDAgMC0uOTg3Ljk4N2wtLjE3NCAxLjEzNmEyLjY3NyAyLjY3NyAwIDAgMS0uNDg5IDEuMThsLS42OC45MjhhMS4xOCAxLjE4IDAgMCAwIDAgMS4zOTRsLjY4LjkyN2MuMjU2LjM0OC40MjQuNzUzLjQ4OSAxLjE4bC4xNzQgMS4xMzdjLjA3OC41MDkuNDc4LjkwOS45ODcuOTg3bDEuMTM2LjE3NGEyLjY3IDIuNjcgMCAwIDEgMS4xOC40ODlsLjkyOC42OGMuNDE0LjMwNS45NzkuMzA1IDEuMzk0IDBsLjkyNy0uNjhhMi42NyAyLjY3IDAgMCAxIDEuMTgtLjQ4OWwxLjEzNy0uMTc0YTEuMTggMS4xOCAwIDAgMCAuOTg3LS45ODdsLjE3NC0xLjEzNmEyLjY3IDIuNjcgMCAwIDEgLjQ4OS0xLjE4bC42OC0uOTI4YTEuMTc2IDEuMTc2IDAgMCAwIDAtMS4zOTRsLS42OC0uOTI3YTIuNjg2IDIuNjg2IDAgMCAxLS40ODktMS4xOGwtLjE3NC0xLjEzN2ExLjE3OSAxLjE3OSAwIDAgMC0uOTg3LS45ODdsLTEuMTM2LS4xNzRhMi42NzcgMi42NzcgMCAwIDEtMS4xOC0uNDg5bC0uOTI4LS42OGExLjE3NiAxLjE3NiAwIDAgMC0xLjM5NCAwWk0xMS4yOCA2Ljc4bC0zLjc1IDMuNzVhLjc1Ljc1IDAgMCAxLTEuMDYgMEw0LjcyIDguNzhhLjc1MS43NTEgMCAwIDEgLjAxOC0xLjA0Mi43NTEuNzUxIDAgMCAxIDEuMDQyLS4wMThMNyA4Ljk0bDMuMjItMy4yMmEuNzUxLjc1MSAwIDAgMSAxLjA0Mi4wMTguNzUxLjc1MSAwIDAgMSAuMDE4IDEuMDQyWiI+PC9wYXRoPgo8L3N2Zz4K)
 
 <!-- badges:end -->
 <!-- examples:start -->
 <!-- examples:end -->
 <!-- contributing:start -->
-
-## Contributing
-
-Contributions are welcome! Please see the [contributing guidelines](https://github.com/hoverkraft-tech/ci-github-common/blob/main/CONTRIBUTING.md) for more details.
-
 <!-- contributing:end -->
 <!-- security:start -->
 <!-- security:end -->
 <!-- license:start -->
-
-## License
-
-This project is licensed under the MIT License.
-
-SPDX-License-Identifier: MIT
-
-Copyright © 2026 hoverkraft
-
-For more details, see the [license](http://choosealicense.com/licenses/mit/).
-
 <!-- license:end -->
 <!-- generated:start -->
 
