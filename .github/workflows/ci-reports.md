@@ -39,6 +39,8 @@ Only this run's current attempt is read. When rerunning failed jobs, reports
 from jobs that did not rerun are explicitly unavailable; rerun all jobs for a
 complete report. Missing reports never imply successful tests. Coverage stays
 separate per source report; percentages are never averaged.
+GitHub's abandoned reusable-job results remain visible with a warning;
+they do not establish success, even when individual reports contain no failures.
 
 Grant contents: read and pull-requests: write. Fork PRs retain
 summaries without commenting. Use the caller's concurrency to cancel superseded
