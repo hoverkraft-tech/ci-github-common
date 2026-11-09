@@ -55,7 +55,7 @@ jobs:
       contents: read
       pull-requests: write
     with:
-      job-results: '{"frontend":{"result":"failure"},"backend":{"result":"success"},"missing":{"result":"skipped"}}'
+      job-results: '{"frontend":{"result":"failure"},"backend":{"result":"success"},"missing":{"result":"skipped"},"abandoned-fixture":{"result":"abandoned"}}'
 
   assert:
     name: Assert - Both packages, failures and missing results remain visible
@@ -78,13 +78,16 @@ jobs:
               assert.match(text, /missing \| skipped/);
               assert.match(text, /missing \| skipped \| \*\*Unavailable\*\*/);
               assert.match(text, /backend \| success \| 1/);
+              assert.match(text, /abandoned-fixture \| abandoned \| \*\*Unavailable\*\*/);
+              assert.match(text, /1 abandoned/);
+              assert.match(text, /does not establish success/);
               assert.doesNotMatch(text, /stale/);
               assert.ok(text.includes('<summary>Job results and report availability</summary>'));
               assert.doesNotMatch(text, /<details[^>]*open/);
               assert.equal((text.match(/<details>/g) || []).length, (text.match(/<\/details>/g) || []).length);
               const visible = text.split('<details>')[0];
               assert.match(visible, /1 failure/);
-              assert.match(visible, /Reports unavailable for 1 job/);
+              assert.match(visible, /Reports unavailable for 2 job/);
               assert.ok(visible.length < 900, 'Visible summary should stay compact');
             }
             assert.match(process.env.LINT, /synthetic lint error/);

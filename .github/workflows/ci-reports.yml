@@ -15,6 +15,8 @@
 # from jobs that did not rerun are explicitly unavailable; rerun all jobs for a
 # complete report. Missing reports never imply successful tests. Coverage stays
 # separate per source report; percentages are never averaged.
+# GitHub's abandoned reusable-job results remain visible with a warning;
+# they do not establish success, even when individual reports contain no failures.
 #
 # Grant contents: read and pull-requests: write. Fork PRs retain
 # summaries without commenting. Use the caller's concurrency to cancel superseded
@@ -95,7 +97,8 @@ jobs:
         with:
           script: |
             const jobs = Object.entries(JSON.parse(process.env.JOB_RESULTS));
-            if (!jobs.length || jobs.some(([name, job]) => !/^[\w-]+$/.test(name) || !['success', 'failure', 'cancelled', 'skipped'].includes(job?.result))) {
+            const results = ['success', 'failure', 'cancelled', 'skipped', 'abandoned'];
+            if (!jobs.length || jobs.some(([name, job]) => !/^[\w-]+$/.test(name) || !results.includes(job?.result))) {
               throw new Error('job-results must contain job IDs and their completed results');
             }
             const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/attempts/${process.env.GITHUB_RUN_ATTEMPT}`;
@@ -111,8 +114,9 @@ jobs:
               if (!count) missing++;
               return `| ${name} | ${job.result} | ${count || '**Unavailable**'} |`;
             }).join('\n');
-            const outcomes = ['success', 'failure', 'cancelled', 'skipped'].map(result => `${jobs.filter(([, job]) => job.result === result).length} ${result}`).join(' · ');
+            const outcomes = results.map(result => `${jobs.filter(([, job]) => job.result === result).length} ${result}`).join(' · ');
             const warning = missing ? `\n\n⚠️ Reports unavailable for ${missing} job(s). Missing reports do not mean passing checks.` : '';
+            const abandoned = jobs.some(([, job]) => job.result === 'abandoned') ? '\n\n⚠️ GitHub reported an abandoned job result. Inspect its nested job checks; this does not establish success.' : '';
             const notice = 'Only this attempt is included. On partial reruns, rerun all producer jobs for complete reports. CodeQL findings remain in code scanning; other diagnostics remain in the job logs.';
             const jobDetails = `<details>\n<summary>Job results and report availability</summary>\n\n${status}\n\n${notice}\n\n</details>`;
             const available = process.env.PARSE_OUTCOME === 'success' && process.env.DOWNLOAD_OUTCOME === 'success';
@@ -128,7 +132,7 @@ jobs:
             }
             const lint = lintReports.length ? `**Lint:** Collected diagnostics and Super-Linter summaries. Execution status is included in the job outcomes.\n\n${lintReports.join('\n\n')}` : '';
             for (const [type, report] of [['tests', available && process.env.TEST_MARKDOWN], ['coverage', available && process.env.COVERAGE_MARKDOWN], ['lint', lint]]) {
-              const prefix = `${header}**Jobs:** ${outcomes}.${warning}\n\n`;
+              const prefix = `${header}**Jobs:** ${outcomes}.${warning}${abandoned}\n\n`;
               let content = report || `No ${type} reports available for this attempt. See the job results and workflow logs.`;
               if (!available) content = `⚠️ Report collection or parsing did not complete; results may be incomplete.\n\n${content}`;
               if ((prefix + content + jobDetails).length > 60000) {
