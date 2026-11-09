@@ -22,6 +22,7 @@ See the [documentation](docs/README.md) for detailed guides.
 
 ### Workflow & repository automation
 
+- [Action distributions](actions/action-distributions/README.md) - builds and commits generated Node.js action bundles with validated pull request policies.
 - [Checkout](actions/checkout/README.md) - event-aware drop-in replacement for `actions/checkout` that supports issue comment triggers.
 - [Create and merge pull request](actions/create-and-merge-pull-request/README.md) - opens a pull request and merges it with the configured strategy and GitHub Actions bot identity.
 - [Create or update comment](actions/create-or-update-comment/README.md) - adds or updates comments on issues and pull requests idempotently.
@@ -56,6 +57,7 @@ See the [documentation](docs/README.md) for detailed guides.
 
 ### Quality gates
 
+- [Action distributions](.github/workflows/action-distributions.md) - regenerates committed action bundles in dependency pull requests.
 - [CI reports](.github/workflows/ci-reports.md) - consolidates tests, coverage and lint into three compact PR comments.
 - [Linter](.github/workflows/linter.md) - runs Super Linter and shared formatting checks across the repository.
 - [Semantic pull request](.github/workflows/semantic-pull-request.md) - enforces semantic pull request titles before merging.

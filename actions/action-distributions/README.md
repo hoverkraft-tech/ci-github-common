@@ -24,14 +24,6 @@ validates the originating event and selects affected packages before execution.
 Build operations require a read-only PR job. Commit operations require a trusted
 default-branch workflow_run job and never execute or check out PR code.
 
-### Development
-
-Run `npm test` in `actions/action-distributions` with Node.js 24 or later. Tests
-cover bot identities, custom inputs, grouped updates, artifact validation, stale
-heads, atomic commits and same-App loop prevention. No npm installation is needed.
-Keep tests beside the action and maintain the security contract in
-[ADR 0002](../../docs/adr/0002-audit-action-dependency-distributions.md).
-
 <!-- overview:end -->
 <!-- usage:start -->
 
