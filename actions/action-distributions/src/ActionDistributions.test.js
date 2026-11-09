@@ -1,18 +1,29 @@
-const assert = require("node:assert/strict");
-const { createHash } = require("node:crypto");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const { test } = require("node:test");
-const {
-	ActionDistributions,
-	GENERATED_BY,
-} = require("../src/ActionDistributions.cjs");
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { test } from "node:test";
+import { pathToFileURL } from "node:url";
 
-const { DistributionOptions } = require("../src/DistributionOptions.cjs");
+const { ActionDistributions, GENERATED_BY } = await import(
+	process.env.ACTION_ENTRYPOINT
+		? pathToFileURL(process.env.ACTION_ENTRYPOINT)
+		: new URL("./ActionDistributions.js", import.meta.url)
+);
+
+import { DistributionOptions } from "./DistributionOptions.js";
 
 const PACKAGE = "actions/example";
 const SHA = "a".repeat(40);
+const TRUSTED_SHA = "c".repeat(40);
+const BUILDER_PATH = ".github/workflows/__rebuild-action-distributions.yml";
+const WRITER_PATH = ".github/workflows/__commit-action-distributions.yml";
+const workflowFile = (path, text) => ({
+	name: path.split("/").at(-1),
+	mode: 0o100644,
+	object: { text, isTruncated: false },
+});
 const BRANCH = "dependabot/npm/example";
 const encode = (value) => Buffer.from(value).toString("base64");
 const file = (name, contents = name) => ({
@@ -47,7 +58,22 @@ function fixture(t, options = {}) {
 			head: { sha: SHA, ref: BRANCH, repo: { full_name: "owner/repo" } },
 			base: { ref: "main", repo: { full_name: "owner/repo" } },
 		},
+		writer: {
+			id: 11,
+			event: "workflow_run",
+			head_sha: TRUSTED_SHA,
+			path: WRITER_PATH,
+		},
+		definitions: [
+			workflowFile(
+				WRITER_PATH,
+				"name: Writer\non:\n  workflow_run:\n    workflows: [Build]\n    types: [completed]",
+			),
+			workflowFile(BUILDER_PATH, "name: Build\non: pull_request"),
+		],
+		workflowReads: [],
 		run: {
+			path: BUILDER_PATH,
 			id: 10,
 			workflow_id: 3,
 			run_attempt: 2,
@@ -87,20 +113,28 @@ function fixture(t, options = {}) {
 				listFiles: async () => state.files,
 			},
 			actions: {
-				getWorkflowRun: async () => ({ data: state.run }),
+				getWorkflowRun: async ({ run_id }) => ({
+					data: run_id === 11 ? state.writer : state.run,
+				}),
 				getWorkflow: async () => ({ data: state.workflow }),
 				listWorkflowRunArtifacts: async () => state.artifacts,
 			},
 			git: { getTree: async () => ({ data: state.tree }) },
 		},
 		paginate: async (method, input) => method(input),
-		graphql: async (_query, { input }) => {
-			state.commits.push(input);
+		graphql: async (_query, variables) => {
+			if (variables.expression) {
+				state.workflowReads.push(variables);
+				return { repository: { object: { entries: state.definitions } } };
+			}
+			state.commits.push(variables.input);
 		},
 	};
 	const context = {
 		repo: { owner: "owner", repo: "repo" },
 		actor: "dependabot[bot]",
+		runId: 11,
+		sha: TRUSTED_SHA,
 		eventName: "workflow_run",
 		payload: {
 			repository: { default_branch: "main" },
@@ -112,7 +146,6 @@ function fixture(t, options = {}) {
 	const automation = new ActionDistributions({
 		options: {
 			workingDirectories: PACKAGE,
-			buildWorkflow: ".github/workflows/__rebuild-action-distributions.yml",
 			...options,
 		},
 		github,
@@ -358,7 +391,9 @@ test("propagates an atomic commit conflict without retrying or forcing", async (
 	const { automation, github, filename, write } = fixture(t);
 	write();
 	let attempts = 0;
-	github.graphql = async () => {
+	const graphql = github.graphql;
+	github.graphql = async (query, variables) => {
+		if (variables.expression) return graphql(query, variables);
 		attempts++;
 		throw new Error("Expected head mismatch");
 	};
@@ -491,14 +526,12 @@ for (const [name, options] of [
 	["duplicates", { workingDirectories: `${PACKAGE}\n${PACKAGE}` }],
 	["overlap", { workingDirectories: `${PACKAGE}\n${PACKAGE}/nested` }],
 	["root overlap", { workingDirectories: `.\n${PACKAGE}` }],
-	["empty directories", { workingDirectories: "" }],
 	["absolute output", { outputDirectory: "/tmp/bundle" }],
 	["unsafe output", { outputDirectory: "../.github" }],
 	["unsafe required file", { requiredFiles: "../package.json" }],
 	["npm flags", { buildScript: "--help" }],
 	["shell command", { buildScript: "build && echo bad" }],
 	["artifact traversal", { artifactName: "../bundle" }],
-	["workflow traversal", { buildWorkflow: ".github/workflows/../ci.yml" }],
 	["unknown preset", { pullRequestAuthors: '["unknown"]' }],
 	["missing author ID", { pullRequestAuthors: '[{"login":"example[bot]"}]' }],
 	["empty authors", { pullRequestAuthors: "[]" }],
@@ -533,7 +566,6 @@ for (const author of [
 				CUSTOM_AUTHOR,
 			]),
 			artifactName: "custom-bundle",
-			buildWorkflow: ".github/workflows/custom-build.yml",
 			commitMessage: "build: update bundles",
 		});
 		state.pr.user = { login: author.login, id: author.id };
@@ -542,7 +574,8 @@ for (const author of [
 		state.pr.head.ref =
 			state.run.head_branch = `${author["branch-prefix"]}example`;
 		context.payload.pull_request = structuredClone(state.pr);
-		state.workflow.path = ".github/workflows/custom-build.yml";
+		state.workflow.path = state.run.path = ".github/workflows/custom-build.yml";
+		state.definitions[1].name = "custom-build.yml";
 		state.artifacts[0].name = "custom-bundle-2";
 		context.eventName = "pull_request";
 		await automation.prepareBuild();
@@ -674,13 +707,201 @@ test("the action rejects unknown operations without executing dependency or writ
 	assert.deepEqual(state.commits, []);
 });
 
-test("an omitted composite builder workflow input is accepted until publication", (t) => {
-	const previous = process.env.BUILD_WORKFLOW;
-	t.after(() => {
-		if (previous === undefined) delete process.env.BUILD_WORKFLOW;
-		else process.env.BUILD_WORKFLOW = previous;
+test("automatic writer discovery uses only base manifests and rejects newly introduced output paths", async (t) => {
+	const { automation, state, github, filename, write } = fixture(t, {
+		workingDirectories: "",
 	});
-	process.env.BUILD_WORKFLOW = "";
-	const options = new DistributionOptions(DistributionOptions.environment());
-	assert.equal(options.buildWorkflow, undefined);
+	state.pr.base.sha = "b".repeat(40);
+	const discoveryRefs = [];
+	github.rest.git.getTree = async ({ tree_sha }) => {
+		discoveryRefs.push(tree_sha);
+		return {
+			data: {
+				truncated: false,
+				tree: [
+					{
+						path: `${PACKAGE}/package.json`,
+						type: "blob",
+						mode: "100644",
+						sha: "manifest",
+					},
+				],
+			},
+		};
+	};
+	github.rest.git.getBlob = async ({ file_sha }) => {
+		assert.equal(file_sha, "manifest");
+		return {
+			data: {
+				encoding: "base64",
+				content: encode(
+					JSON.stringify({
+						scripts: { build: "build", "check:dist": "check" },
+					}),
+				),
+			},
+		};
+	};
+	state.files.push({ filename: "actions/untrusted/package.json" });
+	write([
+		...[file("index.js"), file("licenses.txt")],
+		{ path: "actions/untrusted/dist/index.js", contents: encode("untrusted") },
+	]);
+	await assert.rejects(automation.commit(filename), /outside allowed/);
+	assert.deepEqual(discoveryRefs, [state.pr.base.sha]);
+	assert.equal(state.commits.length, 0);
+});
+
+test("resolves the builder only from the writer's pinned default-branch configuration", async (t) => {
+	const { automation, state } = fixture(t);
+	// Run names are not an authorization source: a PR can change them.
+	state.run.name = "PR-controlled name";
+	state.workflow.name = "PR-controlled registry name";
+	await automation.prepare();
+	assert.equal(state.outputs["artifact-id"], 20);
+	assert.deepEqual(state.workflowReads, [
+		{
+			owner: "owner",
+			repo: "repo",
+			expression: `${TRUSTED_SHA}:.github/workflows`,
+		},
+	]);
+});
+
+for (const [name, mutate, message] of [
+	[
+		"PR-only workflow with a spoofed builder name",
+		(s) => {
+			s.workflow.path = s.run.path = ".github/workflows/spoof.yml";
+			s.run.name = "Build";
+		},
+		/Unexpected builder/,
+	],
+	[
+		"different run path",
+		(s) => {
+			s.run.path = ".github/workflows/spoof.yml";
+		},
+		/Unexpected builder run path/,
+	],
+	[
+		"duplicate default-branch names",
+		(s) => {
+			s.definitions.push(
+				workflowFile("other.yml", "name: Build\non: pull_request"),
+			);
+		},
+		/exactly one trusted workflow/,
+	],
+	[
+		"missing builder",
+		(s) => {
+			s.definitions.pop();
+		},
+		/exactly one trusted workflow/,
+	],
+	[
+		"missing writer",
+		(s) => {
+			s.definitions.shift();
+		},
+		/one exact builder name/,
+	],
+	[
+		"missing filter",
+		(s) => {
+			s.definitions[0].object.text = "on: workflow_run";
+		},
+		/one exact builder name/,
+	],
+	[
+		"wildcard filter",
+		(s) => {
+			s.definitions[0].object.text =
+				'on: {workflow_run: {workflows: ["Build*"]}}';
+		},
+		/one exact builder name/,
+	],
+	[
+		"multiple builders",
+		(s) => {
+			s.definitions[0].object.text =
+				"on: {workflow_run: {workflows: [Build, Other]}}";
+		},
+		/one exact builder name/,
+	],
+	[
+		"builder without a PR trigger",
+		(s) => {
+			s.definitions[1].object.text = "name: Build\non: push";
+		},
+		/pull_request trigger/,
+	],
+	[
+		"truncated configuration",
+		(s) => {
+			s.definitions[1].object.isTruncated = true;
+		},
+		/complete regular workflow/,
+	],
+	[
+		"symlink workflow",
+		(s) => {
+			s.definitions[1].mode = 0o120000;
+		},
+		/complete regular workflow/,
+	],
+	[
+		"duplicate YAML keys",
+		(s) => {
+			s.definitions[1].object.text =
+				"name: Build\nname: Other\non: pull_request";
+		},
+		/unique/,
+	],
+	[
+		"incorrect writer event",
+		(s) => {
+			s.writer.event = "pull_request";
+		},
+		/workflow_run writer/,
+	],
+	[
+		"mismatched writer revision",
+		(s) => {
+			s.writer.head_sha = SHA;
+		},
+		/writer revision/,
+	],
+]) {
+	test(`rejects ${name} before artifact selection or publication`, async (t) => {
+		const { automation, state, filename } = fixture(t);
+		mutate(state);
+		await assert.rejects(automation.prepare(), message);
+		await assert.rejects(automation.commit(filename), message);
+		assert.deepEqual(state.outputs, {});
+		assert.deepEqual(state.commits, []);
+	});
+}
+
+for (const trigger of [
+	"[push, pull_request]",
+	"{pull_request: {branches: [main]}}",
+]) {
+	test(`supports builder trigger ${trigger} and YAML aliases in the writer`, async (t) => {
+		const { automation, state } = fixture(t);
+		state.definitions[0].object.text =
+			"run-name: &builder Build\non: {workflow_run: {workflows: [*builder]}}";
+		state.definitions[1].object.text = `name: Build\non: ${trigger}`;
+		await automation.prepare();
+		assert.equal(state.outputs["artifact-id"], 20);
+	});
+}
+
+test("supports the workflow path as its default name and a scalar filter", async (t) => {
+	const { automation, state } = fixture(t);
+	state.definitions[0].object.text = `on: {workflow_run: {workflows: ${BUILDER_PATH}}}`;
+	state.definitions[1].object.text = "on: pull_request";
+	await automation.prepare();
+	assert.equal(state.outputs["artifact-id"], 20);
 });

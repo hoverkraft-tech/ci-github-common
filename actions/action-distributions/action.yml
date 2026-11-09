@@ -1,11 +1,11 @@
 name: Action distributions
 description: |
-  Build or commit generated Node.js action distributions using validated PR policy.
+  Discover, build or commit generated Node.js action distributions using validated PR policy.
   The [reusable workflow](../../.github/workflows/action-distributions.md) handles
   runner setup, artifacts, App tokens and event routing; use it for repository setup.
 
-  This dependency-free composite action owns the build and publication logic. Its
-  operations are `prepare-build`, `build`, `prepare-commit` and `commit`. Preparation
+  This composite action owns the build and publication logic. Its
+  operations are `discover`, `prepare-build`, `build`, `prepare-commit` and `commit`. Preparation
   validates the originating event and selects affected packages before execution.
   Build operations require a read-only PR job. Commit operations require a trusted
   default-branch workflow_run job and never execute or check out PR code.
@@ -16,11 +16,11 @@ branding:
 
 inputs:
   operation:
-    description: Operation to execute (prepare-build, build, prepare-commit or commit).
+    description: Operation to execute (discover, prepare-build, build, prepare-commit or commit).
     required: true
   working-directories:
-    description: Newline-separated package directories relative to the repository root. Use . for a root package.
-    default: .
+    description: Newline-separated package directories or glob patterns (`*`, `**`, `?`). Empty discovers root and `actions/**` packages declaring build and check:dist scripts.
+    default: ""
   output-directory:
     description: Generated directory relative to each package. Only files inside it may be committed.
     default: dist
@@ -38,9 +38,6 @@ inputs:
   build-script:
     description: npm script name to run after npm ci with dependency lifecycle scripts disabled.
     default: build
-  build-workflow:
-    description: Repository-relative path of the pull_request caller workflow that produced the artifact.
-    required: false
   commit-message:
     description: Single-line commit headline. Per-author suffixes and a loop-prevention body trailer are appended.
     default: "build: regenerate action distributions"
@@ -55,6 +52,9 @@ inputs:
     default: ${{ github.token }}
 
 outputs:
+  working-directories:
+    description: JSON array of package directories selected by discover at the current workflow revision.
+    value: ${{ steps.distributions.outputs.working-directories }}
   head-sha:
     description: Eligible current PR head selected by prepare-build; empty when skipped.
     value: ${{ steps.distributions.outputs.head-sha }}
@@ -82,13 +82,13 @@ runs:
         PULL_REQUEST_AUTHORS: ${{ inputs.pull-request-authors }}
         ARTIFACT_NAME: ${{ inputs.artifact-name }}
         BUILD_SCRIPT: ${{ inputs.build-script }}
-        BUILD_WORKFLOW: ${{ inputs.build-workflow }}
         COMMIT_MESSAGE: ${{ inputs.commit-message }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
           const { join } = require('node:path');
-          const { ActionDistributions } = require(join(process.env.ACTION_PATH, 'src', 'ActionDistributions.cjs'));
+          const { pathToFileURL } = require('node:url');
+          const { ActionDistributions } = await import(pathToFileURL(join(process.env.ACTION_PATH, 'dist', 'index.js')));
           await new ActionDistributions({ github, context, core }).run(process.env.DISTRIBUTION_OPERATION, {
             workspace: process.env.DISTRIBUTION_WORKSPACE,
             artifactPath: process.env.DISTRIBUTION_ARTIFACT_PATH,

@@ -1,8 +1,24 @@
-import { describe, it, suite, test } from "node:test";
 import assert from "node:assert";
+import { describe, it, suite, test } from "node:test";
 import { JUnitParser } from "./JUnitParser.js";
 
 suite("Nested JUnit suites", () => {
+	test("collects Node.js root testcases and nested suites without losing empty status elements", () => {
+		const result = new JUnitParser().parse(`<testsuites>
+      <testcase name="passes" file="src/index.test.js"/>
+      <testcase name="fails"><failure/></testcase>
+      <testcase name="errors"><error/></testcase>
+      <testcase name="skips"><skipped/></testcase>
+      <testsuite name="nested"><testcase name="nested pass"/></testsuite>
+    </testsuites>`);
+		assert.strictEqual(result.getTotalTests(), 5);
+		assert.strictEqual(result.getPassedCount(), 2);
+		assert.strictEqual(result.getFailedCount(), 2);
+		assert.strictEqual(result.getSkippedCount(), 1);
+		assert.strictEqual(result.tests[0].file, "src/index.test.js");
+		assert.strictEqual(result.tests[4].suite, "nested");
+	});
+
 	test("collects leaf tests once across PHPUnit aggregate and sibling suites", () => {
 		// Arrange
 		const parser = new JUnitParser();

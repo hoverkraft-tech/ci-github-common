@@ -45,6 +45,12 @@ jobs:
           path: reports/
           overwrite: true
           retention-days: 1
+      - name: Arrange - Upload unrelated current reports that must be excluded
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-reports-${{ github.run_attempt }}-unrelated-${{ matrix.package }}
+          path: reports/
+          retention-days: 1
 
   reports:
     name: Act - Consolidate reports
@@ -55,14 +61,14 @@ jobs:
       contents: read
       pull-requests: write
     with:
+      comment: false
       job-results: '{"frontend":{"result":"failure"},"backend":{"result":"success"},"missing":{"result":"skipped"},"abandoned-fixture":{"result":"abandoned"}}'
 
   assert:
     name: Assert - Both packages, failures and missing results remain visible
     needs: reports
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: read
+    permissions: {}
     steps:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -82,6 +88,7 @@ jobs:
               assert.match(text, /1 abandoned/);
               assert.match(text, /does not establish success/);
               assert.doesNotMatch(text, /stale/);
+              assert.doesNotMatch(text, /unrelated/);
               assert.ok(text.includes('<summary>Job results and report availability</summary>'));
               assert.doesNotMatch(text, /<details[^>]*open/);
               assert.equal((text.match(/<details>/g) || []).length, (text.match(/<\/details>/g) || []).length);
@@ -99,9 +106,3 @@ jobs:
             assert.match(process.env.COVERAGE, /50\.00%/);
             assert.match(process.env.COVERAGE, /100\.00%/);
             assert.doesNotMatch(process.env.COVERAGE, /Test Results/);
-            const pr = context.payload.pull_request;
-            if (context.eventName !== 'pull_request' || pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) return;
-            const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: pr.number, per_page: 100 });
-            for (const title of ['Test results', 'Code coverage', 'Lint results']) {
-              assert.equal(comments.filter(comment => comment.user.login === 'github-actions[bot]' && comment.body.startsWith(`${context.workflow} - ${title}\n`)).length, 1);
-            }

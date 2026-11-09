@@ -1,7 +1,8 @@
 # ADR 0002: Distribute and maintain action-owned dependencies
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-08
+- Updated: 2026-11-09
 - Related: [CI optimization issue](https://github.com/cloud-native-aixmarseille/pleey/issues/475)
 
 ## Context
@@ -10,6 +11,11 @@
 parser's own dependencies. The same recurring cost can occur in other actions.
 The audit covers all six `hoverkraft-tech/ci-github-*` repositories returned by
 the organization catalog, including nested composite actions and their scripts.
+The following snapshot records the audit on 2026-11-08.
+
+Repeating action paths and isolated bundle runners across consumers makes adding
+packages error-prone. Package discovery and shared validation belong alongside
+the distribution maintenance contract.
 
 | Repository          | Revision       | Actions | Own Node.js installations |
 | ------------------- | -------------- | ------: | ------------------------: |
@@ -49,13 +55,33 @@ in PR #643; submit implementation in each other owning repository for its CI.
 | publish: deploy/jampack                 | Retain platform-aware installation for native dependencies.                         |
 | container: helm/generate-docs           | Retain the configurable documentation toolchain pending plugin distribution.        |
 
+## Package discovery and validation
+
+Discover root and `actions/**` package manifests declaring the selected build
+script and `check:dist`. This replaces the initial explicit-directory-only policy;
+callers may still select literal directories or glob patterns. Reject overlapping
+package scopes. An empty discovery result is a successful no-op.
+
+The builder and writer read manifests from the PR's trusted default-branch base
+revision; ordinary CI discovers packages at the tested revision. Discovery never
+executes repository code. A PR cannot expand the writer's allowed output paths by
+editing package manifests. Existing identity, artifact, path and atomic-head
+checks remain mandatory.
+
+The shared test workflow generates a package matrix for host and container runs.
+A separate quality action owns isolation and cleanup; each package owns its
+contract tests and selects them with `test:distribution`. Generated-output
+exclusions use recursive action patterns. Existing action integration and security
+checks remain necessary alongside distribution checks.
+
 ## Automated distribution maintenance
 
 Follow the split-permission pattern in `actions/attest`. Expose one public reusable
 `action-distributions.yml` workflow backed by the dedicated
 `actions/action-distributions` composite action. The action owns the helper,
-validated inputs and focused tests. Its implementation uses Node.js built-ins and
-runs through github-script, so it needs no dependency installation or bundle.
+validated inputs and focused tests. It runs through github-script from its own
+committed bundle, including a maintained YAML parser for trusted workflow
+definitions. No runtime dependency installation is needed.
 
 Consumers keep two small event callers: a read-only `pull_request` build and a
 trusted default-branch `workflow_run` writer. Both invoke the same public reusable
@@ -85,12 +111,19 @@ without write credentials. It installs locked dependencies with
 lifecycle scripts disabled. Grouped, lockfile-only and build-tool updates produce
 one artifact. Each package's existing script owns bundling and license generation.
 
-The `workflow_run` writer validates GitHub-provided run metadata, the configured
+The `workflow_run` writer validates GitHub-provided run metadata, the resolved
 originating workflow, repository, author, actor, branch and unchanged open PR. Its
 policy inputs come from the trusted default-branch caller. The artifact contains
 file bytes only and cannot select the branch or expand the allowed output paths. The writer
 never checks out or executes PR code. Origin checks and atomic head validation are
 mandatory and have no disable switch.
+
+The writer derives the builder path from the exact workflow name declared in its
+caller's `workflow_run.workflows`, read at the writer's default-branch revision.
+A single GitHub query reads workflow definitions, so PR-controlled names cannot
+expand the allowed builders. Missing or duplicate names and wildcard or multiple
+filters fail closed. This replaces the repeated builder-path input while retaining
+independent workflow identity validation.
 
 Use GitHub's commit API with an expected head to reject stale writes atomically.
 Only changed generated files, including additions and removals, enter one commit.
@@ -105,10 +138,6 @@ to the workflow's own repository and immutable revision without a checkout, even
 when another repository calls it. The hosted tests check out the same revision to
 run the action's test package. This targets GitHub.com; self-repository action
 references are unavailable on GitHub Enterprise Server.
-
-The current actionlint 1.7.12 release does not recognize `job.workflow_repository`
-and `job.workflow_sha`. Limit its exception to these two properties in the hosted
-action test; keep all other expression and security checks enabled.
 
 ## Automation alternatives
 
@@ -155,6 +184,11 @@ copied outside the repositories, with no adjacent `node_modules`.
   A distribution built on one host does not establish support for another OS,
   CPU architecture or libc. No portable native bundle is claimed.
 
+During the 2026-11-09 implementation review, actionlint 1.7.12 did not recognize
+`job.workflow_repository` and `job.workflow_sha` used by an earlier hosted test.
+The final test setup uses ordinary checkout and self-repository action references,
+so that expression exception is no longer needed.
+
 ## Follow-up acceptance criteria
 
 - [ ] Commitlint: package schema and the default preset, then verify JSON, CJS,
@@ -179,6 +213,11 @@ Repository downloads grow with committed distributions. Measure bundle size and
 local setup/startup separately; this audit does not establish end-to-end CI gains.
 Dependency updates must rebuild output. Keep security analysis on maintained
 sources and dependency review on lockfiles; generated exclusions must be scoped.
+
+Consumers no longer copy a test runner or repeat distribution path lists. New
+packages enter ordinary CI immediately and become eligible for automated writes
+after their manifests reach the default branch. Callers can narrow selection
+explicitly. Dependency installation continues to disable lifecycle scripts.
 
 ## References
 

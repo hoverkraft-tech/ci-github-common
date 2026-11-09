@@ -4,6 +4,27 @@ Use Node.js 24 or later for the packages below. Keep implementation and test
 instructions in this guide; action descriptions and generated readmes describe
 how to use the actions.
 
+## Action package structure
+
+JavaScript actions own their `package.json`, lockfile and ES modules under `src/`.
+Keep `*.test.js` beside the code they cover. Use `npm test` for Node's test runner,
+`npm run test:watch` during development and `npm run test:ci` for test output plus
+`coverage/lcov.info` and `coverage/junit.xml`. The CI command creates the coverage directory on a clean
+checkout; coverage output is not committed.
+
+Follow `parse-ci-reports` for each JavaScript action: call the Node.js
+`continuous-integration` workflow with the action's working directory and explicit
+job permissions. Disable its build and lint jobs; keep CodeQL with the repository
+config, dependency review and GitHub coverage enabled. Set `test.comment` to false
+and `test.report-group` to the calling job ID in `__shared-ci.yml`. Source tests
+run through the package-owned `test:ci` script. One `ci-reports` job collects the
+native reports after all source-test jobs, including failures, and updates one
+coverage comment with separate figures for each action. It also combines test
+results and lint summaries; individual producer comments stay disabled.
+Each action's integration workflow exercises its public entrypoint. Actions with
+runtime dependencies bundle them with their licenses; dependency-free helpers
+load their own source without adding a build step.
+
 ## Updating npm dependencies
 
 From an interactive terminal at the repository root, run:
@@ -41,9 +62,13 @@ After changing source or dependencies, run `npm run build` and commit the comple
 `npm run check:dist` rebuilds and fails if output differs from Git, including added
 or removed files. Run it again after committing the rebuilt distribution.
 
-CI checks distribution consistency before tests and exercises the action on a
-host and in a container. Distribution tests copy only `dist/` to a temporary
-directory and compare its outputs with source across supported formats. CodeQL
+The shared distribution workflow discovers packages declaring `build` and
+`check:dist`, then checks them on a host and in a container. Its shared test action
+copies only `dist/` to a temporary directory and runs the package-owned
+`test:distribution` script with `ACTION_ENTRYPOINT` pointing at the isolated bundle.
+The parser uses one public-entrypoint suite in `src/index.test.js` for both runs.
+Local `npm test` exercises source; the shared action runs the same assertions
+against the isolated bundle through `test:distribution`. CodeQL
 scans maintained source and excludes the generated copy; dependency review checks
 the lockfile. Repository package commands also skip distribution metadata.
 
@@ -53,7 +78,7 @@ To add a report format:
    `getAutoPatterns()`. Override `getPriority()` when format detection needs to
    run before a more general parser.
 2. Register the parser in `ParserFactory`.
-3. Add parsing and source/distribution parity tests, then rebuild the distribution.
+3. Add parsing tests and a public-entrypoint fixture, then rebuild the distribution.
 4. Update the action's `action.yml` description or leading documentation comments
    and regenerate its
    [usage documentation](../../actions/quality/parse-ci-reports/README.md#supported-formats).
@@ -63,18 +88,26 @@ dated validation evidence.
 
 ## Distribution automation
 
-The dependency-free composite action in `actions/action-distributions` owns the
-build and publication logic. Its source and tests use Node.js built-ins; no npm
-installation is needed to run its tests:
+The composite action in `actions/action-distributions` owns discovery, build and
+publication logic. It bundles its YAML parser to read trusted workflow definitions
+without runtime installation. Install its locked dependencies before testing:
 
 ```bash
+npm ci --ignore-scripts --prefix actions/action-distributions
 npm test --prefix actions/action-distributions
+npm run check:dist --prefix actions/action-distributions
 ```
 
 Tests cover bot identities, custom inputs, grouped updates, artifact validation,
-stale heads, atomic commits and same-App loop prevention. Keep tests beside the
+stale heads, atomic commits, package discovery, trusted workflow resolution and
+same-App loop prevention. The shared distribution matrix also runs the publication
+contracts against an isolated bundle on the host and in a container. Rebuild and
+commit `dist/` after source or dependency changes. Keep tests beside the
 action and maintain the security contract recorded in
 [ADR 0002](../adr/0002-audit-action-dependency-distributions.md).
+
+Run `npm test --prefix actions/quality/test-action-distribution` to validate
+isolated execution, missing runtime dependencies, failure propagation and cleanup.
 
 Allowed dependency updates regenerate bundles in the same PR through the shared
 distribution workflow. Human source changes must include their rebuilt bundles.

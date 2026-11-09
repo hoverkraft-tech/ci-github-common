@@ -4,7 +4,9 @@
 # `job-results: ${{ toJSON(needs) }}`. Keep producer jobs as required checks.
 # Producers must disable individual comments and upload only report files in
 # artifacts named `ci-reports-<run_attempt>-<job ID>-<unique name>`. Use the same
-# job IDs in the caller and its reusable workflows. Directories are kept
+# job IDs in the caller and its reusable workflows, or set the producer's report
+# group to its outer calling job ID. Only artifacts belonging to these jobs are
+# downloaded. Directories are kept
 # separate so identically named reports cannot overwrite one another.
 # The shared linter uploads its native `super-linter-summary.md`; call it from
 # a job named `lint` with `comment: false`. Other lint producers can upload any
@@ -26,6 +28,10 @@ name: CI reports
 on:
   workflow_call:
     inputs:
+      comment:
+        description: Publish combined PR comments. Disable for report previews or workflow tests; summaries and outputs remain available.
+        type: boolean
+        default: true
       job-results:
         description: JSON needs context containing lint and test jobs and their results.
         type: string
@@ -61,8 +67,17 @@ jobs:
       - name: Prepare report directory
         id: directory
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          JOB_RESULTS: ${{ inputs.job-results }}
         with:
           script: |
+            const jobs = Object.entries(JSON.parse(process.env.JOB_RESULTS));
+            if (!jobs.length || jobs.some(([name, job]) => !/^[\w-]+$/.test(name) || !['success', 'failure', 'cancelled', 'skipped', 'abandoned'].includes(job?.result))) {
+              throw new Error('job-results must contain job IDs and their completed results');
+            }
+            const names = jobs.map(([name]) => name);
+            const group = names.length === 1 ? names[0] : `{${names.join(',')}}`;
+            core.setOutput('pattern', `ci-reports-${process.env.GITHUB_RUN_ATTEMPT}-${group}-*`);
             const { mkdtemp } = require('node:fs/promises');
             const path = require('node:path');
             core.setOutput('path', await mkdtemp(path.join(process.env.RUNNER_TEMP, 'ci-reports-')));
@@ -70,7 +85,7 @@ jobs:
         id: download
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: ci-reports-${{ github.run_attempt }}-*
+          pattern: ${{ steps.directory.outputs.pattern }}
           path: ${{ steps.directory.outputs.path }}
       - name: Parse reports
         id: parse
@@ -94,6 +109,7 @@ jobs:
           PARSE_OUTCOME: ${{ steps.parse.outcome }}
           DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
           REPORT_DIRECTORY: ${{ steps.directory.outputs.path }}
+          COMMENT: ${{ inputs.comment }}
         with:
           script: |
             const jobs = Object.entries(JSON.parse(process.env.JOB_RESULTS));
@@ -105,7 +121,7 @@ jobs:
             const header = `[Workflow run and full reports](${run}) · Commit ${context.sha.slice(0, 7)}\n\n`;
             const fs = require('node:fs');
             const path = require('node:path');
-            const directory = process.env.REPORT_DIRECTORY;
+            const directory = process.env.REPORT_DIRECTORY || '';
             const artifacts = fs.existsSync(directory) ? fs.readdirSync(directory) : [];
             let missing = 0;
             const status = '| Job | Result | Report artifacts |\n| --- | --- | --- |\n' + jobs.map(([name, job]) => {
@@ -144,7 +160,7 @@ jobs:
               await core.summary.addRaw(body + '\n\n').write();
             }
             const pr = context.payload.pull_request;
-            if (context.eventName !== 'pull_request' || pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) return;
+            if (process.env.COMMENT !== 'true' || context.eventName !== 'pull_request' || pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) return;
             const { data: current } = await github.rest.pulls.get({ ...context.repo, pull_number: pr.number });
             core.setOutput('comment', current.state === 'open' && current.head.sha === pr.head.sha);
       - name: Update test results comment

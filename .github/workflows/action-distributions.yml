@@ -6,19 +6,19 @@
 #
 # ### Configure a repository
 #
-# 1. Each package needs a lockfile and an npm build script. Defaults use Node.js 24,
+# 1. Each package needs a lockfile and npm build and check:dist scripts. Defaults use Node.js 24,
 #    `npm run build`, and `dist/index.js` plus `dist/licenses.txt`. Dependency
 #    installation uses `npm ci --ignore-scripts`; packages requiring install
 #    lifecycle scripts are outside this contract.
 # 2. Copy the [build caller](https://github.com/hoverkraft-tech/ci-github-common/blob/main/.github/workflows/__rebuild-action-distributions.yml) and
 #    [writer caller](https://github.com/hoverkraft-tech/ci-github-common/blob/main/.github/workflows/__commit-action-distributions.yml). Both call
 #    `hoverkraft-tech/ci-github-common/.github/workflows/action-distributions.yml`
-#    pinned to the same reviewed commit. Configure package directories and author
-#    rules in both callers. Repeat other shared settings when overriding defaults.
-# 3. Set `workflow_run.workflows` to the build caller's `name`, `build-workflow` to
-#    its repository-relative path, and `pull_request.branches` to the default
-#    branch. GitHub rejects a workflow listening to its own completion, so the two
-#    small event callers are required even though they share one reusable workflow.
+#    pinned to the same reviewed commit. Configure author rules in both callers; package directories are discovered
+#    automatically. Repeat other shared settings when overriding defaults.
+# 3. Set `workflow_run.workflows` to the build caller's unique, exact `name`
+#    and `pull_request.branches` to the default branch. GitHub rejects a workflow
+#    listening to its own completion, so the two small event callers are required
+#    even though they share one reusable workflow.
 # 4. Provide `CI_BOT_APP_CLIENT_ID` as a repository variable and
 #    `CI_BOT_APP_PRIVATE_KEY` as an Actions secret. Install the App with contents
 #    write, actions read and pull requests read on the consumer repository. Only
@@ -31,14 +31,22 @@
 # the linked callers; a push-only caller does not run either job. To customize the
 # build, set `build-script` to an npm script name and choose `node-version`. Override
 # `output-directory`, `required-files`, `artifact-name`, `retention-days` or
-# `commit-message` when needed. A root package uses `working-directories: .`;
-# multiple packages use a newline-separated list.
+# `commit-message` when needed.
 #
-# Directory lists must not overlap. Paths are relative, contain only letters,
-# numbers, underscores, hyphens and dots within components, and cannot contain
-# hidden or traversal components. An empty `required-files` accepts any nonempty
-# output for each affected package. The writer uses its own default-branch caller
-# inputs as the allowlist. A PR cannot expand its write scope by editing inputs.
+# By default, discover root and `actions/**` packages declaring the selected build
+# script and check:dist. Override working-directories with newline-separated
+# literal directories or glob patterns (`*`, `**`, `?`). Literal directories explicitly
+# define the allowlist; glob matches must declare both scripts. No matches is a
+# successful no-op. Dependency, generated and hidden directories are excluded.
+# Selected directories must not overlap or contain traversal components.
+#
+# Build and writer discovery read manifests from the PR's default-branch base
+# revision through GitHub's API. No repository code is executed during discovery.
+# A newly introduced package must reach the default branch before automated
+# rebuilds can write its output; normal distribution CI tests it on the PR.
+# An empty required-files accepts any nonempty output for each affected package.
+# The writer uses its own default-branch inputs and manifests as the allowlist.
+# A PR cannot expand its write scope by editing inputs or package manifests.
 #
 # ### Choose allowed PR authors
 #
@@ -80,12 +88,19 @@
 # are uploaded together. Updated dependencies execute only in this read-only job.
 #
 # The writer checks the originating run and current PR through GitHub's API. It
-# accepts only the current successful attempt, the configured builder and author,
+# accepts only the current successful attempt, the resolved builder and configured author,
 # a same-repository branch, and an unchanged open PR targeting the default branch.
 # It treats the artifact as bytes, validates every path, and commits only changes
 # inside the selected output directories. Deleted chunks are removed; unrelated
 # files remain untouched. It never checks out or executes PR code. These origin and
 # head checks cannot be disabled through inputs.
+#
+# The writer resolves its caller file through GitHub, then reads the workflow
+# definitions at its default-branch revision. Its workflow_run.workflows filter
+# must contain one exact name matching one pull_request workflow in that snapshot.
+# Missing or duplicate names, multiple names and wildcard filters fail publication.
+# The originating run must belong to that workflow path; a name supplied by a PR
+# or the run is never used to authorize publication. No builder-path input is needed.
 #
 # One generated commit covers all affected packages. The App token triggers normal
 # CI. Identical output and superseded runs produce no commit. Publication is
@@ -114,9 +129,9 @@ on:
   workflow_call:
     inputs:
       working-directories:
-        description: Newline-separated package directories relative to the repository root. Use . for a root package.
+        description: Newline-separated package directories or glob patterns (`*`, `**`, `?`). Empty discovers root and `actions/**` packages declaring build and check:dist scripts.
         type: string
-        default: .
+        default: ""
       output-directory:
         description: Generated directory relative to each package. Only files inside it may be committed.
         type: string
@@ -147,10 +162,6 @@ on:
         description: Artifact retention in days, within the repository's artifact policy.
         type: number
         default: 1
-      build-workflow:
-        description: Repository-relative path of the pull_request caller workflow that produced the artifact.
-        type: string
-        required: true
       commit-message:
         description: Single-line commit headline. Per-author suffixes and a loop-prevention body trailer are appended.
         type: string
@@ -185,6 +196,7 @@ jobs:
         uses: $/actions/action-distributions
         with:
           operation: prepare-build
+          build-script: ${{ inputs.build-script }}
           working-directories: ${{ inputs.working-directories }}
           output-directory: ${{ inputs.output-directory }}
           required-files: ${{ inputs.required-files }}
@@ -245,12 +257,12 @@ jobs:
         uses: $/actions/action-distributions
         with:
           operation: prepare-commit
+          build-script: ${{ inputs.build-script }}
           working-directories: ${{ inputs.working-directories }}
           output-directory: ${{ inputs.output-directory }}
           required-files: ${{ inputs.required-files }}
           pull-request-authors: ${{ inputs.pull-request-authors }}
           artifact-name: ${{ inputs.artifact-name }}
-          build-workflow: ${{ inputs.build-workflow }}
       - name: Download this attempt's generated bytes
         if: steps.prepare.outputs.artifact-id
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -275,12 +287,12 @@ jobs:
         uses: $/actions/action-distributions
         with:
           operation: commit
+          build-script: ${{ inputs.build-script }}
           working-directories: ${{ inputs.working-directories }}
           output-directory: ${{ inputs.output-directory }}
           required-files: ${{ inputs.required-files }}
           pull-request-authors: ${{ inputs.pull-request-authors }}
           artifact-name: ${{ inputs.artifact-name }}
-          build-workflow: ${{ inputs.build-workflow }}
           commit-message: ${{ inputs.commit-message }}
           github-token: ${{ steps.token.outputs.token }}
           artifact-path: ${{ runner.temp }}/incoming-distributions/distributions.json

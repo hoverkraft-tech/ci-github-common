@@ -1,10 +1,13 @@
-const assert = require("node:assert/strict");
-const { execFileSync } = require("node:child_process");
-const { createHash } = require("node:crypto");
-const fs = require("node:fs");
-const path = require("node:path");
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 
-const { DistributionOptions } = require("./DistributionOptions.cjs");
+import { DistributionOptions } from "./DistributionOptions.js";
+import { DistributionPackages } from "./DistributionPackages.js";
+import { DistributionWorkflow } from "./DistributionWorkflow.js";
+
 const GENERATED_BY = "Generated-by: ci-github-common/action-distributions";
 const MAX_BYTES = 20 * 1024 * 1024;
 
@@ -25,6 +28,11 @@ class ActionDistributions {
 
 	async run(operation, { workspace, artifactPath } = {}) {
 		switch (operation) {
+			case "discover": {
+				const packages = await this.packages(this.context.sha);
+				this.core.setOutput("working-directories", JSON.stringify(packages));
+				return;
+			}
 			case "prepare-build":
 				return this.prepareBuild();
 			case "build":
@@ -38,12 +46,21 @@ class ActionDistributions {
 		}
 	}
 
+	async packages(ref) {
+		return new DistributionPackages(
+			this.github,
+			this.repo,
+			this.options,
+		).discover(ref);
+	}
+
 	async affectedPackages(pr) {
 		assert(
 			pr.changed_files <= 3000,
 			"PR file list exceeds GitHub's supported limit",
 		);
-		const packages = this.options.directories;
+		// The writer's allowlist is always derived from the trusted base, never PR manifests.
+		const packages = await this.packages(pr.base.sha);
 		const files = await this.github.paginate(this.github.rest.pulls.listFiles, {
 			...this.repo,
 			pull_number: pr.number,
@@ -161,16 +178,7 @@ class ActionDistributions {
 			run.run_attempt !== event.run_attempt
 		)
 			return null;
-		const { data: workflow } = await this.github.rest.actions.getWorkflow({
-			...this.repo,
-			workflow_id: run.workflow_id,
-		});
-		assert(this.options.buildWorkflow, "Expected builder workflow path");
-		assert.equal(
-			workflow.path,
-			this.options.buildWorkflow,
-			"Unexpected builder workflow",
-		);
+		await new DistributionWorkflow(this.github, this.context).validate(run);
 		const prs = await this.github.paginate(this.github.rest.pulls.list, {
 			...this.repo,
 			state: "open",
@@ -339,4 +347,4 @@ class ActionDistributions {
 	}
 }
 
-module.exports = { ActionDistributions, GENERATED_BY };
+export { ActionDistributions, GENERATED_BY };

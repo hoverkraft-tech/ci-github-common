@@ -1,6 +1,5 @@
 name: Maintained JavaScript sources
 
-# The bundle is rebuilt and compared with source in the parser's build gate.
-# Dependency review checks its locked third-party packages separately.
+# CI rebuilds distributions; dependency review checks their locked packages.
 paths-ignore:
-  - actions/quality/parse-ci-reports/dist
+  - actions/**/dist/**
