@@ -1,0 +1,87 @@
+# Discover bundled Node.js actions and validate each checked-in distribution on a
+# host runner and in a Node.js container. Requires contents: read only.
+#
+# Packages at the root or under actions/ are discovered when they declare build
+# and check:dist scripts. Override working-directories with newline-separated
+# literal directories or glob patterns (`*`, `**`, `?`). An empty result skips testing.
+#
+# Each package must commit its npm lockfile and declare test:distribution. That
+# script runs package-owned contract tests which load process.env.ACTION_ENTRYPOINT.
+# The shared test action supplies an isolated dist/index.js, clears NODE_PATH and
+# NODE_OPTIONS, propagates test failures and removes temporary files. Tests may
+# use development dependencies; the bundle must include its runtime dependencies.
+#
+# check:dist must rebuild the distribution and reject modified or untracked output.
+# Dependency lifecycle scripts are disabled during installation. This workflow
+# never writes commits. Run source tests with the Node.js continuous-integration
+# workflow, and keep action integration tests and repository security checks in CI.
+name: Test action distributions
+
+on:
+  workflow_call:
+    inputs:
+      working-directories:
+        description: Newline-separated package directories or glob patterns. Empty discovers root and `actions/**` packages declaring build and check:dist scripts.
+        type: string
+        default: ""
+      output-directory:
+        description: Bundle directory relative to each package, containing index.js.
+        type: string
+        default: dist
+      node-version:
+        description: Node.js version installed for checks on both the host and Node.js 24 container.
+        type: string
+        default: "24"
+
+permissions: {}
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      directories: ${{ steps.packages.outputs.working-directories }}
+    steps:
+      - id: packages
+        uses: $/actions/action-distributions
+        with:
+          operation: discover
+          working-directories: ${{ inputs.working-directories }}
+          output-directory: ${{ inputs.output-directory }}
+
+  test:
+    needs: discover
+    if: needs.discover.outputs.directories != '[]'
+    name: Distribution (${{ matrix.directory }}, ${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        directory: ${{ fromJSON(needs.discover.outputs.directories) }}
+        environment: [host, container]
+    container: ${{ matrix.environment == 'container' && 'node:24' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ inputs.node-version }}
+          package-manager-cache: false
+      - name: Trust the checked-out workspace in the container
+        if: matrix.environment == 'container'
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Install dependencies and verify the checked-in distribution
+        working-directory: ${{ matrix.directory }}
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run check:dist
+      - uses: $/actions/quality/test-action-distribution
+        with:
+          working-directory: ${{ matrix.directory }}
+          output-directory: ${{ inputs.output-directory }}

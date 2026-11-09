@@ -1,0 +1,51 @@
+name: Internal - Tests for test-action-distribution action
+
+on:
+  workflow_call:
+
+permissions: {}
+
+jobs:
+  continuous-integration:
+    uses: hoverkraft-tech/ci-github-nodejs/.github/workflows/continuous-integration.yml@fbd3522b68c55a6314aadbededaa487825ba9b35 # 3.0.0
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: write
+      security-events: write
+    with:
+      working-directory: actions/quality/test-action-distribution
+      build: ""
+      lint: ""
+      code-ql: '{"languages":"typescript","config-file":".github/codeql/config.yml"}'
+      test: '{"comment":false,"report-group":"test-action-test-action-distribution"}'
+
+  integration-tests:
+    name: Execute package distribution contracts (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        environment: [host, container]
+    container: ${{ matrix.environment == 'container' && 'node:24' || '' }}
+    steps:
+      - name: Arrange - Package with a standalone distribution
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          FIXTURE_PATH: ${{ runner.temp }}/distribution-fixture
+        with:
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const directory = process.env.FIXTURE_PATH;
+            await io.mkdirP(path.join(directory, 'dist'));
+            fs.writeFileSync(path.join(directory, 'package.json'), JSON.stringify({ scripts: { 'test:distribution': 'node contract.cjs' } }));
+            fs.writeFileSync(path.join(directory, 'dist/index.js'), 'exports.value = 42;');
+            fs.writeFileSync(path.join(directory, 'contract.cjs'), 'require("node:assert/strict").equal(require(process.env.ACTION_ENTRYPOINT).value, 42);');
+
+      - name: Act and assert - Run package-owned contract tests
+        uses: $/actions/quality/test-action-distribution
+        with:
+          working-directory: ${{ runner.temp }}/distribution-fixture

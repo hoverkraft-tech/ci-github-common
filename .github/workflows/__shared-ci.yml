@@ -6,13 +6,31 @@ on:
 permissions: {}
 
 jobs:
+  test-bundled-actions:
+    permissions:
+      contents: read
+    uses: $/.github/workflows/test-action-distributions.yml
+
   test-action-distributions:
     permissions:
       contents: read
-      pull-requests: read
+      id-token: write
+      packages: read
+      pull-requests: write
+      security-events: write
     uses: $/.github/workflows/__test-action-distributions.yml
 
-  linter:
+  test-action-test-action-distribution:
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: write
+      security-events: write
+    uses: $/.github/workflows/__test-action-test-action-distribution.yml
+
+  lint:
+    name: linter
     permissions:
       actions: read
       contents: read
@@ -22,15 +40,17 @@ jobs:
       security-events: write
       statuses: write
     uses: $/.github/workflows/linter.yml
+    with:
+      comment: false
 
   test-action-matrix-outputs:
-    needs: linter
+    needs: lint
     permissions:
       contents: read
     uses: $/.github/workflows/__test-action-matrix-outputs.yml
 
   test-action-lint-pull-request-title:
-    needs: linter
+    needs: lint
     permissions:
       contents: read
       id-token: write
@@ -40,32 +60,32 @@ jobs:
     uses: $/.github/workflows/__test-action-lint-pull-request-title.yml
 
   test-action-checkout:
-    needs: linter
+    needs: lint
     permissions:
       contents: read
     uses: $/.github/workflows/__test-action-checkout.yml
 
   test-action-checkout-issue-comment:
-    needs: linter
+    needs: lint
     permissions:
       contents: read
       pull-requests: read
     uses: $/.github/workflows/__test-action-checkout-issue-comment.yml
 
   test-action-get-github-actions-bot-user:
-    needs: linter
+    needs: lint
     permissions:
       contents: read
     uses: $/.github/workflows/__test-action-get-github-actions-bot-user.yml
 
   test-action-get-issue-number:
-    needs: linter
+    needs: lint
     permissions:
       contents: read
     uses: $/.github/workflows/__test-action-get-issue-number.yml
 
   test-action-parse-ci-reports:
-    needs: linter
+    needs: lint
     permissions:
       contents: read
       id-token: write
@@ -75,7 +95,7 @@ jobs:
     uses: $/.github/workflows/__test-action-parse-ci-reports.yml
 
   test-action-need-fix-to-issue:
-    needs: linter
+    needs: lint
     permissions:
       contents: read
       id-token: write
@@ -85,26 +105,42 @@ jobs:
     uses: $/.github/workflows/__test-action-need-fix-to-issue.yml
 
   test-action-repository-owner-is-organization:
-    needs: linter
+    needs: lint
     permissions:
       contents: read
     uses: $/.github/workflows/__test-action-repository-owner-is-organization.yml
 
   test-action-slugify:
-    needs: linter
+    needs: lint
     permissions:
       contents: read
     uses: $/.github/workflows/__test-action-slugify.yml
 
   test-action-working-directory:
-    needs: linter
+    needs: lint
     permissions:
       contents: read
     uses: $/.github/workflows/__test-action-working-directory.yml
 
   test-workflow-ci-reports:
-    needs: linter
+    needs: lint
     uses: $/.github/workflows/__test-workflow-ci-reports.yml
     permissions:
       contents: read
       pull-requests: write
+
+  reports:
+    needs:
+      - lint
+      - test-action-distributions
+      - test-action-test-action-distribution
+      - test-action-lint-pull-request-title
+      - test-action-parse-ci-reports
+      - test-action-need-fix-to-issue
+    if: always()
+    uses: $/.github/workflows/ci-reports.yml
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      job-results: ${{ toJSON(needs) }}

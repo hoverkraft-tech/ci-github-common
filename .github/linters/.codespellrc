@@ -1,4 +1,4 @@
 [codespell]
-skip = *.svg,*/parse-ci-reports/dist/*
+skip = *.svg,*actions/*/dist/*
 # Package integrity hashes are generated data.
 ignore-regex = \bsha(?:256|384|512)-[A-Za-z0-9+/]+={0,2}

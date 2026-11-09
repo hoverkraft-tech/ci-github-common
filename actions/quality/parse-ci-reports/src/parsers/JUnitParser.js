@@ -1,6 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
-import { BaseParser, ReportCategory } from "./BaseParser.js";
 import { ReportData, TestResult } from "../models/ReportData.js";
+import { BaseParser, ReportCategory } from "./BaseParser.js";
 
 /**
  * Parser for JUnit XML format
@@ -69,7 +69,8 @@ export class JUnitParser extends BaseParser {
 	_normalizeTestSuites(parsed) {
 		// Handle different root elements
 		if (parsed.testsuites) {
-			const suites = parsed.testsuites.testsuite;
+			// Node's JUnit reporter can place testcases directly under testsuites.
+			const suites = parsed.testsuites;
 			return Array.isArray(suites) ? suites : [suites];
 		} else if (parsed.testsuite) {
 			return Array.isArray(parsed.testsuite)
@@ -109,7 +110,7 @@ export class JUnitParser extends BaseParser {
 		let stackTrace = "";
 
 		// Check for failure
-		if (testcase.failure) {
+		if (Object.hasOwn(testcase, "failure")) {
 			status = "failed";
 			const failure = testcase.failure;
 			message = failure["@_message"] || failure["#text"] || "Test failed";
@@ -117,7 +118,7 @@ export class JUnitParser extends BaseParser {
 			stackTrace = failure["#text"] || "";
 		}
 		// Check for error
-		else if (testcase.error) {
+		else if (Object.hasOwn(testcase, "error")) {
 			status = "error";
 			const error = testcase.error;
 			message = error["@_message"] || error["#text"] || "Test error";
@@ -125,7 +126,7 @@ export class JUnitParser extends BaseParser {
 			stackTrace = error["#text"] || "";
 		}
 		// Check for skipped
-		else if (testcase.skipped) {
+		else if (Object.hasOwn(testcase, "skipped")) {
 			status = "skipped";
 			const skipped = testcase.skipped;
 			message = skipped["@_message"] || skipped["#text"] || "Test skipped";

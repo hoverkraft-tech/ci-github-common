@@ -1,4 +1,4 @@
 {
 	"threshold": 5,
-	"ignore": ["actions/**/README.md", "actions/quality/parse-ci-reports/dist/**"]
+	"ignore": ["actions/**/README.md", "actions/**/dist/**"]
 }

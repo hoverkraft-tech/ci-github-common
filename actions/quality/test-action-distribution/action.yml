@@ -1,0 +1,37 @@
+name: Test action distribution
+description: |
+  Run a package's distribution contract tests against an isolated copy of its bundle.
+  The package must declare a `test:distribution` npm script. Its tests load the
+  absolute `ACTION_ENTRYPOINT` path supplied by this action instead of source.
+  Dependencies needed by the tests may be installed in the package; the copied
+  bundle has no adjacent node_modules. Temporary files are removed even on failure.
+  Use the [test workflow](../../../.github/workflows/test-action-distributions.md)
+  to discover packages, install dependencies and verify checked-in distributions.
+author: hoverkraft
+branding:
+  icon: check-circle
+  color: blue
+inputs:
+  working-directory:
+    description: Package directory containing the distribution contract test script.
+    default: .
+  output-directory:
+    description: Bundle directory relative to the package, containing index.js.
+    default: dist
+runs:
+  using: composite
+  steps:
+    - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        PACKAGE_DIRECTORY: ${{ inputs.working-directory }}
+        OUTPUT_DIRECTORY: ${{ inputs.output-directory }}
+      with:
+        script: |
+          const { join } = require('node:path');
+          const { pathToFileURL } = require('node:url');
+          const { DistributionTest } = await import(pathToFileURL(join(process.env.ACTION_PATH, 'src', 'index.js')));
+          await new DistributionTest({ io, exec }).run({
+            workingDirectory: process.env.PACKAGE_DIRECTORY,
+            outputDirectory: process.env.OUTPUT_DIRECTORY,
+          });

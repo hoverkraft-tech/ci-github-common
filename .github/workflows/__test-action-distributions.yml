@@ -8,22 +8,29 @@ permissions:
   pull-requests: read
 
 jobs:
-  contracts:
+  continuous-integration:
+    uses: hoverkraft-tech/ci-github-nodejs/.github/workflows/continuous-integration.yml@fbd3522b68c55a6314aadbededaa487825ba9b35 # 3.0.0
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: write
+      security-events: write
+    with:
+      working-directory: actions/action-distributions
+      build: ""
+      lint: ""
+      code-ql: '{"languages":"typescript","config-file":".github/codeql/config.yml"}'
+      test: '{"comment":false,"report-group":"test-action-distributions"}'
+
+  integration-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout reusable workflow implementation
+      - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "24"
-          package-manager-cache: false
-      - name: Validate build and publication contracts
-        run: npm test --prefix actions/action-distributions
       - name: Exercise public action on an unrelated package
         id: prepare-build
         uses: $/actions/action-distributions
@@ -36,7 +43,6 @@ jobs:
         uses: $/actions/action-distributions
         with:
           operation: prepare-commit
-          build-workflow: .github/workflows/__rebuild-action-distributions.yml
       - name: Check public no-op outputs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

@@ -1,4 +1,4 @@
-const assert = require("node:assert/strict");
+import assert from "node:assert/strict";
 
 const AUTHOR_PRESETS = {
 	dependabot: {
@@ -16,20 +16,18 @@ const AUTHOR_PRESETS = {
 
 class DistributionOptions {
 	constructor(options = {}) {
-		this.directories = this.lines(options.workingDirectories ?? ".");
+		this.directories = this.lines(options.workingDirectories ?? "");
 		this.outputDirectory = options.outputDirectory ?? "dist";
 		this.requiredFiles = this.lines(
 			options.requiredFiles ?? "index.js\nlicenses.txt",
 		);
 		this.buildScript = options.buildScript ?? "build";
 		this.artifactName = options.artifactName ?? "action-distributions";
-		this.buildWorkflow = options.buildWorkflow;
 		this.commitMessage =
 			options.commitMessage ?? "build: regenerate action distributions";
 		this.authors = this.authorRules(
 			options.pullRequestAuthors ?? '["dependabot","renovate"]',
 		);
-		assert(this.directories.length > 0, "Expected working directories");
 		assert.equal(
 			new Set(this.directories).size,
 			this.directories.length,
@@ -37,7 +35,7 @@ class DistributionOptions {
 		);
 		for (const directory of this.directories) {
 			assert(
-				directory === "." || this.safePath(directory),
+				directory === "." || this.safePattern(directory),
 				"Invalid working directory",
 			);
 			assert(
@@ -68,14 +66,6 @@ class DistributionOptions {
 				!/[\r\n]/.test(this.commitMessage),
 			"Expected a single-line commit headline",
 		);
-		if (this.buildWorkflow !== undefined) {
-			assert(
-				/^\.github\/workflows\/[a-zA-Z0-9_-][a-zA-Z0-9_.-]*\.ya?ml$/.test(
-					this.buildWorkflow,
-				),
-				"Invalid builder workflow path",
-			);
-		}
 	}
 
 	lines(value) {
@@ -93,6 +83,17 @@ class DistributionOptions {
 				.split("/")
 				.every((part) => /^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/.test(part))
 		);
+	}
+
+	safePattern(value) {
+		return value
+			.split("/")
+			.every(
+				(part) =>
+					part !== "." &&
+					part !== ".." &&
+					/^[a-zA-Z0-9_*?][a-zA-Z0-9_.*?-]*$/.test(part),
+			);
 	}
 
 	authorRules(value) {
@@ -165,10 +166,9 @@ class DistributionOptions {
 			pullRequestAuthors: process.env.PULL_REQUEST_AUTHORS,
 			buildScript: process.env.BUILD_SCRIPT,
 			artifactName: process.env.ARTIFACT_NAME,
-			buildWorkflow: process.env.BUILD_WORKFLOW || undefined,
 			commitMessage: process.env.COMMIT_MESSAGE,
 		};
 	}
 }
 
-module.exports = { DistributionOptions };
+export { DistributionOptions };

@@ -1,0 +1,18 @@
+{
+	"name": "test-action-distribution",
+	"private": true,
+	"scripts": {
+		"test": "node --test",
+		"test:watch": "node --test --watch",
+		"test:ci": "node --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=coverage/junit.xml --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test",
+		"pretest:ci": "node -e \"require('node:fs').mkdirSync('coverage', { recursive: true })\""
+	},
+	"engines": {
+		"node": ">=24.0.0"
+	},
+	"type": "module",
+	"version": "1.0.0",
+	"description": "Run package distribution contracts in isolation",
+	"author": "hoverkraft",
+	"license": "MIT"
+}
