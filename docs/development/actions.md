@@ -39,7 +39,8 @@ To add a report format:
    before a more general parser.
 2. Register the parser in `ParserFactory`.
 3. Add parsing and source/distribution parity tests, then rebuild the distribution.
-4. Update the action's `action.yml` description and regenerate its
+4. Update the action's `action.yml` description or leading documentation comments
+   and regenerate its
    [usage documentation](../../actions/quality/parse-ci-reports/README.md#supported-formats).
 
 See [ADR 0001](../adr/0001-bundle-ci-report-parser.md) for the bundle decision and
@@ -65,7 +66,8 @@ distribution workflow. Human source changes must include their rebuilt bundles.
 
 ## Generated documentation
 
-Edit each action's `action.yml` description and input/output metadata, or a
-reusable workflow's leading documentation comments. The existing documentation
-generation workflow updates their readmes through CI Dokumentor. Do not edit those
-generated files by hand.
+Edit each action's `action.yml` description, leading documentation comments and
+input/output metadata, or a reusable workflow's leading documentation comments.
+Put examples containing workflow expressions in leading comments so GitHub does
+not evaluate them as action metadata. The existing documentation generation
+workflow updates readmes through CI Dokumentor. Do not edit generated files by hand.
