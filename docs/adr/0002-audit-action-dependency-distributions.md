@@ -57,18 +57,19 @@ Follow the split-permission pattern in `actions/attest`. Expose one public reusa
 validated inputs and focused tests. Its implementation uses Node.js built-ins and
 runs through github-script, so it needs no dependency installation or bundle.
 
-Consumers use one event caller for both `pull_request` and `workflow_run`, and
-pass settings once through workflow inputs. The reusable workflow still uses
-separate read-only build and privileged writer jobs, selected by the event. Pass
-the App secret only on `workflow_run`; the PR execution receives an empty value.
+Consumers keep two small event callers: a read-only `pull_request` build and a
+trusted default-branch `workflow_run` writer. Both invoke the same public reusable
+workflow, which selects separate jobs by event. Only the writer caller passes the
+App secret. Shared settings are repeated through inputs, following the preference
+for explicit caller configuration over a separate config file.
 
-The caller listens for its own completion, excluding the default branch through
-`workflow_run.branches-ignore`. PR builds run on the PR branch; the privileged
-workflow_run execution runs on the default branch and is excluded from triggering
-another execution. Also reject non-PR originating runs in the reusable workflow
-and helper. Keep event-specific concurrency groups so a new PR build cannot cancel
-its writer. The caller name, originating workflow path and default-branch filters
-must agree. Live event routing remains a post-merge acceptance check.
+During review on 2026-11-09, a single combined event caller was tested. GitHub
+[rejected its definition](https://github.com/hoverkraft-tech/ci-github-common/actions/runs/42577213586)
+because a workflow cannot listen to its own completion. Retain the two event files;
+consolidating the reusable workflow still centralizes the implementation. Do not
+move the writer into a PR execution or bypass distribution checks to reduce the
+number of files. Keep separate build and writer concurrency groups so a new build
+cannot cancel publication. Live event routing remains a post-merge acceptance check.
 
 Workflow inputs configure package directories, npm script, Node.js version, output
 paths, required files, artifact retention, author rules and commit headline. No
@@ -121,7 +122,7 @@ action test; keep all other expression and security checks enabled.
 
 ## Automation rollout
 
-Consumers retain one event caller, App credential wiring and explicit workflow inputs.
+Consumers retain two event callers, App credential wiring and explicit workflow inputs.
 Packages without committed bundles need no workflow. Build failures remain visible
 and block merging through existing checks; automation does not bypass review.
 
@@ -194,5 +195,4 @@ sources and dependency review on lockfiles; generated exclusions must be scoped.
 - [GitHub token workflow triggers](https://docs.github.com/en/actions/concepts/security/github_token)
 - [Reusable job identity](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#job-context)
 - [workflow_run branch and permission semantics](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run)
-- [Filtering workflow_run branches](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow#using-filters-to-target-specific-branches-for-workflow-run-events)
 - [Self-repository action references](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#example-using-an-action-in-the-same-repository-as-the-workflow-at-the-running-commit-recommended)

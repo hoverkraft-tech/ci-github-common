@@ -58,7 +58,7 @@ function fixture(t, options = {}) {
 			head_repository: { full_name: "owner/repo" },
 			actor: { login: "dependabot[bot]", id: 49699333 },
 		},
-		workflow: { path: ".github/workflows/__action-distributions.yml" },
+		workflow: { path: ".github/workflows/__rebuild-action-distributions.yml" },
 		files: [{ filename: `${PACKAGE}/package-lock.json` }],
 		artifacts: [
 			{
@@ -112,7 +112,7 @@ function fixture(t, options = {}) {
 	const automation = new ActionDistributions({
 		options: {
 			workingDirectories: PACKAGE,
-			buildWorkflow: ".github/workflows/__action-distributions.yml",
+			buildWorkflow: ".github/workflows/__rebuild-action-distributions.yml",
 			...options,
 		},
 		github,

@@ -1,5 +1,5 @@
 # Rebuild committed Node.js bundles in the same dependency PR through one reusable
-# workflow and one event caller. Configure settings once through workflow inputs;
+# workflow with separate build and writer event callers. Configure workflow inputs;
 # no repository configuration file is needed. The dedicated
 # [action](../../actions/action-distributions/README.md) owns the implementation and
 # tests. Existing CI must check bundle consistency before merging.
@@ -10,24 +10,25 @@
 #    `npm run build`, and `dist/index.js` plus `dist/licenses.txt`. Dependency
 #    installation uses `npm ci --ignore-scripts`; packages requiring install
 #    lifecycle scripts are outside this contract.
-# 2. Copy the [event caller](__action-distributions.yml). Replace its `uses` value
-#    with `hoverkraft-tech/ci-github-common/.github/workflows/action-distributions.yml`
-#    pinned to a reviewed commit. Set `working-directories` and author rules once.
-# 3. Keep `workflow_run.workflows` equal to the caller's `name`, and set
-#    `build-workflow` to its repository-relative path. Both `pull_request.branches`
-#    and `workflow_run.branches-ignore` must name the default branch. The ignore
-#    filter prevents the privileged writer's completion from triggering itself.
+# 2. Copy the [build caller](__rebuild-action-distributions.yml) and
+#    [writer caller](__commit-action-distributions.yml). Both call
+#    `hoverkraft-tech/ci-github-common/.github/workflows/action-distributions.yml`
+#    pinned to the same reviewed commit. Configure package directories and author
+#    rules in both callers. Repeat other shared settings when overriding defaults.
+# 3. Set `workflow_run.workflows` to the build caller's `name`, `build-workflow` to
+#    its repository-relative path, and `pull_request.branches` to the default
+#    branch. GitHub rejects a workflow listening to its own completion, so the two
+#    small event callers are required even though they share one reusable workflow.
 # 4. Provide `CI_BOT_APP_CLIENT_ID` as a repository variable and
 #    `CI_BOT_APP_PRIVATE_KEY` as an Actions secret. Install the App with contents
-#    write, actions read and pull requests read on the consumer repository. Preserve
-#    the caller's conditional secret expression: only workflow_run receives the App
-#    key; pull_request receives an empty value. Do not use `secrets: inherit`.
-# 5. Merge the caller into the default branch. Trigger a fresh dependency update to
-#    verify regeneration, CI on the generated commit, bot rebasing and no repeated
-#    writer executions. GitHub.com is required for self-repository action references.
+#    write, actions read and pull requests read on the consumer repository. Only
+#    the writer caller passes the App key; the build caller passes no secrets.
+# 5. Merge the callers into the default branch. Trigger a fresh dependency update
+#    to verify regeneration, CI on the generated commit and bot rebasing.
+#    GitHub.com is required for self-repository action references.
 #
 # The generated Usage block lists inputs. Actual execution requires both events in
-# the linked caller; a push-only caller does not run either job. To customize the
+# the linked callers; a push-only caller does not run either job. To customize the
 # build, set `build-script` to an npm script name and choose `node-version`. Override
 # `output-directory`, `required-files`, `artifact-name`, `retention-days` or
 # `commit-message` when needed. A root package uses `working-directories: .`;
@@ -48,7 +49,7 @@
 # package code executes.
 #
 # For self-hosted Renovate or another automation account, pass an explicit rule in
-# the caller. For example, the Hoverkraft callers add their own App:
+# both callers. For example, the Hoverkraft callers add their own App:
 #
 # ```yaml
 # pull-request-authors: |
@@ -160,7 +161,7 @@ on:
         required: false
     secrets:
       github-app-key:
-        description: GitHub App private key. Pass an empty value on pull_request; pass the secret only on workflow_run.
+        description: GitHub App private key, passed only by the trusted workflow_run caller.
         required: false
 
 permissions: {}
