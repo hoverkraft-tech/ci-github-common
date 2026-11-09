@@ -62,7 +62,7 @@
 #
 # Dependabot's preset adds `[dependabot skip]` to generated commits so it can rebase
 # over them. For Renovate, add the writer's actual commit author email to
-# [`gitIgnoredAuthors`](https://docs.renovatebot.com/configuration-options/#gitignoredauthors)
+# [gitIgnoredAuthors](https://docs.renovatebot.com/configuration-options/#gitignoredauthors)
 # in its existing configuration; otherwise Renovate can treat the generated commit
 # as a manual modification and stop updating that PR. The common and container
 # repositories configure `128996893+hoverkraft-bot[bot]@users.noreply.github.com`.
