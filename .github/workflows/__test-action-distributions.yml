@@ -36,7 +36,7 @@ jobs:
         uses: $/actions/action-distributions
         with:
           operation: prepare-commit
-          build-workflow: .github/workflows/__action-distributions.yml
+          build-workflow: .github/workflows/__rebuild-action-distributions.yml
       - name: Check public no-op outputs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

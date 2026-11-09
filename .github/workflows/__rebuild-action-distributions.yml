@@ -1,0 +1,21 @@
+name: Internal - Rebuild action distributions
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  distributions:
+    uses: $/.github/workflows/action-distributions.yml
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    with:
+      working-directories: |
+        actions/quality/parse-ci-reports
+      pull-request-authors: |
+        ["dependabot", "renovate", {"login":"hoverkraft-bot[bot]","id":128996893,"branch-prefix":"renovate/"}]
+      build-workflow: .github/workflows/__rebuild-action-distributions.yml
