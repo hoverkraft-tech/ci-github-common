@@ -1,4 +1,6 @@
-.PHONY: help
+SHELL := /bin/bash
+
+.PHONY: help npm-update
 
 help: ## Display help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -18,6 +20,9 @@ lint-fix: ## Execute linting and fix
 setup: ## Install npm dependencies for all package.json files under actions/
 	@echo "Installing npm dependencies for all packages..."
 	$(call run_npm_for_packages,install)
+
+npm-update: ## Interactively update npm dependencies for all packages
+	$(call run_npm_for_packages,exec --yes --package=npm-check-updates -- ncu --interactive --cwd "$$pkg_dir")
 
 npm-audit-fix: ## Execute npm audit fix
 	@echo "Running npm audit fix for all packages..."

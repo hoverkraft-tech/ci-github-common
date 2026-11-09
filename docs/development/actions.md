@@ -4,6 +4,21 @@ Use Node.js 24 or later for the packages below. Keep implementation and test
 instructions in this guide; action descriptions and generated readmes describe
 how to use the actions.
 
+## Updating npm dependencies
+
+From an interactive terminal at the repository root, run:
+
+```bash
+make npm-update
+```
+
+The target uses [npm-check-updates](https://github.com/raineorshine/npm-check-updates)
+to select dependency upgrades for each package under `actions/`, excluding
+`node_modules/` and `dist/`. It downloads the tool through npm when needed, without
+adding it to the action dependencies. Accept the install prompt after selecting
+upgrades to update installed dependencies and `package-lock.json`. Review the
+changes, run `make test`, and rebuild affected distributions as described below.
+
 ## CI report parser
 
 The parser lives in `actions/quality/parse-ci-reports`. Its `src/models/` define
@@ -35,8 +50,8 @@ the lockfile. Repository package commands also skip distribution metadata.
 To add a report format:
 
 1. Extend `BaseParser` with `canParse()`, `parse()`, `getCategory()` and
-   `getAutoPatterns()`. Override `getPriority()` when format detection needs to run
-   before a more general parser.
+   `getAutoPatterns()`. Override `getPriority()` when format detection needs to
+   run before a more general parser.
 2. Register the parser in `ParserFactory`.
 3. Add parsing and source/distribution parity tests, then rebuild the distribution.
 4. Update the action's `action.yml` description or leading documentation comments
