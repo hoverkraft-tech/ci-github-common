@@ -6,6 +6,11 @@ on:
 permissions: {}
 
 jobs:
+  test-action-create-and-merge-pull-request:
+    permissions:
+      contents: read
+    uses: $/.github/workflows/__test-action-create-and-merge-pull-request.yml
+
   test-bundled-actions:
     permissions:
       contents: read

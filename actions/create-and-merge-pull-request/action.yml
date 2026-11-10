@@ -4,6 +4,7 @@ name: "Create and merge Pull Request"
 description: |
   Action to create and merge Pull Request.
   Opinionated, set GitHub Actions bot as author, then merge with the configured strategy.
+  When the base branch requires a merge queue, request auto-merge and let GitHub enforce reviews and checks.
 author: hoverkraft
 branding:
   icon: git-pull-request
@@ -32,16 +33,20 @@ inputs:
     description: |
       Merge strategy for the created pull request.
       Valid values: `merge`, `rebase`, `squash`.
+      For branches requiring a merge queue, the queue's configured strategy takes precedence.
     default: rebase
     required: false
 
 outputs:
   merged-ref:
-    description: "The fully qualified ref updated by the merge."
+    description: "The fully qualified ref updated by the merge. Empty while the merge is pending."
     value: ${{ steps.merge-pull-request.outputs.merged-ref }}
   merged-sha:
-    description: "The commit SHA at the merged ref after the merge completes."
+    description: "The commit SHA at the merged ref after the merge completes. Empty while the merge is pending."
     value: ${{ steps.merge-pull-request.outputs.merged-sha }}
+  merge-pending:
+    description: "Whether GitHub is waiting for required reviews, checks, or the merge queue. Do not publish unmerged changes while this is true."
+    value: ${{ steps.merge-pull-request.outputs.merge-pending || 'false' }}
 
 runs:
   using: "composite"
@@ -146,6 +151,22 @@ runs:
             return pullRequest;
           };
 
+          const getMergeQueueState = async pullNumber => {
+            const { repository: { pullRequest } } = await github.graphql(`
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $number) {
+                    isMergeQueueEnabled
+                    merged
+                    autoMergeRequest { enabledAt }
+                    mergeQueueEntry { id }
+                  }
+                }
+              }
+            `, { ...context.repo, number: pullNumber });
+            return pullRequest;
+          };
+
           const waitForMergeablePullRequest = pullNumber =>
             waitFor({
               run: () => getPullRequest(pullNumber),
@@ -160,34 +181,33 @@ runs:
               getTimeoutMessage: () => `Pull request #${pullNumber} is not mergeable after ${maxAttempts} attempts`,
             });
 
-          const getMergeArguments = pullNumber => {
+          const getMergeArguments = (pullNumber, requiresMergeQueue) => {
             const args = [
               'pr',
               'merge',
               '-R',
               repository,
-              mergeMethodFlags[mergeMethod],
-              '--admin',
+              ...(requiresMergeQueue ? ['--auto'] : [mergeMethodFlags[mergeMethod], '--admin']),
               String(pullNumber),
             ];
 
-            if (mergeMethod !== 'rebase' && mergeCommitTitle) {
+            if (!requiresMergeQueue && mergeMethod !== 'rebase' && mergeCommitTitle) {
               args.push('--subject', mergeCommitTitle);
             }
 
-            if (mergeMethod !== 'rebase' && mergeCommitMessage.trim()) {
+            if (!requiresMergeQueue && mergeMethod !== 'rebase' && mergeCommitMessage.trim()) {
               args.push('--body', mergeCommitMessage);
             }
 
             return args;
           };
 
-          const mergePullRequest = async pullNumber => {
+          const mergePullRequest = async (pullNumber, requiresMergeQueue) => {
             core.debug(`Merging pull request #${pullNumber} for repository ${repository} with method ${mergeMethod}...`);
 
             const { exitCode, stdout, stderr } = await exec.getExecOutput(
               'gh',
-              getMergeArguments(pullNumber),
+              getMergeArguments(pullNumber, requiresMergeQueue),
               {
                 env: process.env,
                 ignoreReturnCode: true,
@@ -222,8 +242,10 @@ runs:
 
           await waitForMergeablePullRequest(pullNumber);
 
+          const { isMergeQueueEnabled: requiresMergeQueue } = await getMergeQueueState(pullNumber);
+
           const { mergeOutputs } = await waitFor({
-            run: () => mergePullRequest(pullNumber),
+            run: () => mergePullRequest(pullNumber, requiresMergeQueue),
             isComplete: ({ mergeExitCode }) => mergeExitCode === 0,
             shouldRetry: ({ mergeOutputs }) => mergeOutputs.includes(requiredWorkflowsError),
             onAttempt: ({ mergeExitCode, mergeOutputs }) => {
@@ -235,4 +257,22 @@ runs:
             getTimeoutMessage: () => `Failed to merge pull request after ${maxAttempts} attempts`,
           });
 
+          if (requiresMergeQueue) {
+            const queueState = await waitFor({
+              run: () => getMergeQueueState(pullNumber),
+              isComplete: pullRequest => Boolean(
+                pullRequest.merged || pullRequest.autoMergeRequest || pullRequest.mergeQueueEntry,
+              ),
+              getRetryMessage: (_pullRequest, retryDelayMs) => `Waiting for GitHub to confirm the merge request, retrying in ${retryDelayMs}ms...`,
+              getTimeoutMessage: () => `GitHub did not confirm auto-merge or queue entry for pull request #${pullNumber}`,
+            });
+
+            if (!queueState.merged) {
+              core.setOutput('merge-pending', 'true');
+              core.notice(`Pull request #${pullNumber} is waiting for required reviews, checks, or the merge queue.`);
+              return;
+            }
+          }
+
           await verifyMergedPullRequest(pullNumber, mergeOutputs);
+          core.setOutput('merge-pending', 'false');

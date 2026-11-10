@@ -31,6 +31,7 @@
 
 Action to create and merge Pull Request.
 Opinionated, set GitHub Actions bot as author, then merge with the configured strategy.
+When the base branch requires a merge queue, request auto-merge and let GitHub enforce reviews and checks.
 
 For this action to work you must explicitly allow GitHub Actions to create pull requests.
 See <https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository>.
@@ -89,6 +90,7 @@ See <https://docs.github.com/en/repositories/managing-your-repositorys-settings-
 | **`commit-message`** | The commit message for the pull request and, for merge/squash merges, the merged commit body               | **true**     | -                     |
 | **`merge-method`**   | Merge strategy for the created pull request.                                                               | **false**    | `rebase`              |
 |                      | Valid values: `merge`, `rebase`, `squash`.                                                                 |              |                       |
+|                      | For branches requiring a merge queue, the queue's configured strategy takes precedence.                    |              |                       |
 
 <!-- inputs:end -->
 
@@ -103,10 +105,11 @@ See <https://docs.github.com/en/repositories/managing-your-repositorys-settings-
 
 ## Outputs
 
-| **Output**       | **Description**                                             |
-| ---------------- | ----------------------------------------------------------- |
-| **`merged-ref`** | The fully qualified ref updated by the merge.               |
-| **`merged-sha`** | The commit SHA at the merged ref after the merge completes. |
+| **Output**          | **Description**                                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **`merged-ref`**    | The fully qualified ref updated by the merge. Empty while the merge is pending.                                                 |
+| **`merged-sha`**    | The commit SHA at the merged ref after the merge completes. Empty while the merge is pending.                                   |
+| **`merge-pending`** | Whether GitHub is waiting for required reviews, checks, or the merge queue. Do not publish unmerged changes while this is true. |
 
 <!-- outputs:end -->
 
