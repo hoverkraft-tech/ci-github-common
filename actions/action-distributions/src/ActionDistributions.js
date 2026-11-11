@@ -6,6 +6,7 @@ import path from "node:path";
 
 import { DistributionCommit } from "./DistributionCommit.js";
 import { DistributionOptions } from "./DistributionOptions.js";
+import { DistributionOutputs } from "./DistributionOutputs.js";
 import { DistributionPackages } from "./DistributionPackages.js";
 import { DistributionWorkflow } from "./DistributionWorkflow.js";
 
@@ -24,6 +25,7 @@ class ActionDistributions {
 		this.context = context;
 		this.core = core;
 		this.repo = context.repo;
+		this.outputs = new DistributionOutputs(github, this.repo, this.options);
 		this.fullName = `${this.repo.owner}/${this.repo.repo}`;
 	}
 
@@ -62,6 +64,7 @@ class ActionDistributions {
 		);
 		// The writer's allowlist is always derived from the trusted base, never PR manifests.
 		const packages = await this.packages(pr.base.sha);
+		await this.outputs.resolve(pr.base.sha, packages);
 		const files = await this.github.paginate(this.github.rest.pulls.listFiles, {
 			...this.repo,
 			pull_number: pr.number,
@@ -73,7 +76,7 @@ class ActionDistributions {
 					(name) =>
 						typeof name === "string" &&
 						(directory === "." || name.startsWith(`${directory}/`)) &&
-						!this.options.containsOutput(directory, name),
+						!this.outputs.contains(directory, name),
 				),
 			),
 		);
@@ -142,7 +145,7 @@ class ActionDistributions {
 				cwd,
 				stdio: "inherit",
 			});
-			for (const outputPath of this.options.outputPaths(directory))
+			for (const outputPath of this.outputs.paths(directory))
 				this.collect(workspace, outputPath, files);
 		}
 		const payload = JSON.stringify(files);
@@ -267,7 +270,7 @@ class ActionDistributions {
 			);
 			assert(
 				packages.some((directory) =>
-					this.options.containsOutput(directory, file.path),
+					this.outputs.contains(directory, file.path),
 				),
 				"File outside allowed distributions",
 			);
@@ -284,7 +287,7 @@ class ActionDistributions {
 			names.add(file.path);
 		}
 		for (const output of packages.flatMap((directory) =>
-			this.options.outputPaths(directory),
+			this.outputs.paths(directory),
 		)) {
 			const prefix = `${output}/`;
 			assert(
@@ -310,7 +313,7 @@ class ActionDistributions {
 		for (const entry of tree.tree) {
 			if (
 				!source.packages.some((directory) =>
-					this.options.containsOutput(directory, entry.path),
+					this.outputs.contains(directory, entry.path),
 				)
 			)
 				continue;

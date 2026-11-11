@@ -69,21 +69,26 @@ test("discovers a standalone root action", async () => {
 	);
 });
 
-test("excludes manifests inside explicitly configured workspace outputs", async () => {
-	// Arrange
-	const { packages } = fixture(
-		{
-			".": bundled,
-			"actions/a/dist": bundled,
-			"actions/b/dist/nested": bundled,
-		},
-		{ outputDirectory: "actions/a/dist\nactions/b/dist" },
-	);
-	// Act
-	const directories = await packages.discover("revision");
-	// Assert
-	assert.deepEqual(directories, ["."]);
-});
+for (const outputDirectory of [
+	"actions/a/dist\nactions/b/dist",
+	"actions/**/dist",
+]) {
+	test(`excludes generated package manifests selected by ${outputDirectory}`, async () => {
+		// Arrange
+		const { packages } = fixture(
+			{
+				".": bundled,
+				"actions/a/dist": bundled,
+				"actions/b/dist/nested": bundled,
+			},
+			{ outputDirectory },
+		);
+		// Act
+		const directories = await packages.discover("revision");
+		// Assert
+		assert.deepEqual(directories, ["."]);
+	});
+}
 
 test("glob overrides select custom directories without duplicate matches", async () => {
 	const { packages } = fixture(

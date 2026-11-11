@@ -55,18 +55,10 @@ class DistributionOptions {
 		}
 		assert(
 			this.outputDirectories.length > 0 &&
-				this.outputDirectories.every((entry) => this.safePath(entry)),
+				this.outputDirectories.every((entry) => this.safePattern(entry)),
 			"Invalid output directory",
 		);
-		assert(
-			new Set(this.outputDirectories).size === this.outputDirectories.length &&
-				!this.outputDirectories.some((directory) =>
-					this.outputDirectories.some((other) =>
-						directory.startsWith(`${other}/`),
-					),
-				),
-			"Duplicate or overlapping output directories",
-		);
+		this.validateOutputDirectories(this.outputDirectories);
 		assert(
 			["true", "false"].includes(this.ignoreScripts),
 			"Invalid ignore-scripts value",
@@ -184,15 +176,13 @@ class DistributionOptions {
 		);
 	}
 
-	outputPaths(directory) {
-		return this.outputDirectories.map((output) =>
-			directory === "." ? output : `${directory}/${output}`,
-		);
-	}
-
-	containsOutput(directory, filename) {
-		return this.outputPaths(directory).some((output) =>
-			filename.startsWith(`${output}/`),
+	validateOutputDirectories(directories) {
+		assert(
+			new Set(directories).size === directories.length &&
+				!directories.some((directory) =>
+					directories.some((other) => directory.startsWith(`${other}/`)),
+				),
+			"Duplicate or overlapping output directories",
 		);
 	}
 

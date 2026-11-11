@@ -37,10 +37,8 @@ class DistributionPackages {
 			if (
 				this.options.outputDirectories.some(
 					(output) =>
-						directory === output ||
-						directory.startsWith(`${output}/`) ||
-						directory.includes(`/${output}/`) ||
-						directory.endsWith(`/${output}`),
+						path.matchesGlob(directory, `**/${output}`) ||
+						path.matchesGlob(directory, `**/${output}/**`),
 				)
 			)
 				continue;

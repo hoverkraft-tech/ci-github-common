@@ -123,9 +123,15 @@ For a pnpm workspace, select `working-directories: .`
 and the workspace's bundling script with `build-script`. Commit the root
 `packageManager` pin and `pnpm-lock.yaml`. Installation uses the frozen lockfile;
 `ignore-scripts: false` permits lifecycle hooks subject to pnpm's build approvals.
-List each bundle directory literally in the newline-separated `output-directory`
-input. The writer accepts only those directories and requires `required-files`
-in every directory. Keep both event callers' output lists and size limits equal.
+Set `output-directory: actions/**/dist` for bundles below `actions/`, or use
+newline-separated literal directories and patterns (`*`, `**`, `?`). Patterns are
+relative to each selected package. Both jobs resolve them against committed
+directories in the trusted PR base revision; PR-created paths cannot expand the
+writer's scope. New directories become eligible after merging to the default branch.
+Hidden and `node_modules` directories are excluded. Every pattern must match a
+directory; duplicate or overlapping resolved paths fail. The writer requires
+`required-files` in every resolved directory. Keep both event callers' patterns
+and size limits equal.
 
 The default serialized artifact limit is 20 MiB. `max-artifact-size` can raise it
 to 128 MiB for workspaces, with at most 1,000 files and 50 MiB per file. Large
