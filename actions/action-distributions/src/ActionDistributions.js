@@ -117,7 +117,13 @@ class ActionDistributions {
 
 	async prepareBuild() {
 		const source = await this.buildSource();
-		if (source) this.core.setOutput("head-sha", source.pr.head.sha);
+		if (source) {
+			this.core.setOutput("head-sha", source.pr.head.sha);
+			this.core.setOutput(
+				"working-directories",
+				JSON.stringify(source.packages),
+			);
+		}
 	}
 
 	async build({ workspace, output, execute = execFileSync }) {
@@ -127,16 +133,12 @@ class ActionDistributions {
 		const files = [];
 		for (const directory of packages) {
 			const cwd = path.join(workspace, directory);
-			const install =
-				this.options.packageManager === "pnpm"
-					? ["install", "--frozen-lockfile"]
-					: ["ci", "--no-audit", "--no-fund"];
-			install.push(`--ignore-scripts=${this.options.ignoreScripts}`);
-			execute(this.options.packageManager, install, {
-				cwd,
-				stdio: "inherit",
-			});
-			execute(this.options.packageManager, ["run", this.options.buildScript], {
+			const [installer, ...installArgs] = this.options.installCommand;
+			if (this.options.ignoreScripts === "true")
+				installArgs.push("--ignore-scripts");
+			execute(installer, installArgs, { cwd, stdio: "inherit" });
+			const [runner, ...runArgs] = this.options.runScriptCommand;
+			execute(runner, [...runArgs, this.options.buildScript], {
 				cwd,
 				stdio: "inherit",
 			});

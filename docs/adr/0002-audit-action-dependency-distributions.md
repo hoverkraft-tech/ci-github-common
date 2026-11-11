@@ -148,8 +148,13 @@ above for explicitly configured consumers; their defaults remain unchanged.
 
 Use explicit newline-separated literal output directories relative to the build
 root, not broad output globs or PR-provided manifests. The same trusted writer
-inputs limit additions and deletions. A root build runs once with a frozen pnpm
-lockfile. An opt-in enables lifecycle hooks only in the read-only builder; pnpm
+inputs limit additions and deletions. Package-manager detection, version setup and command selection belong to
+`ci-github-nodejs`; the distribution helper executes its detected commands for
+each affected package. This replaces the initial workspace implementation's
+custom manager selector and direct pnpm bootstrap. The shared setup configures
+tooling without installing, because this workflow owns the per-package loop.
+Apply the workflow's explicit Node version afterward; setup-node 3.0.0 has no
+version override input. A root build runs once with a frozen pnpm lockfile. An opt-in enables lifecycle hooks only in the read-only builder; pnpm
 retains its allowBuilds policy. No installation or package-manager bootstrap runs
 in the writer.
 

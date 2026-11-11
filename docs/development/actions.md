@@ -112,7 +112,14 @@ isolated execution, missing runtime dependencies, failure propagation and cleanu
 Allowed dependency updates regenerate bundles in the same PR through the shared
 distribution workflow. Human source changes must include their rebuilt bundles.
 
-For a pnpm workspace, select `working-directories: .`, `package-manager: pnpm`
+The rebuild workflow uses `ci-github-nodejs/actions/setup-node` for tooling and
+`get-package-manager` for locked installation and script commands. It configures
+the first affected package, then installs and builds each affected directory
+with those commands. Selected packages must use the same package manager. The
+explicit `node-version` is applied after shared setup so package version files
+do not override the requested build runtime.
+
+For a pnpm workspace, select `working-directories: .`
 and the workspace's bundling script with `build-script`. Commit the root
 `packageManager` pin and `pnpm-lock.yaml`. Installation uses the frozen lockfile;
 `ignore-scripts: false` permits lifecycle hooks subject to pnpm's build approvals.
