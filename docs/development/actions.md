@@ -112,6 +112,26 @@ isolated execution, missing runtime dependencies, failure propagation and cleanu
 Allowed dependency updates regenerate bundles in the same PR through the shared
 distribution workflow. Human source changes must include their rebuilt bundles.
 
+For a pnpm workspace, select `working-directories: .`, `package-manager: pnpm`
+and the workspace's bundling script with `build-script`. Commit the root
+`packageManager` pin and `pnpm-lock.yaml`. Installation uses the frozen lockfile;
+`ignore-scripts: false` permits lifecycle hooks subject to pnpm's build approvals.
+List each bundle directory literally in the newline-separated `output-directory`
+input. The writer accepts only those directories and requires `required-files`
+in every directory. Keep both event callers' output lists and size limits equal.
+
+The default serialized artifact limit is 20 MiB. `max-artifact-size` can raise it
+to 128 MiB for workspaces, with at most 1,000 files and 50 MiB per file. Large
+changes upload blobs separately, preserve the parent tree and create one commit.
+The final ref update compares the expected head and never forces or retries a
+conflict. Unlike small changes, this Git Data API path does not automatically
+sign commits; check repository signing rules before enabling it. The trusted
+writer still never installs dependencies or executes repository code.
+
+The npm-oriented `test-action-distributions` workflow requires one package-owned
+bundle and a `test:distribution` contract. Workspace consumers of the rebuild
+workflow retain their own `check:dist` and action integration checks.
+
 ## Generated documentation
 
 Edit each action's `action.yml` description, leading documentation comments and

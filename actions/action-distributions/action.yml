@@ -22,7 +22,7 @@ inputs:
     description: Newline-separated package directories or glob patterns (`*`, `**`, `?`). Empty discovers root and `actions/**` packages declaring build and check:dist scripts.
     default: ""
   output-directory:
-    description: Generated directory relative to each package. Only files inside it may be committed.
+    description: Newline-separated generated directories relative to each package. Only files inside these literal, non-overlapping directories may be committed.
     default: dist
   required-files:
     description: Newline-separated files required in every generated directory. Empty accepts any nonempty output.
@@ -36,8 +36,17 @@ inputs:
     description: Artifact name prefix. The run attempt is appended automatically. Use the same value for build and commit.
     default: action-distributions
   build-script:
-    description: npm script name to run after npm ci with dependency lifecycle scripts disabled.
+    description: Package script name to run after a locked dependency installation.
     default: build
+  package-manager:
+    description: Package manager for the locked installation and build (npm or pnpm). pnpm must already be installed.
+    default: npm
+  ignore-scripts:
+    description: Disable install lifecycle scripts. Set false only in the read-only builder when the package requires approved hooks.
+    default: "true"
+  max-artifact-size:
+    description: Maximum serialized artifact size in MiB (integer from 1 to 128). Use the same limit for build and writer.
+    default: "20"
   commit-message:
     description: Single-line commit headline. Per-author suffixes and a loop-prevention body trailer are appended.
     default: "build: regenerate action distributions"
@@ -81,6 +90,9 @@ runs:
         REQUIRED_FILES: ${{ inputs.required-files }}
         PULL_REQUEST_AUTHORS: ${{ inputs.pull-request-authors }}
         ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        PACKAGE_MANAGER: ${{ inputs.package-manager }}
+        IGNORE_SCRIPTS: ${{ inputs.ignore-scripts }}
+        MAX_ARTIFACT_SIZE: ${{ inputs.max-artifact-size }}
         BUILD_SCRIPT: ${{ inputs.build-script }}
         COMMIT_MESSAGE: ${{ inputs.commit-message }}
       with:
