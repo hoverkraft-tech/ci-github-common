@@ -38,9 +38,12 @@ inputs:
   build-script:
     description: Package script name to run after a locked dependency installation.
     default: build
-  package-manager:
-    description: Package manager for the locked installation and build (npm or pnpm). pnpm must already be installed.
-    default: npm
+  install-command:
+    description: Locked install command from ci-github-nodejs/get-package-manager. The executable must already be installed; arguments are passed without a shell.
+    default: npm ci --no-audit --no-fund
+  run-script-command:
+    description: Script command from ci-github-nodejs/get-package-manager, used for every selected package without a shell.
+    default: npm run
   ignore-scripts:
     description: Disable install lifecycle scripts. Set false only in the read-only builder when the package requires approved hooks.
     default: "true"
@@ -62,7 +65,7 @@ inputs:
 
 outputs:
   working-directories:
-    description: JSON array of package directories selected by discover at the current workflow revision.
+    description: JSON array of package directories selected by discover or affected packages selected by prepare-build for an eligible PR.
     value: ${{ steps.distributions.outputs.working-directories }}
   head-sha:
     description: Eligible current PR head selected by prepare-build; empty when skipped.
@@ -90,7 +93,8 @@ runs:
         REQUIRED_FILES: ${{ inputs.required-files }}
         PULL_REQUEST_AUTHORS: ${{ inputs.pull-request-authors }}
         ARTIFACT_NAME: ${{ inputs.artifact-name }}
-        PACKAGE_MANAGER: ${{ inputs.package-manager }}
+        INSTALL_COMMAND: ${{ inputs.install-command }}
+        RUN_SCRIPT_COMMAND: ${{ inputs.run-script-command }}
         IGNORE_SCRIPTS: ${{ inputs.ignore-scripts }}
         MAX_ARTIFACT_SIZE: ${{ inputs.max-artifact-size }}
         BUILD_SCRIPT: ${{ inputs.build-script }}

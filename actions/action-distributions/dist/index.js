@@ -8740,7 +8740,10 @@ class DistributionOptions {
 	constructor(options = {}) {
 		this.directories = this.lines(options.workingDirectories ?? "");
 		this.outputDirectories = this.lines(options.outputDirectory ?? "dist");
-		this.packageManager = options.packageManager ?? "npm";
+		this.installCommand = this.command(
+			options.installCommand ?? "npm ci --no-audit --no-fund",
+		);
+		this.runScriptCommand = this.command(options.runScriptCommand ?? "npm run");
 		this.ignoreScripts = options.ignoreScripts ?? "true";
 		this.maxBytes = Number(options.maxArtifactSize ?? 20) * 1024 * 1024;
 		this.requiredFiles = this.lines(
@@ -8787,10 +8790,6 @@ class DistributionOptions {
 			"Duplicate or overlapping output directories",
 		);
 		strict_namespaceObject(
-			["npm", "pnpm"].includes(this.packageManager),
-			"Unsupported package manager",
-		);
-		strict_namespaceObject(
 			["true", "false"].includes(this.ignoreScripts),
 			"Invalid ignore-scripts value",
 		);
@@ -8818,6 +8817,19 @@ class DistributionOptions {
 				!/[\r\n]/.test(this.commitMessage),
 			"Expected a single-line commit headline",
 		);
+	}
+
+	command(value) {
+		strict_namespaceObject(
+			typeof value === "string" && value.trim(),
+			"Expected a package command",
+		);
+		const parts = value.trim().split(/\s+/);
+		strict_namespaceObject(
+			parts.every((part) => /^[a-zA-Z0-9_./=:-]+$/.test(part)),
+			"Expected command arguments without shell syntax",
+		);
+		return parts;
 	}
 
 	lines(value) {
@@ -8920,7 +8932,8 @@ class DistributionOptions {
 		return {
 			workingDirectories: process.env.WORKING_DIRECTORIES,
 			outputDirectory: process.env.OUTPUT_DIRECTORY,
-			packageManager: process.env.PACKAGE_MANAGER,
+			installCommand: process.env.INSTALL_COMMAND,
+			runScriptCommand: process.env.RUN_SCRIPT_COMMAND,
 			ignoreScripts: process.env.IGNORE_SCRIPTS,
 			maxArtifactSize: process.env.MAX_ARTIFACT_SIZE,
 			requiredFiles: process.env.REQUIRED_FILES,
@@ -9239,7 +9252,13 @@ class ActionDistributions {
 
 	async prepareBuild() {
 		const source = await this.buildSource();
-		if (source) this.core.setOutput("head-sha", source.pr.head.sha);
+		if (source) {
+			this.core.setOutput("head-sha", source.pr.head.sha);
+			this.core.setOutput(
+				"working-directories",
+				JSON.stringify(source.packages),
+			);
+		}
 	}
 
 	async build({ workspace, output, execute = external_node_child_process_namespaceObject.execFileSync }) {
@@ -9249,16 +9268,12 @@ class ActionDistributions {
 		const files = [];
 		for (const directory of packages) {
 			const cwd = external_node_path_namespaceObject.join(workspace, directory);
-			const install =
-				this.options.packageManager === "pnpm"
-					? ["install", "--frozen-lockfile"]
-					: ["ci", "--no-audit", "--no-fund"];
-			install.push(`--ignore-scripts=${this.options.ignoreScripts}`);
-			execute(this.options.packageManager, install, {
-				cwd,
-				stdio: "inherit",
-			});
-			execute(this.options.packageManager, ["run", this.options.buildScript], {
+			const [installer, ...installArgs] = this.options.installCommand;
+			if (this.options.ignoreScripts === "true")
+				installArgs.push("--ignore-scripts");
+			execute(installer, installArgs, { cwd, stdio: "inherit" });
+			const [runner, ...runArgs] = this.options.runScriptCommand;
+			execute(runner, [...runArgs, this.options.buildScript], {
 				cwd,
 				stdio: "inherit",
 			});

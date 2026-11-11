@@ -18,7 +18,10 @@ class DistributionOptions {
 	constructor(options = {}) {
 		this.directories = this.lines(options.workingDirectories ?? "");
 		this.outputDirectories = this.lines(options.outputDirectory ?? "dist");
-		this.packageManager = options.packageManager ?? "npm";
+		this.installCommand = this.command(
+			options.installCommand ?? "npm ci --no-audit --no-fund",
+		);
+		this.runScriptCommand = this.command(options.runScriptCommand ?? "npm run");
 		this.ignoreScripts = options.ignoreScripts ?? "true";
 		this.maxBytes = Number(options.maxArtifactSize ?? 20) * 1024 * 1024;
 		this.requiredFiles = this.lines(
@@ -65,10 +68,6 @@ class DistributionOptions {
 			"Duplicate or overlapping output directories",
 		);
 		assert(
-			["npm", "pnpm"].includes(this.packageManager),
-			"Unsupported package manager",
-		);
-		assert(
 			["true", "false"].includes(this.ignoreScripts),
 			"Invalid ignore-scripts value",
 		);
@@ -96,6 +95,19 @@ class DistributionOptions {
 				!/[\r\n]/.test(this.commitMessage),
 			"Expected a single-line commit headline",
 		);
+	}
+
+	command(value) {
+		assert(
+			typeof value === "string" && value.trim(),
+			"Expected a package command",
+		);
+		const parts = value.trim().split(/\s+/);
+		assert(
+			parts.every((part) => /^[a-zA-Z0-9_./=:-]+$/.test(part)),
+			"Expected command arguments without shell syntax",
+		);
+		return parts;
 	}
 
 	lines(value) {
@@ -198,7 +210,8 @@ class DistributionOptions {
 		return {
 			workingDirectories: process.env.WORKING_DIRECTORIES,
 			outputDirectory: process.env.OUTPUT_DIRECTORY,
-			packageManager: process.env.PACKAGE_MANAGER,
+			installCommand: process.env.INSTALL_COMMAND,
+			runScriptCommand: process.env.RUN_SCRIPT_COMMAND,
 			ignoreScripts: process.env.IGNORE_SCRIPTS,
 			maxArtifactSize: process.env.MAX_ARTIFACT_SIZE,
 			requiredFiles: process.env.REQUIRED_FILES,
