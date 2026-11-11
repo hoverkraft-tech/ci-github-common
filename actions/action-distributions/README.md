@@ -39,7 +39,7 @@ default-branch workflow_run job and never execute or check out PR code.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/action-distributions@ce885f8dd6bf7191a79e3eebdf37bca805d40932 # 3.0.0
+- uses: hoverkraft-tech/ci-github-common/actions/action-distributions@66882b24f9f13e45a6541896a5a7c638cb91c94c # 4.0.0
   with:
     # Operation to execute (discover, prepare-build, build, prepare-commit or commit).
     # This input is required.
@@ -48,7 +48,7 @@ default-branch workflow_run job and never execute or check out PR code.
     # Newline-separated package directories or glob patterns (`*`, `**`, `?`). Empty discovers root and `actions/**` packages declaring build and check:dist scripts.
     working-directories: ""
 
-    # Generated directory relative to each package. Only files inside it may be committed.
+    # Newline-separated generated directories relative to each package. Only files inside these literal, non-overlapping directories may be committed.
     # Default: `dist`
     output-directory: dist
 
@@ -68,9 +68,25 @@ default-branch workflow_run job and never execute or check out PR code.
     # Default: `action-distributions`
     artifact-name: action-distributions
 
-    # npm script name to run after npm ci with dependency lifecycle scripts disabled.
+    # Package script name to run after a locked dependency installation.
     # Default: `build`
     build-script: build
+
+    # Locked install command from ci-github-nodejs/get-package-manager. The executable must already be installed; arguments are passed without a shell.
+    # Default: `npm ci --no-audit --no-fund`
+    install-command: npm ci --no-audit --no-fund
+
+    # Script command from ci-github-nodejs/get-package-manager, used for every selected package without a shell.
+    # Default: `npm run`
+    run-script-command: npm run
+
+    # Disable install lifecycle scripts. Set false only in the read-only builder when the package requires approved hooks.
+    # Default: `true`
+    ignore-scripts: "true"
+
+    # Maximum serialized artifact size in MiB (integer from 1 to 128). Use the same limit for build and writer.
+    # Default: `20`
+    max-artifact-size: "20"
 
     # Single-line commit headline. Per-author suffixes and a loop-prevention body trailer are appended.
     # Default: `build: regenerate action distributions`
@@ -98,11 +114,15 @@ default-branch workflow_run job and never execute or check out PR code.
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------- |
 | **`operation`**            | Operation to execute (discover, prepare-build, build, prepare-commit or commit).                                                                                | **true**     | -                                                                                                 |
 | **`working-directories`**  | Newline-separated package directories or glob patterns (`*`, `**`, `?`). Empty discovers root and `actions/**` packages declaring build and check:dist scripts. | **false**    | -                                                                                                 |
-| **`output-directory`**     | Generated directory relative to each package. Only files inside it may be committed.                                                                            | **false**    | `dist`                                                                                            |
+| **`output-directory`**     | Newline-separated generated directories relative to each package. Only files inside these literal, non-overlapping directories may be committed.                | **false**    | `dist`                                                                                            |
 | **`required-files`**       | Newline-separated files required in every generated directory. Empty accepts any nonempty output.                                                               | **false**    | <!-- textlint-disable --><pre lang="text">index.js&#13;licenses.txt</pre><!-- textlint-enable --> |
 | **`pull-request-authors`** | JSON array of dependabot or renovate presets, or objects with login, numeric account ID and optional branch-prefix and commit-message-suffix.                   | **false**    | `["dependabot","renovate"]`                                                                       |
 | **`artifact-name`**        | Artifact name prefix. The run attempt is appended automatically. Use the same value for build and commit.                                                       | **false**    | `action-distributions`                                                                            |
-| **`build-script`**         | npm script name to run after npm ci with dependency lifecycle scripts disabled.                                                                                 | **false**    | `build`                                                                                           |
+| **`build-script`**         | Package script name to run after a locked dependency installation.                                                                                              | **false**    | `build`                                                                                           |
+| **`install-command`**      | Locked install command from ci-github-nodejs/get-package-manager. The executable must already be installed; arguments are passed without a shell.               | **false**    | `npm ci --no-audit --no-fund`                                                                     |
+| **`run-script-command`**   | Script command from ci-github-nodejs/get-package-manager, used for every selected package without a shell.                                                      | **false**    | `npm run`                                                                                         |
+| **`ignore-scripts`**       | Disable install lifecycle scripts. Set false only in the read-only builder when the package requires approved hooks.                                            | **false**    | `true`                                                                                            |
+| **`max-artifact-size`**    | Maximum serialized artifact size in MiB (integer from 1 to 128). Use the same limit for build and writer.                                                       | **false**    | `20`                                                                                              |
 | **`commit-message`**       | Single-line commit headline. Per-author suffixes and a loop-prevention body trailer are appended.                                                               | **false**    | `build: regenerate action distributions`                                                          |
 | **`workspace`**            | Absolute path of the exact PR head checkout, required for build.                                                                                                | **false**    | `${{ github.workspace }}`                                                                         |
 | **`artifact-path`**        | Absolute JSON artifact path to write for build or read for commit.                                                                                              | **false**    | `${{ runner.temp }}/action-distributions/distributions.json`                                      |
@@ -115,12 +135,12 @@ default-branch workflow_run job and never execute or check out PR code.
 
 ## Outputs
 
-| **Output**                | **Description**                                                                          |
-| ------------------------- | ---------------------------------------------------------------------------------------- |
-| **`working-directories`** | JSON array of package directories selected by discover at the current workflow revision. |
-| **`head-sha`**            | Eligible current PR head selected by prepare-build; empty when skipped.                  |
-| **`built`**               | Whether build produced a validated distribution artifact.                                |
-| **`artifact-id`**         | Validated artifact selected by prepare-commit; empty when skipped.                       |
+| **Output**                | **Description**                                                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **`working-directories`** | JSON array of package directories selected by discover or affected packages selected by prepare-build for an eligible PR. |
+| **`head-sha`**            | Eligible current PR head selected by prepare-build; empty when skipped.                                                   |
+| **`built`**               | Whether build produced a validated distribution artifact.                                                                 |
+| **`artifact-id`**         | Validated artifact selected by prepare-commit; empty when skipped.                                                        |
 
 <!-- outputs:end -->
 <!-- examples:start -->
