@@ -6,10 +6,13 @@
 #
 # ### Configure a repository
 #
-# 1. Each package needs a lockfile and npm build and check:dist scripts. Defaults use Node.js 24,
-#    `npm run build`, and `dist/index.js` plus `dist/licenses.txt`. Dependency
-#    installation uses `npm ci --ignore-scripts`; packages requiring install
-#    lifecycle scripts are outside this contract.
+# 1. Each package needs a lockfile and build and check:dist scripts. Defaults use Node.js 24,
+#    `npm ci --ignore-scripts`, `npm run build`, and `dist/index.js` plus `dist/licenses.txt`.
+#    For pnpm workspaces, select the root working directory, set package-manager to pnpm,
+#    commit pnpm-lock.yaml and pin packageManager in the root package.json. Installation
+#    uses `pnpm install --frozen-lockfile`. Set ignore-scripts to false when approved
+#    hooks are required; pnpm's allowBuilds policy still applies. Only the read-only
+#    builder installs dependencies or executes repository scripts.
 # 2. Copy the [build caller](https://github.com/hoverkraft-tech/ci-github-common/blob/main/.github/workflows/__rebuild-action-distributions.yml) and
 #    [writer caller](https://github.com/hoverkraft-tech/ci-github-common/blob/main/.github/workflows/__commit-action-distributions.yml). Both call
 #    `hoverkraft-tech/ci-github-common/.github/workflows/action-distributions.yml`
@@ -29,9 +32,12 @@
 #
 # The generated Usage block lists inputs. Actual execution requires both events in
 # the linked callers; a push-only caller does not run either job. To customize the
-# build, set `build-script` to an npm script name and choose `node-version`. Override
+# build, set `build-script` to a package script name and choose `node-version`. Override
 # `output-directory`, `required-files`, `artifact-name`, `retention-days` or
-# `commit-message` when needed.
+# `commit-message` when needed. A workspace build can emit several bundles: supply
+# newline-separated literal output-directory paths relative to the workspace root.
+# Required files must exist in every output directory; glob output paths are rejected.
+# Keep these paths and the max-artifact-size limit identical in both callers.
 #
 # By default, discover root and `actions/**` packages declaring the selected build
 # script and check:dist. Override working-directories with newline-separated
@@ -117,9 +123,13 @@
 #   failed atomic write never replaces newer commits.
 # - Token creation or commit failures require checking the App installation,
 #   permissions, repository rules and Actions secret. No PAT fallback is used.
-# - Keep generated output below 20 MiB of JSON and 1,000 regular files. Symbolic
-#   links, executable distribution files and truncated GitHub tree/file listings
-#   are rejected. Large/native distributions need a separate reviewed design.
+# - Artifacts default to a 20 MiB JSON limit; max-artifact-size can raise it to 128 MiB.
+#   Keep output below 1,000 regular files and each file below 50 MiB. Symbolic links,
+#   executable distribution files and truncated GitHub tree/file listings are rejected.
+# - Changes above 20 MiB use individual Git blob uploads and one Git commit, followed
+#   by a non-forced atomic update guarded by the expected head. Unlike the small-change
+#   commit API, this path does not automatically sign the commit. Repositories requiring
+#   signed bot commits must account for this before enabling large artifacts.
 #
 # See [ADR 0002](../../docs/adr/0002-audit-action-dependency-distributions.md) for the design,
 # alternatives and rollout constraints.
@@ -133,7 +143,7 @@ on:
         type: string
         default: ""
       output-directory:
-        description: Generated directory relative to each package. Only files inside it may be committed.
+        description: Newline-separated generated directories relative to each package. Only files inside these literal, non-overlapping directories may be committed.
         type: string
         default: dist
       required-files:
@@ -151,13 +161,25 @@ on:
         type: string
         default: action-distributions
       node-version:
-        description: Node.js version used for npm install and the build script.
+        description: Node.js version used for dependency installation and the build script.
         type: string
         default: "24"
       build-script:
-        description: npm script name to run after npm ci with dependency lifecycle scripts disabled.
+        description: Package script name to run after a locked dependency installation.
         type: string
         default: build
+      package-manager:
+        description: Package manager for installation and build (npm or pnpm). pnpm requires an exact packageManager version in the repository root package.json.
+        type: string
+        default: npm
+      ignore-scripts:
+        description: Disable install lifecycle scripts. Set false only when the read-only builder needs approved hooks.
+        type: boolean
+        default: true
+      max-artifact-size:
+        description: Maximum serialized artifact size in MiB (integer from 1 to 128). Use the same limit for build and writer.
+        type: number
+        default: 20
       retention-days:
         description: Artifact retention in days, within the repository's artifact policy.
         type: number
@@ -199,6 +221,7 @@ jobs:
           build-script: ${{ inputs.build-script }}
           working-directories: ${{ inputs.working-directories }}
           output-directory: ${{ inputs.output-directory }}
+          max-artifact-size: ${{ inputs.max-artifact-size }}
           required-files: ${{ inputs.required-files }}
           pull-request-authors: ${{ inputs.pull-request-authors }}
           artifact-name: ${{ inputs.artifact-name }}
@@ -214,6 +237,12 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           package-manager-cache: false
+      - name: Install the repository's pinned pnpm
+        if: steps.prepare.outputs.head-sha && inputs.package-manager == 'pnpm'
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: source/package.json
+          run_install: false
       - name: Rebuild affected distributions
         if: steps.prepare.outputs.head-sha
         id: build
@@ -222,10 +251,13 @@ jobs:
           operation: build
           working-directories: ${{ inputs.working-directories }}
           output-directory: ${{ inputs.output-directory }}
+          max-artifact-size: ${{ inputs.max-artifact-size }}
           required-files: ${{ inputs.required-files }}
           pull-request-authors: ${{ inputs.pull-request-authors }}
           artifact-name: ${{ inputs.artifact-name }}
           build-script: ${{ inputs.build-script }}
+          package-manager: ${{ inputs.package-manager }}
+          ignore-scripts: ${{ inputs.ignore-scripts }}
           workspace: ${{ github.workspace }}/source
       - name: Upload generated bytes
         if: steps.build.outputs.built == 'true'
@@ -260,6 +292,7 @@ jobs:
           build-script: ${{ inputs.build-script }}
           working-directories: ${{ inputs.working-directories }}
           output-directory: ${{ inputs.output-directory }}
+          max-artifact-size: ${{ inputs.max-artifact-size }}
           required-files: ${{ inputs.required-files }}
           pull-request-authors: ${{ inputs.pull-request-authors }}
           artifact-name: ${{ inputs.artifact-name }}
@@ -290,6 +323,7 @@ jobs:
           build-script: ${{ inputs.build-script }}
           working-directories: ${{ inputs.working-directories }}
           output-directory: ${{ inputs.output-directory }}
+          max-artifact-size: ${{ inputs.max-artifact-size }}
           required-files: ${{ inputs.required-files }}
           pull-request-authors: ${{ inputs.pull-request-authors }}
           artifact-name: ${{ inputs.artifact-name }}

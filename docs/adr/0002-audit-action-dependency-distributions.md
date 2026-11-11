@@ -139,6 +139,35 @@ when another repository calls it. The hosted tests check out the same revision t
 run the action's test package. This targets GitHub.com; self-repository action
 references are unavailable on GitHub Enterprise Server.
 
+## Workspace extension (2026-11-11)
+
+The pnpm workspace consumer builds several action bundles from one root lockfile.
+Its combined output exceeds the original 20 MiB serialized-artifact limit. This
+extension supersedes the npm-only, single-output and disabled-hooks requirements
+above for explicitly configured consumers; their defaults remain unchanged.
+
+Use explicit newline-separated literal output directories relative to the build
+root, not broad output globs or PR-provided manifests. The same trusted writer
+inputs limit additions and deletions. A root build runs once with a frozen pnpm
+lockfile. An opt-in enables lifecycle hooks only in the read-only builder; pnpm
+retains its allowBuilds policy. No installation or package-manager bootstrap runs
+in the writer.
+
+Keep the 20 MiB default and bound opt-in artifacts at 128 MiB, 1,000 files and
+50 MiB per file. Large changes upload individual Git blobs, create a tree based
+on the expected parent's tree and create one child commit. GraphQL updateRefs
+uses beforeOid and force: false for the final compare-and-swap. Failures leave
+the branch unchanged, though uploaded unreachable Git objects can remain. This
+preserves an atomic single-commit update without sending all file contents in
+one GraphQL mutation. The Git Data API path does not provide the automatic
+signature of createCommitOnBranch; consumers must check their signing rules.
+
+Alternatives rejected: raising the JSON limit alone leaves one oversized commit
+request; separate per-bundle commits expose partial rebuilds and trigger excess
+CI; a normal non-forced ref update lacks an exact-head guard for branch rewinds.
+Keep the current commit API for small changes. Keep the consumer's existing
+bundle verification and real action integration tests.
+
 ## Automation alternatives
 
 - Check-only workflows, as in GitHub's TypeScript template, leave manual rebuilding.

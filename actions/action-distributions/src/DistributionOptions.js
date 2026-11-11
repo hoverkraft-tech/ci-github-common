@@ -17,7 +17,10 @@ const AUTHOR_PRESETS = {
 class DistributionOptions {
 	constructor(options = {}) {
 		this.directories = this.lines(options.workingDirectories ?? "");
-		this.outputDirectory = options.outputDirectory ?? "dist";
+		this.outputDirectories = this.lines(options.outputDirectory ?? "dist");
+		this.packageManager = options.packageManager ?? "npm";
+		this.ignoreScripts = options.ignoreScripts ?? "true";
+		this.maxBytes = Number(options.maxArtifactSize ?? 20) * 1024 * 1024;
 		this.requiredFiles = this.lines(
 			options.requiredFiles ?? "index.js\nlicenses.txt",
 		);
@@ -47,7 +50,34 @@ class DistributionOptions {
 				"Overlapping working directories",
 			);
 		}
-		assert(this.safePath(this.outputDirectory), "Invalid output directory");
+		assert(
+			this.outputDirectories.length > 0 &&
+				this.outputDirectories.every((entry) => this.safePath(entry)),
+			"Invalid output directory",
+		);
+		assert(
+			new Set(this.outputDirectories).size === this.outputDirectories.length &&
+				!this.outputDirectories.some((directory) =>
+					this.outputDirectories.some((other) =>
+						directory.startsWith(`${other}/`),
+					),
+				),
+			"Duplicate or overlapping output directories",
+		);
+		assert(
+			["npm", "pnpm"].includes(this.packageManager),
+			"Unsupported package manager",
+		);
+		assert(
+			["true", "false"].includes(this.ignoreScripts),
+			"Invalid ignore-scripts value",
+		);
+		assert(
+			Number.isSafeInteger(this.maxBytes / 1024 / 1024) &&
+				this.maxBytes >= 1024 * 1024 &&
+				this.maxBytes <= 128 * 1024 * 1024,
+			"Artifact size must be an integer between 1 and 128 MiB",
+		);
 		assert(
 			this.requiredFiles.every((file) => this.safePath(file)),
 			"Invalid required file",
@@ -142,10 +172,16 @@ class DistributionOptions {
 		);
 	}
 
-	outputPath(directory) {
-		return directory === "."
-			? this.outputDirectory
-			: `${directory}/${this.outputDirectory}`;
+	outputPaths(directory) {
+		return this.outputDirectories.map((output) =>
+			directory === "." ? output : `${directory}/${output}`,
+		);
+	}
+
+	containsOutput(directory, filename) {
+		return this.outputPaths(directory).some((output) =>
+			filename.startsWith(`${output}/`),
+		);
 	}
 
 	artifact(attempt) {
@@ -162,6 +198,9 @@ class DistributionOptions {
 		return {
 			workingDirectories: process.env.WORKING_DIRECTORIES,
 			outputDirectory: process.env.OUTPUT_DIRECTORY,
+			packageManager: process.env.PACKAGE_MANAGER,
+			ignoreScripts: process.env.IGNORE_SCRIPTS,
+			maxArtifactSize: process.env.MAX_ARTIFACT_SIZE,
 			requiredFiles: process.env.REQUIRED_FILES,
 			pullRequestAuthors: process.env.PULL_REQUEST_AUTHORS,
 			buildScript: process.env.BUILD_SCRIPT,

@@ -4,12 +4,13 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { DistributionCommit } from "./DistributionCommit.js";
 import { DistributionOptions } from "./DistributionOptions.js";
 import { DistributionPackages } from "./DistributionPackages.js";
 import { DistributionWorkflow } from "./DistributionWorkflow.js";
 
 const GENERATED_BY = "Generated-by: ci-github-common/action-distributions";
-const MAX_BYTES = 20 * 1024 * 1024;
+const INLINE_COMMIT_BYTES = 20 * 1024 * 1024;
 
 class ActionDistributions {
 	constructor({
@@ -72,7 +73,7 @@ class ActionDistributions {
 					(name) =>
 						typeof name === "string" &&
 						(directory === "." || name.startsWith(`${directory}/`)) &&
-						!name.startsWith(`${this.options.outputPath(directory)}/`),
+						!this.options.containsOutput(directory, name),
 				),
 			),
 		);
@@ -126,19 +127,25 @@ class ActionDistributions {
 		const files = [];
 		for (const directory of packages) {
 			const cwd = path.join(workspace, directory);
-			execute("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], {
+			const install =
+				this.options.packageManager === "pnpm"
+					? ["install", "--frozen-lockfile"]
+					: ["ci", "--no-audit", "--no-fund"];
+			install.push(`--ignore-scripts=${this.options.ignoreScripts}`);
+			execute(this.options.packageManager, install, {
 				cwd,
 				stdio: "inherit",
 			});
-			execute("npm", ["run", this.options.buildScript], {
+			execute(this.options.packageManager, ["run", this.options.buildScript], {
 				cwd,
 				stdio: "inherit",
 			});
-			this.collect(workspace, this.options.outputPath(directory), files);
+			for (const outputPath of this.options.outputPaths(directory))
+				this.collect(workspace, outputPath, files);
 		}
 		const payload = JSON.stringify(files);
 		assert(
-			Buffer.byteLength(payload) <= MAX_BYTES,
+			Buffer.byteLength(payload) <= this.options.maxBytes,
 			"Distribution artifact exceeds size limit",
 		);
 		fs.mkdirSync(path.dirname(output), { recursive: true });
@@ -157,6 +164,11 @@ class ActionDistributions {
 			return;
 		}
 		assert(stat.isFile(), "Expected a regular distribution file");
+		assert(
+			stat.size <= 50 * 1024 * 1024,
+			"Distribution file exceeds size limit",
+		);
+		assert(files.length < 1000, "Invalid distribution file count");
 		files.push({
 			path: relative,
 			contents: fs.readFileSync(absolute).toString("base64"),
@@ -222,7 +234,8 @@ class ActionDistributions {
 			"Expected one distribution artifact for this attempt",
 		);
 		assert(
-			!matching[0].expired && matching[0].size_in_bytes <= MAX_BYTES,
+			!matching[0].expired &&
+				matching[0].size_in_bytes <= this.options.maxBytes,
 			"Artifact expired or too large",
 		);
 		this.core.setOutput("artifact-id", matching[0].id);
@@ -230,7 +243,7 @@ class ActionDistributions {
 
 	readPayload(filename, packages) {
 		assert(
-			fs.statSync(filename).size <= MAX_BYTES,
+			fs.statSync(filename).size <= this.options.maxBytes,
 			"Distribution artifact exceeds size limit",
 		);
 		const files = JSON.parse(fs.readFileSync(filename, "utf8"));
@@ -252,7 +265,7 @@ class ActionDistributions {
 			);
 			assert(
 				packages.some((directory) =>
-					file.path.startsWith(`${this.options.outputPath(directory)}/`),
+					this.options.containsOutput(directory, file.path),
 				),
 				"File outside allowed distributions",
 			);
@@ -262,10 +275,16 @@ class ActionDistributions {
 						file.contents,
 				"Invalid file encoding",
 			);
+			assert(
+				Buffer.byteLength(file.contents, "base64") <= 50 * 1024 * 1024,
+				"Distribution file exceeds size limit",
+			);
 			names.add(file.path);
 		}
-		for (const directory of packages) {
-			const prefix = `${this.options.outputPath(directory)}/`;
+		for (const output of packages.flatMap((directory) =>
+			this.options.outputPaths(directory),
+		)) {
+			const prefix = `${output}/`;
 			assert(
 				[...names].some((name) => name.startsWith(prefix)) &&
 					this.options.requiredFiles.every((name) =>
@@ -289,7 +308,7 @@ class ActionDistributions {
 		for (const entry of tree.tree) {
 			if (
 				!source.packages.some((directory) =>
-					entry.path.startsWith(`${this.options.outputPath(directory)}/`),
+					this.options.containsOutput(directory, entry.path),
 				)
 			)
 				continue;
@@ -324,25 +343,34 @@ class ActionDistributions {
 		const fileChanges = await this.changes(source, filename);
 		if (!fileChanges.additions.length && !fileChanges.deletions.length)
 			return this.core.info("Distributions are already current.");
-		await this.github.graphql(
-			`mutation($input: CreateCommitOnBranchInput!) {
+		const message = {
+			headline: this.options.headline(source.author),
+			body: GENERATED_BY,
+		};
+		if (Buffer.byteLength(JSON.stringify(fileChanges)) > INLINE_COMMIT_BYTES) {
+			await new DistributionCommit(this.github, this.repo).create({
+				branch: source.pr.head.ref,
+				head: source.pr.head.sha,
+				message,
+				fileChanges,
+			});
+		} else
+			await this.github.graphql(
+				`mutation($input: CreateCommitOnBranchInput!) {
 			createCommitOnBranch(input: $input) { commit { oid } }
 		}`,
-			{
-				input: {
-					branch: {
-						repositoryNameWithOwner: this.fullName,
-						branchName: source.pr.head.ref,
+				{
+					input: {
+						branch: {
+							repositoryNameWithOwner: this.fullName,
+							branchName: source.pr.head.ref,
+						},
+						expectedHeadOid: source.pr.head.sha,
+						message,
+						fileChanges,
 					},
-					expectedHeadOid: source.pr.head.sha,
-					message: {
-						headline: this.options.headline(source.author),
-						body: GENERATED_BY,
-					},
-					fileChanges,
 				},
-			},
-		);
+			);
 		this.core.info("Committed regenerated distributions to the automation PR.");
 	}
 }

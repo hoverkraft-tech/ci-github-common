@@ -8654,6 +8654,71 @@ const external_node_crypto_namespaceObject = __WEBPACK_EXTERNAL_createRequire(im
 const external_node_fs_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:fs");
 ;// CONCATENATED MODULE: external "node:path"
 const external_node_path_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:path");
+;// CONCATENATED MODULE: ./src/DistributionCommit.js
+class DistributionCommit {
+	constructor(github, repo) {
+		this.github = github;
+		this.repo = repo;
+	}
+
+	async create({ branch, head, message, fileChanges }) {
+		const tree = [];
+		for (const file of fileChanges.additions) {
+			const { data } = await this.github.rest.git.createBlob({
+				...this.repo,
+				content: file.contents,
+				encoding: "base64",
+			});
+			tree.push({
+				path: file.path,
+				mode: "100644",
+				type: "blob",
+				sha: data.sha,
+			});
+		}
+		for (const file of fileChanges.deletions)
+			tree.push({ path: file.path, mode: "100644", type: "blob", sha: null });
+		const { data: parent } = await this.github.rest.git.getCommit({
+			...this.repo,
+			commit_sha: head,
+		});
+		const { data: createdTree } = await this.github.rest.git.createTree({
+			...this.repo,
+			base_tree: parent.tree.sha,
+			tree,
+		});
+		const { data: commit } = await this.github.rest.git.createCommit({
+			...this.repo,
+			message: `${message.headline}\n\n${message.body}`,
+			tree: createdTree.sha,
+			parents: [head],
+		});
+		const { repository } = await this.github.graphql(
+			"query($owner: String!, $repo: String!) { repository(owner: $owner, name: $repo) { id } }",
+			this.repo,
+		);
+		// beforeOid is a compare-and-swap guard, including branch rewinds and rebases.
+		await this.github.graphql(
+			"mutation($input: UpdateRefsInput!) { updateRefs(input: $input) { clientMutationId } }",
+			{
+				input: {
+					repositoryId: repository.id,
+					refUpdates: [
+						{
+							name: `refs/heads/${branch}`,
+							beforeOid: head,
+							afterOid: commit.sha,
+							force: false,
+						},
+					],
+				},
+			},
+		);
+	}
+}
+
+
+
 ;// CONCATENATED MODULE: ./src/DistributionOptions.js
 
 
@@ -8674,7 +8739,10 @@ const AUTHOR_PRESETS = {
 class DistributionOptions {
 	constructor(options = {}) {
 		this.directories = this.lines(options.workingDirectories ?? "");
-		this.outputDirectory = options.outputDirectory ?? "dist";
+		this.outputDirectories = this.lines(options.outputDirectory ?? "dist");
+		this.packageManager = options.packageManager ?? "npm";
+		this.ignoreScripts = options.ignoreScripts ?? "true";
+		this.maxBytes = Number(options.maxArtifactSize ?? 20) * 1024 * 1024;
 		this.requiredFiles = this.lines(
 			options.requiredFiles ?? "index.js\nlicenses.txt",
 		);
@@ -8704,7 +8772,34 @@ class DistributionOptions {
 				"Overlapping working directories",
 			);
 		}
-		strict_namespaceObject(this.safePath(this.outputDirectory), "Invalid output directory");
+		strict_namespaceObject(
+			this.outputDirectories.length > 0 &&
+				this.outputDirectories.every((entry) => this.safePath(entry)),
+			"Invalid output directory",
+		);
+		strict_namespaceObject(
+			new Set(this.outputDirectories).size === this.outputDirectories.length &&
+				!this.outputDirectories.some((directory) =>
+					this.outputDirectories.some((other) =>
+						directory.startsWith(`${other}/`),
+					),
+				),
+			"Duplicate or overlapping output directories",
+		);
+		strict_namespaceObject(
+			["npm", "pnpm"].includes(this.packageManager),
+			"Unsupported package manager",
+		);
+		strict_namespaceObject(
+			["true", "false"].includes(this.ignoreScripts),
+			"Invalid ignore-scripts value",
+		);
+		strict_namespaceObject(
+			Number.isSafeInteger(this.maxBytes / 1024 / 1024) &&
+				this.maxBytes >= 1024 * 1024 &&
+				this.maxBytes <= 128 * 1024 * 1024,
+			"Artifact size must be an integer between 1 and 128 MiB",
+		);
 		strict_namespaceObject(
 			this.requiredFiles.every((file) => this.safePath(file)),
 			"Invalid required file",
@@ -8799,10 +8894,16 @@ class DistributionOptions {
 		);
 	}
 
-	outputPath(directory) {
-		return directory === "."
-			? this.outputDirectory
-			: `${directory}/${this.outputDirectory}`;
+	outputPaths(directory) {
+		return this.outputDirectories.map((output) =>
+			directory === "." ? output : `${directory}/${output}`,
+		);
+	}
+
+	containsOutput(directory, filename) {
+		return this.outputPaths(directory).some((output) =>
+			filename.startsWith(`${output}/`),
+		);
 	}
 
 	artifact(attempt) {
@@ -8819,6 +8920,9 @@ class DistributionOptions {
 		return {
 			workingDirectories: process.env.WORKING_DIRECTORIES,
 			outputDirectory: process.env.OUTPUT_DIRECTORY,
+			packageManager: process.env.PACKAGE_MANAGER,
+			ignoreScripts: process.env.IGNORE_SCRIPTS,
+			maxArtifactSize: process.env.MAX_ARTIFACT_SIZE,
 			requiredFiles: process.env.REQUIRED_FILES,
 			pullRequestAuthors: process.env.PULL_REQUEST_AUTHORS,
 			buildScript: process.env.BUILD_SCRIPT,
@@ -8864,11 +8968,17 @@ class DistributionPackages {
 			if (
 				directory !== "." &&
 				(!this.options.safePath(directory) ||
-					directory
-						.split("/")
-						.some((part) =>
-							["node_modules", this.options.outputDirectory].includes(part),
-						))
+					directory.split("/").some((part) => part === "node_modules"))
+			)
+				continue;
+			if (
+				this.options.outputDirectories.some(
+					(output) =>
+						directory === output ||
+						directory.startsWith(`${output}/`) ||
+						directory.includes(`/${output}/`) ||
+						directory.endsWith(`/${output}`),
+				)
 			)
 				continue;
 			if (!selected.some((pattern) => external_node_path_namespaceObject.posix.matchesGlob(directory, pattern)))
@@ -9020,8 +9130,9 @@ class DistributionWorkflow {
 
 
 
+
 const GENERATED_BY = "Generated-by: ci-github-common/action-distributions";
-const MAX_BYTES = 20 * 1024 * 1024;
+const INLINE_COMMIT_BYTES = 20 * 1024 * 1024;
 
 class ActionDistributions {
 	constructor({
@@ -9084,7 +9195,7 @@ class ActionDistributions {
 					(name) =>
 						typeof name === "string" &&
 						(directory === "." || name.startsWith(`${directory}/`)) &&
-						!name.startsWith(`${this.options.outputPath(directory)}/`),
+						!this.options.containsOutput(directory, name),
 				),
 			),
 		);
@@ -9138,19 +9249,25 @@ class ActionDistributions {
 		const files = [];
 		for (const directory of packages) {
 			const cwd = external_node_path_namespaceObject.join(workspace, directory);
-			execute("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], {
+			const install =
+				this.options.packageManager === "pnpm"
+					? ["install", "--frozen-lockfile"]
+					: ["ci", "--no-audit", "--no-fund"];
+			install.push(`--ignore-scripts=${this.options.ignoreScripts}`);
+			execute(this.options.packageManager, install, {
 				cwd,
 				stdio: "inherit",
 			});
-			execute("npm", ["run", this.options.buildScript], {
+			execute(this.options.packageManager, ["run", this.options.buildScript], {
 				cwd,
 				stdio: "inherit",
 			});
-			this.collect(workspace, this.options.outputPath(directory), files);
+			for (const outputPath of this.options.outputPaths(directory))
+				this.collect(workspace, outputPath, files);
 		}
 		const payload = JSON.stringify(files);
 		strict_namespaceObject(
-			Buffer.byteLength(payload) <= MAX_BYTES,
+			Buffer.byteLength(payload) <= this.options.maxBytes,
 			"Distribution artifact exceeds size limit",
 		);
 		external_node_fs_namespaceObject.mkdirSync(external_node_path_namespaceObject.dirname(output), { recursive: true });
@@ -9169,6 +9286,11 @@ class ActionDistributions {
 			return;
 		}
 		strict_namespaceObject(stat.isFile(), "Expected a regular distribution file");
+		strict_namespaceObject(
+			stat.size <= 50 * 1024 * 1024,
+			"Distribution file exceeds size limit",
+		);
+		strict_namespaceObject(files.length < 1000, "Invalid distribution file count");
 		files.push({
 			path: relative,
 			contents: external_node_fs_namespaceObject.readFileSync(absolute).toString("base64"),
@@ -9234,7 +9356,8 @@ class ActionDistributions {
 			"Expected one distribution artifact for this attempt",
 		);
 		strict_namespaceObject(
-			!matching[0].expired && matching[0].size_in_bytes <= MAX_BYTES,
+			!matching[0].expired &&
+				matching[0].size_in_bytes <= this.options.maxBytes,
 			"Artifact expired or too large",
 		);
 		this.core.setOutput("artifact-id", matching[0].id);
@@ -9242,7 +9365,7 @@ class ActionDistributions {
 
 	readPayload(filename, packages) {
 		strict_namespaceObject(
-			external_node_fs_namespaceObject.statSync(filename).size <= MAX_BYTES,
+			external_node_fs_namespaceObject.statSync(filename).size <= this.options.maxBytes,
 			"Distribution artifact exceeds size limit",
 		);
 		const files = JSON.parse(external_node_fs_namespaceObject.readFileSync(filename, "utf8"));
@@ -9264,7 +9387,7 @@ class ActionDistributions {
 			);
 			strict_namespaceObject(
 				packages.some((directory) =>
-					file.path.startsWith(`${this.options.outputPath(directory)}/`),
+					this.options.containsOutput(directory, file.path),
 				),
 				"File outside allowed distributions",
 			);
@@ -9274,10 +9397,16 @@ class ActionDistributions {
 						file.contents,
 				"Invalid file encoding",
 			);
+			strict_namespaceObject(
+				Buffer.byteLength(file.contents, "base64") <= 50 * 1024 * 1024,
+				"Distribution file exceeds size limit",
+			);
 			names.add(file.path);
 		}
-		for (const directory of packages) {
-			const prefix = `${this.options.outputPath(directory)}/`;
+		for (const output of packages.flatMap((directory) =>
+			this.options.outputPaths(directory),
+		)) {
+			const prefix = `${output}/`;
 			strict_namespaceObject(
 				[...names].some((name) => name.startsWith(prefix)) &&
 					this.options.requiredFiles.every((name) =>
@@ -9301,7 +9430,7 @@ class ActionDistributions {
 		for (const entry of tree.tree) {
 			if (
 				!source.packages.some((directory) =>
-					entry.path.startsWith(`${this.options.outputPath(directory)}/`),
+					this.options.containsOutput(directory, entry.path),
 				)
 			)
 				continue;
@@ -9336,25 +9465,34 @@ class ActionDistributions {
 		const fileChanges = await this.changes(source, filename);
 		if (!fileChanges.additions.length && !fileChanges.deletions.length)
 			return this.core.info("Distributions are already current.");
-		await this.github.graphql(
-			`mutation($input: CreateCommitOnBranchInput!) {
+		const message = {
+			headline: this.options.headline(source.author),
+			body: GENERATED_BY,
+		};
+		if (Buffer.byteLength(JSON.stringify(fileChanges)) > INLINE_COMMIT_BYTES) {
+			await new DistributionCommit(this.github, this.repo).create({
+				branch: source.pr.head.ref,
+				head: source.pr.head.sha,
+				message,
+				fileChanges,
+			});
+		} else
+			await this.github.graphql(
+				`mutation($input: CreateCommitOnBranchInput!) {
 			createCommitOnBranch(input: $input) { commit { oid } }
 		}`,
-			{
-				input: {
-					branch: {
-						repositoryNameWithOwner: this.fullName,
-						branchName: source.pr.head.ref,
+				{
+					input: {
+						branch: {
+							repositoryNameWithOwner: this.fullName,
+							branchName: source.pr.head.ref,
+						},
+						expectedHeadOid: source.pr.head.sha,
+						message,
+						fileChanges,
 					},
-					expectedHeadOid: source.pr.head.sha,
-					message: {
-						headline: this.options.headline(source.author),
-						body: GENERATED_BY,
-					},
-					fileChanges,
 				},
-			},
-		);
+			);
 		this.core.info("Committed regenerated distributions to the automation PR.");
 	}
 }

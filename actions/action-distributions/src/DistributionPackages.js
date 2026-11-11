@@ -31,11 +31,17 @@ class DistributionPackages {
 			if (
 				directory !== "." &&
 				(!this.options.safePath(directory) ||
-					directory
-						.split("/")
-						.some((part) =>
-							["node_modules", this.options.outputDirectory].includes(part),
-						))
+					directory.split("/").some((part) => part === "node_modules"))
+			)
+				continue;
+			if (
+				this.options.outputDirectories.some(
+					(output) =>
+						directory === output ||
+						directory.startsWith(`${output}/`) ||
+						directory.includes(`/${output}/`) ||
+						directory.endsWith(`/${output}`),
+				)
 			)
 				continue;
 			if (!selected.some((pattern) => path.matchesGlob(directory, pattern)))
