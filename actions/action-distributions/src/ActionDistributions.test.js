@@ -56,7 +56,11 @@ function fixture(t, options = {}) {
 			user: { login: "dependabot[bot]", id: 49699333 },
 			changed_files: 1,
 			head: { sha: SHA, ref: BRANCH, repo: { full_name: "owner/repo" } },
-			base: { ref: "main", repo: { full_name: "owner/repo" } },
+			base: {
+				ref: "main",
+				sha: TRUSTED_SHA,
+				repo: { full_name: "owner/repo" },
+			},
 		},
 		writer: {
 			id: 11,
@@ -95,6 +99,8 @@ function fixture(t, options = {}) {
 			},
 		],
 		tree: { truncated: false, tree: [] },
+		baseTree: { truncated: false, tree: [] },
+		treeReads: [],
 		outputs: {},
 		commits: [],
 		reads: [],
@@ -119,7 +125,15 @@ function fixture(t, options = {}) {
 				getWorkflow: async () => ({ data: state.workflow }),
 				listWorkflowRunArtifacts: async () => state.artifacts,
 			},
-			git: { getTree: async () => ({ data: state.tree }) },
+			git: {
+				getTree: async (request) => {
+					state.treeReads.push(request);
+					return {
+						data:
+							request.tree_sha === TRUSTED_SHA ? state.baseTree : state.tree,
+					};
+				},
+			},
 		},
 		paginate: async (method, input) => method(input),
 		graphql: async (_query, variables) => {
@@ -906,60 +920,66 @@ test("supports the workflow path as its default name and a scalar filter", async
 	assert.equal(state.outputs["artifact-id"], 20);
 });
 
-for (const ignoreScripts of ["true", "false"]) {
-	test(`builds all workspace outputs with detected pnpm commands and ignore-scripts=${ignoreScripts}`, async (t) => {
-		// Arrange
-		const outputs = ["actions/a/dist", "actions/b/dist"];
-		const { automation, context, temporary, filename, state } = fixture(t, {
-			workingDirectories: ".",
-			outputDirectory: outputs.join("\n"),
-			requiredFiles: "index.js",
-			installCommand: "pnpm install --frozen-lockfile",
-			runScriptCommand: "pnpm",
-			ignoreScripts,
-			buildScript: "package",
+for (const outputPattern of [false, true]) {
+	for (const ignoreScripts of ["true", "false"]) {
+		test(`builds and commits workspace outputs with glob=${outputPattern} and ignore-scripts=${ignoreScripts}`, async (t) => {
+			// Arrange
+			const outputs = ["actions/a/dist", "actions/b/dist"];
+			const { automation, context, temporary, filename, state } = fixture(t, {
+				workingDirectories: ".",
+				outputDirectory: outputPattern ? "actions/**/dist" : outputs.join("\n"),
+				requiredFiles: "index.js",
+				installCommand: "pnpm install --frozen-lockfile",
+				runScriptCommand: "pnpm",
+				ignoreScripts,
+				buildScript: "package",
+			});
+			context.eventName = "pull_request";
+			state.files = [{ filename: "pnpm-lock.yaml" }];
+			state.baseTree.tree = outputs.map((path) => ({
+				path,
+				type: "tree",
+				mode: "040000",
+			}));
+			const calls = [];
+			// Act
+			await automation.build({
+				workspace: temporary,
+				output: filename,
+				execute: (command, args, { cwd }) => {
+					calls.push({ command, args, cwd });
+					if (args[0] !== "package") return;
+					for (const output of outputs) {
+						fs.mkdirSync(path.join(cwd, output), { recursive: true });
+						fs.writeFileSync(path.join(cwd, output, "index.js"), "bundle");
+					}
+				},
+			});
+			context.eventName = "workflow_run";
+			await automation.commit(filename);
+			// Assert
+			assert.deepEqual(calls, [
+				{
+					command: "pnpm",
+					args: [
+						"install",
+						"--frozen-lockfile",
+						...(ignoreScripts === "true" ? ["--ignore-scripts"] : []),
+					],
+					cwd: temporary,
+				},
+				{ command: "pnpm", args: ["package"], cwd: temporary },
+			]);
+			assert.equal(state.commits.length, 1);
+			assert.deepEqual(
+				state.commits[0].fileChanges.additions.map((file) => file.path),
+				outputs.map((output) => `${output}/index.js`),
+			);
 		});
-		context.eventName = "pull_request";
-		state.files = [{ filename: "pnpm-lock.yaml" }];
-		const calls = [];
-		// Act
-		await automation.build({
-			workspace: temporary,
-			output: filename,
-			execute: (command, args, { cwd }) => {
-				calls.push({ command, args, cwd });
-				if (args[0] !== "package") return;
-				for (const output of outputs) {
-					fs.mkdirSync(path.join(cwd, output), { recursive: true });
-					fs.writeFileSync(path.join(cwd, output, "index.js"), "bundle");
-				}
-			},
-		});
-		context.eventName = "workflow_run";
-		await automation.commit(filename);
-		// Assert
-		assert.deepEqual(calls, [
-			{
-				command: "pnpm",
-				args: [
-					"install",
-					"--frozen-lockfile",
-					...(ignoreScripts === "true" ? ["--ignore-scripts"] : []),
-				],
-				cwd: temporary,
-			},
-			{ command: "pnpm", args: ["package"], cwd: temporary },
-		]);
-		assert.equal(state.commits.length, 1);
-		assert.deepEqual(
-			state.commits[0].fileChanges.additions.map((file) => file.path),
-			outputs.map((output) => `${output}/index.js`),
-		);
-	});
+	}
 }
 
 for (const outputDirectory of [
-	"actions/*/dist",
 	"dist\ndist",
 	"dist\ndist/nested",
 	"dist\n../outside",
@@ -987,28 +1007,77 @@ for (const options of [
 	});
 }
 
-test("every configured workspace output must be present and cannot authorize neighboring source", async (t) => {
+for (const outputDirectory of [
+	"actions/a/dist\nactions/b/dist",
+	"actions/**/dist",
+]) {
+	test(`requires complete workspace output and rejects neighboring paths with ${outputDirectory}`, async (t) => {
+		// Arrange
+		const { automation, state, filename, write } = fixture(t, {
+			workingDirectories: ".",
+			outputDirectory,
+			requiredFiles: "index.js",
+		});
+		const allowed = ["actions/a/dist/index.js", "actions/b/dist/index.js"].map(
+			(path) => ({ path, contents: encode("bundle") }),
+		);
+		state.baseTree.tree = ["actions/a/dist", "actions/b/dist"].map((path) => ({
+			path,
+			type: "tree",
+			mode: "040000",
+		}));
+		state.tree.tree = [
+			{ path: "actions/c/dist", type: "tree", mode: "040000" },
+		];
+		// Act / Assert: each rejected payload must leave the branch untouched.
+		for (const files of [
+			allowed.slice(0, 1),
+			[...allowed, { path: "actions/a/action.yml", contents: encode("bad") }],
+			[
+				...allowed,
+				{ path: "actions/c/dist/index.js", contents: encode("bad") },
+			],
+		]) {
+			write(files);
+			await assert.rejects(automation.commit(filename));
+		}
+		assert.deepEqual(state.commits, []);
+		state.files = allowed.map(({ path: filename }) => ({ filename }));
+		assert.deepEqual(await automation.affectedPackages(state.pr), []);
+	});
+}
+
+test("glob publication removes stale chunks only inside directories from the trusted base", async (t) => {
 	// Arrange
 	const { automation, state, filename, write } = fixture(t, {
 		workingDirectories: ".",
-		outputDirectory: "actions/a/dist\nactions/b/dist",
+		outputDirectory: "actions/**/dist",
 		requiredFiles: "index.js",
 	});
-	const allowed = ["actions/a/dist/index.js", "actions/b/dist/index.js"].map(
-		(path) => ({ path, contents: encode("bundle") }),
+	state.baseTree.tree = [
+		{ path: `${PACKAGE}/dist`, type: "tree", mode: "040000" },
+	];
+	const newDirectory = {
+		path: "actions/new/dist/index.js",
+		contents: encode("unrelated"),
+	};
+	state.tree.tree = [
+		blob(file("index.js", "old")),
+		blob(file("obsolete.js")),
+		blob(newDirectory),
+	];
+	write([file("index.js")]);
+	// Act
+	await automation.commit(filename);
+	// Assert
+	assert.deepEqual(state.commits[0].fileChanges, {
+		additions: [file("index.js")],
+		deletions: [{ path: `${PACKAGE}/dist/obsolete.js` }],
+	});
+	assert.deepEqual(
+		state.treeReads.map((read) => read.tree_sha),
+		[TRUSTED_SHA, SHA],
 	);
-	// Act / Assert: each rejected payload must leave the branch untouched.
-	for (const files of [
-		allowed.slice(0, 1),
-		[...allowed, { path: "actions/a/action.yml", contents: encode("bad") }],
-		[...allowed, { path: "actions/c/dist/index.js", contents: encode("bad") }],
-	]) {
-		write(files);
-		await assert.rejects(automation.commit(filename));
-	}
-	assert.deepEqual(state.commits, []);
-	state.files = allowed.map(({ path: filename }) => ({ filename }));
-	assert.deepEqual(await automation.affectedPackages(state.pr), []);
 });
 
 test("large artifacts use blob publication with a guarded single commit", async (t) => {

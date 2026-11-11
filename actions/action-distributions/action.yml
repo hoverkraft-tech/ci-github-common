@@ -22,7 +22,7 @@ inputs:
     description: Newline-separated package directories or glob patterns (`*`, `**`, `?`). Empty discovers root and `actions/**` packages declaring build and check:dist scripts.
     default: ""
   output-directory:
-    description: Newline-separated generated directories relative to each package. Only files inside these literal, non-overlapping directories may be committed.
+    description: Newline-separated generated directories or glob patterns (`*`, `**`, `?`) relative to each package. Patterns select committed directories from the trusted base revision; matches must be non-overlapping.
     default: dist
   required-files:
     description: Newline-separated files required in every generated directory. Empty accepts any nonempty output.

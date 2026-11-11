@@ -8777,18 +8777,10 @@ class DistributionOptions {
 		}
 		strict_namespaceObject(
 			this.outputDirectories.length > 0 &&
-				this.outputDirectories.every((entry) => this.safePath(entry)),
+				this.outputDirectories.every((entry) => this.safePattern(entry)),
 			"Invalid output directory",
 		);
-		strict_namespaceObject(
-			new Set(this.outputDirectories).size === this.outputDirectories.length &&
-				!this.outputDirectories.some((directory) =>
-					this.outputDirectories.some((other) =>
-						directory.startsWith(`${other}/`),
-					),
-				),
-			"Duplicate or overlapping output directories",
-		);
+		this.validateOutputDirectories(this.outputDirectories);
 		strict_namespaceObject(
 			["true", "false"].includes(this.ignoreScripts),
 			"Invalid ignore-scripts value",
@@ -8906,15 +8898,13 @@ class DistributionOptions {
 		);
 	}
 
-	outputPaths(directory) {
-		return this.outputDirectories.map((output) =>
-			directory === "." ? output : `${directory}/${output}`,
-		);
-	}
-
-	containsOutput(directory, filename) {
-		return this.outputPaths(directory).some((output) =>
-			filename.startsWith(`${output}/`),
+	validateOutputDirectories(directories) {
+		strict_namespaceObject(
+			new Set(directories).size === directories.length &&
+				!directories.some((directory) =>
+					directories.some((other) => directory.startsWith(`${other}/`)),
+				),
+			"Duplicate or overlapping output directories",
 		);
 	}
 
@@ -8942,6 +8932,86 @@ class DistributionOptions {
 			artifactName: process.env.ARTIFACT_NAME,
 			commitMessage: process.env.COMMIT_MESSAGE,
 		};
+	}
+}
+
+
+
+;// CONCATENATED MODULE: ./src/DistributionOutputs.js
+
+
+
+class DistributionOutputs {
+	constructor(github, repo, options) {
+		this.github = github;
+		this.repo = repo;
+		this.options = options;
+		this.resolved = new Map();
+	}
+
+	async resolve(ref, packages) {
+		this.resolved.clear();
+		if (!this.options.outputDirectories.some((output) => /[*?]/.test(output)))
+			return;
+		if (!packages.length) return;
+		strict_namespaceObject(ref, "Expected a trusted revision for output discovery");
+		const { data } = await this.github.rest.git.getTree({
+			...this.repo,
+			tree_sha: ref,
+			recursive: "1",
+		});
+		strict_namespaceObject(!data.truncated, "Cannot discover outputs from a truncated tree");
+		for (const directory of packages) {
+			const outputs = this.options.outputDirectories.flatMap((output) => {
+				const pattern = directory === "." ? output : `${directory}/${output}`;
+				if (!/[*?]/.test(output)) return [pattern];
+				return this.match(data.tree, pattern);
+			});
+			this.options.validateOutputDirectories(outputs);
+			this.resolved.set(directory, outputs.sort());
+		}
+	}
+
+	match(tree, pattern) {
+		const matches = tree.filter(
+			(entry) =>
+				this.options.safePath(entry.path) &&
+				!entry.path.split("/").includes("node_modules") &&
+				external_node_path_namespaceObject.posix.matchesGlob(entry.path, pattern),
+		);
+		const directories = [];
+		for (const entry of matches) {
+			strict_namespaceObject(
+				entry.mode !== "120000" && entry.type !== "commit",
+				"Output patterns cannot select symlinks or submodules",
+			);
+			if (entry.type !== "tree") continue;
+			strict_namespaceObject(entry.mode === "040000", "Expected a regular output directory");
+			directories.push(entry.path);
+		}
+		strict_namespaceObject(
+			directories.length,
+			`Output pattern matched no directories: ${pattern}`,
+		);
+		return directories;
+	}
+
+	paths(directory) {
+		const resolved = this.resolved.get(directory);
+		if (resolved) return resolved;
+		strict_namespaceObject(
+			!this.options.outputDirectories.some((output) => /[*?]/.test(output)),
+			"Output patterns must be resolved from the trusted revision",
+		);
+		return this.options.outputDirectories.map((output) =>
+			directory === "." ? output : `${directory}/${output}`,
+		);
+	}
+
+	contains(directory, filename) {
+		return this.paths(directory).some((output) =>
+			filename.startsWith(`${output}/`),
+		);
 	}
 }
 
@@ -8987,10 +9057,8 @@ class DistributionPackages {
 			if (
 				this.options.outputDirectories.some(
 					(output) =>
-						directory === output ||
-						directory.startsWith(`${output}/`) ||
-						directory.includes(`/${output}/`) ||
-						directory.endsWith(`/${output}`),
+						external_node_path_namespaceObject.posix.matchesGlob(directory, `**/${output}`) ||
+						external_node_path_namespaceObject.posix.matchesGlob(directory, `**/${output}/**`),
 				)
 			)
 				continue;
@@ -9144,6 +9212,7 @@ class DistributionWorkflow {
 
 
 
+
 const GENERATED_BY = "Generated-by: ci-github-common/action-distributions";
 const INLINE_COMMIT_BYTES = 20 * 1024 * 1024;
 
@@ -9159,6 +9228,7 @@ class ActionDistributions {
 		this.context = context;
 		this.core = core;
 		this.repo = context.repo;
+		this.outputs = new DistributionOutputs(github, this.repo, this.options);
 		this.fullName = `${this.repo.owner}/${this.repo.repo}`;
 	}
 
@@ -9197,6 +9267,7 @@ class ActionDistributions {
 		);
 		// The writer's allowlist is always derived from the trusted base, never PR manifests.
 		const packages = await this.packages(pr.base.sha);
+		await this.outputs.resolve(pr.base.sha, packages);
 		const files = await this.github.paginate(this.github.rest.pulls.listFiles, {
 			...this.repo,
 			pull_number: pr.number,
@@ -9208,7 +9279,7 @@ class ActionDistributions {
 					(name) =>
 						typeof name === "string" &&
 						(directory === "." || name.startsWith(`${directory}/`)) &&
-						!this.options.containsOutput(directory, name),
+						!this.outputs.contains(directory, name),
 				),
 			),
 		);
@@ -9277,7 +9348,7 @@ class ActionDistributions {
 				cwd,
 				stdio: "inherit",
 			});
-			for (const outputPath of this.options.outputPaths(directory))
+			for (const outputPath of this.outputs.paths(directory))
 				this.collect(workspace, outputPath, files);
 		}
 		const payload = JSON.stringify(files);
@@ -9402,7 +9473,7 @@ class ActionDistributions {
 			);
 			strict_namespaceObject(
 				packages.some((directory) =>
-					this.options.containsOutput(directory, file.path),
+					this.outputs.contains(directory, file.path),
 				),
 				"File outside allowed distributions",
 			);
@@ -9419,7 +9490,7 @@ class ActionDistributions {
 			names.add(file.path);
 		}
 		for (const output of packages.flatMap((directory) =>
-			this.options.outputPaths(directory),
+			this.outputs.paths(directory),
 		)) {
 			const prefix = `${output}/`;
 			strict_namespaceObject(
@@ -9445,7 +9516,7 @@ class ActionDistributions {
 		for (const entry of tree.tree) {
 			if (
 				!source.packages.some((directory) =>
-					this.options.containsOutput(directory, entry.path),
+					this.outputs.contains(directory, entry.path),
 				)
 			)
 				continue;

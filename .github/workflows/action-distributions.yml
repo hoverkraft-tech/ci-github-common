@@ -39,9 +39,14 @@
 # build, set `build-script` to a package script name and choose `node-version`. Override
 # `output-directory`, `required-files`, `artifact-name`, `retention-days` or
 # `commit-message` when needed. A workspace build can emit several bundles: supply
-# newline-separated literal output-directory paths relative to the workspace root.
-# Required files must exist in every output directory; glob output paths are rejected.
-# Keep these paths and the max-artifact-size limit identical in both callers.
+# newline-separated output-directory paths or patterns such as `actions/**/dist`
+# relative to the workspace root. Patterns support `*`, `**` and `?`. Both jobs
+# resolve them against committed directories in the trusted PR base revision,
+# never the PR checkout or artifact. New matching directories become eligible
+# after reaching the default branch. Hidden and node_modules directories are excluded.
+# Every pattern must match; duplicate or overlapping resolved directories fail.
+# Required files must exist in every resolved output directory. Keep the patterns
+# and max-artifact-size limit identical in both callers.
 #
 # By default, discover root and `actions/**` packages declaring the selected build
 # script and check:dist. Override working-directories with newline-separated
@@ -147,7 +152,7 @@ on:
         type: string
         default: ""
       output-directory:
-        description: Newline-separated generated directories relative to each package. Only files inside these literal, non-overlapping directories may be committed.
+        description: Newline-separated generated directories or glob patterns (`*`, `**`, `?`) relative to each package. Patterns select committed directories from the trusted base revision; matches must be non-overlapping.
         type: string
         default: dist
       required-files:
