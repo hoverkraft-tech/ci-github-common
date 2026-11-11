@@ -63,9 +63,14 @@ the linked callers; a push-only caller does not run either job. To customize the
 build, set `build-script` to a package script name and choose `node-version`. Override
 `output-directory`, `required-files`, `artifact-name`, `retention-days` or
 `commit-message` when needed. A workspace build can emit several bundles: supply
-newline-separated literal output-directory paths relative to the workspace root.
-Required files must exist in every output directory; glob output paths are rejected.
-Keep these paths and the max-artifact-size limit identical in both callers.
+newline-separated output-directory paths or patterns such as `actions/**/dist`
+relative to the workspace root. Patterns support `*`, `**` and `?`. Both jobs
+resolve them against committed directories in the trusted PR base revision,
+never the PR checkout or artifact. New matching directories become eligible
+after reaching the default branch. Hidden and node_modules directories are excluded.
+Every pattern must match; duplicate or overlapping resolved directories fail.
+Required files must exist in every resolved output directory. Keep the patterns
+and max-artifact-size limit identical in both callers.
 
 By default, discover root and `actions/**` packages declaring the selected build
 script and check:dist. Override working-directories with newline-separated
@@ -182,7 +187,7 @@ on:
 permissions: {}
 jobs:
   action-distributions:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/action-distributions.yml@66882b24f9f13e45a6541896a5a7c638cb91c94c # 4.0.0
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/action-distributions.yml@0864018583d79f7e535f572005baa35f2e864849 # 4.1.0
     permissions:
       actions: read
       contents: read
@@ -194,7 +199,7 @@ jobs:
       # Newline-separated package directories or glob patterns (`*`, `**`, `?`). Empty discovers root and `actions/**` packages declaring build and check:dist scripts.
       working-directories: ""
 
-      # Newline-separated generated directories relative to each package. Only files inside these literal, non-overlapping directories may be committed.
+      # Newline-separated generated directories or glob patterns (`*`, `**`, `?`) relative to each package. Patterns select committed directories from the trusted base revision; matches must be non-overlapping.
       # Default: `dist`
       output-directory: dist
 
@@ -249,20 +254,20 @@ jobs:
 
 ### Workflow Call Inputs
 
-| **Input**                  | **Description**                                                                                                                                                 | **Required** | **Type**    | **Default**                                                                                       |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- | ------------------------------------------------------------------------------------------------- |
-| **`working-directories`**  | Newline-separated package directories or glob patterns (`*`, `**`, `?`). Empty discovers root and `actions/**` packages declaring build and check:dist scripts. | **false**    | **string**  | -                                                                                                 |
-| **`output-directory`**     | Newline-separated generated directories relative to each package. Only files inside these literal, non-overlapping directories may be committed.                | **false**    | **string**  | `dist`                                                                                            |
-| **`required-files`**       | Newline-separated files required in every generated directory. Empty accepts any nonempty output.                                                               | **false**    | **string**  | <!-- textlint-disable --><pre lang="text">index.js&#13;licenses.txt</pre><!-- textlint-enable --> |
-| **`pull-request-authors`** | JSON array of dependabot or renovate presets, or objects with login, numeric account ID and optional branch-prefix and commit-message-suffix.                   | **false**    | **string**  | `["dependabot","renovate"]`                                                                       |
-| **`artifact-name`**        | Artifact name prefix shared by build and commit. The run attempt is appended automatically.                                                                     | **false**    | **string**  | `action-distributions`                                                                            |
-| **`node-version`**         | Node.js version used for dependency installation and the build script.                                                                                          | **false**    | **string**  | `24`                                                                                              |
-| **`build-script`**         | Package script name to run after a locked dependency installation.                                                                                              | **false**    | **string**  | `build`                                                                                           |
-| **`ignore-scripts`**       | Disable install lifecycle scripts. Set false only when the read-only builder needs approved hooks.                                                              | **false**    | **boolean** | `true`                                                                                            |
-| **`max-artifact-size`**    | Maximum serialized artifact size in MiB (integer from 1 to 128). Use the same limit for build and writer.                                                       | **false**    | **number**  | `20`                                                                                              |
-| **`retention-days`**       | Artifact retention in days, within the repository's artifact policy.                                                                                            | **false**    | **number**  | `1`                                                                                               |
-| **`commit-message`**       | Single-line commit headline. Per-author suffixes and a loop-prevention body trailer are appended.                                                               | **false**    | **string**  | `build: regenerate action distributions`                                                          |
-| **`github-app-client-id`** | Client ID of the GitHub App installed on the caller repository with contents write and actions and pull requests read access.                                   | **false**    | **string**  | -                                                                                                 |
+| **Input**                  | **Description**                                                                                                                                                                                            | **Required** | **Type**    | **Default**                                                                                       |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- | ------------------------------------------------------------------------------------------------- |
+| **`working-directories`**  | Newline-separated package directories or glob patterns (`*`, `**`, `?`). Empty discovers root and `actions/**` packages declaring build and check:dist scripts.                                            | **false**    | **string**  | -                                                                                                 |
+| **`output-directory`**     | Newline-separated generated directories or glob patterns (`*`, `**`, `?`) relative to each package. Patterns select committed directories from the trusted base revision; matches must be non-overlapping. | **false**    | **string**  | `dist`                                                                                            |
+| **`required-files`**       | Newline-separated files required in every generated directory. Empty accepts any nonempty output.                                                                                                          | **false**    | **string**  | <!-- textlint-disable --><pre lang="text">index.js&#13;licenses.txt</pre><!-- textlint-enable --> |
+| **`pull-request-authors`** | JSON array of dependabot or renovate presets, or objects with login, numeric account ID and optional branch-prefix and commit-message-suffix.                                                              | **false**    | **string**  | `["dependabot","renovate"]`                                                                       |
+| **`artifact-name`**        | Artifact name prefix shared by build and commit. The run attempt is appended automatically.                                                                                                                | **false**    | **string**  | `action-distributions`                                                                            |
+| **`node-version`**         | Node.js version used for dependency installation and the build script.                                                                                                                                     | **false**    | **string**  | `24`                                                                                              |
+| **`build-script`**         | Package script name to run after a locked dependency installation.                                                                                                                                         | **false**    | **string**  | `build`                                                                                           |
+| **`ignore-scripts`**       | Disable install lifecycle scripts. Set false only when the read-only builder needs approved hooks.                                                                                                         | **false**    | **boolean** | `true`                                                                                            |
+| **`max-artifact-size`**    | Maximum serialized artifact size in MiB (integer from 1 to 128). Use the same limit for build and writer.                                                                                                  | **false**    | **number**  | `20`                                                                                              |
+| **`retention-days`**       | Artifact retention in days, within the repository's artifact policy.                                                                                                                                       | **false**    | **number**  | `1`                                                                                               |
+| **`commit-message`**       | Single-line commit headline. Per-author suffixes and a loop-prevention body trailer are appended.                                                                                                          | **false**    | **string**  | `build: regenerate action distributions`                                                          |
+| **`github-app-client-id`** | Client ID of the GitHub App installed on the caller repository with contents write and actions and pull requests read access.                                                                              | **false**    | **string**  | -                                                                                                 |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
