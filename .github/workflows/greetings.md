@@ -32,7 +32,10 @@ Workflow to greet new contributors.
 Mainly using [First Interaction Action](https://github.com/actions/first-interaction), with some opinionated defaults.
 
 - On issue creation, a comment is added to the issue.
-- On first contribution, a comment is added to the pull request.
+- On first contribution from a branch in the same repository, a comment is added to the pull request.
+
+Pull requests from forks are skipped because their `pull_request` token is read-only.
+Callers do not need their own fork condition. Issue greetings remain enabled.
 
 ### Permissions
 

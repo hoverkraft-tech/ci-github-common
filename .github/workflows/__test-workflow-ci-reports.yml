@@ -12,7 +12,7 @@ jobs:
       contents: read
     strategy:
       matrix:
-        package: [frontend, backend]
+        package: [frontend, backend, lint-only]
     steps:
       - name: Arrange - Create independent native reports
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -23,6 +23,10 @@ jobs:
             const fs = require('node:fs');
             await io.mkdirP('reports');
             const name = process.env.PACKAGE;
+            if (name === 'lint-only') {
+              fs.writeFileSync('reports/super-linter-summary.md', '| Linter | Status |\n| --- | --- |\n| Fixture linter | ✅ |\n');
+              return;
+            }
             const messages = name === 'frontend' ? [
               { severity: 2, ruleId: 'fixture-error', message: 'synthetic lint error' },
               { severity: 1, ruleId: 'fixture-warning', message: 'synthetic lint warning' },
@@ -64,20 +68,38 @@ jobs:
       comment: false
       job-results: '{"frontend":{"result":"failure"},"backend":{"result":"success"},"missing":{"result":"skipped"},"abandoned-fixture":{"result":"abandoned"}}'
 
+  lint-only-reports:
+    name: Act - Consolidate a summary without native reports
+    needs: fixtures
+    uses: $/.github/workflows/ci-reports.yml
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      comment: false
+      job-results: '{"lint-only":{"result":"success"}}'
+
   assert:
     name: Assert - Both packages, failures and missing results remain visible
-    needs: reports
+    needs: [reports, lint-only-reports]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
+          LINT_ONLY: ${{ needs.lint-only-reports.outputs.lint-markdown }}
+          LINT_ONLY_TESTS: ${{ needs.lint-only-reports.outputs.test-markdown }}
+          LINT_ONLY_COVERAGE: ${{ needs.lint-only-reports.outputs.coverage-markdown }}
           LINT: ${{ needs.reports.outputs.lint-markdown }}
           TESTS: ${{ needs.reports.outputs.test-markdown }}
           COVERAGE: ${{ needs.reports.outputs.coverage-markdown }}
         with:
           script: |
             const assert = require('node:assert/strict');
+            assert.match(process.env.LINT_ONLY, /Fixture linter/);
+            assert.match(process.env.LINT_ONLY_TESTS, /lint-only/);
+            assert.match(process.env.LINT_ONLY_COVERAGE, /lint-only/);
+            assert.doesNotMatch(process.env.LINT_ONLY_COVERAGE, /100\.00%/);
             for (const text of [process.env.TESTS, process.env.COVERAGE, process.env.LINT]) {
               assert.match(text, /frontend/);
               assert.match(text, /backend/);

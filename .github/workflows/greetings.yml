@@ -2,7 +2,10 @@
 # Mainly using [First Interaction Action](https://github.com/actions/first-interaction), with some opinionated defaults.
 #
 # - On issue creation, a comment is added to the issue.
-# - On first contribution, a comment is added to the pull request.
+# - On first contribution from a branch in the same repository, a comment is added to the pull request.
+#
+# Pull requests from forks are skipped because their `pull_request` token is read-only.
+# Callers do not need their own fork condition. Issue greetings remain enabled.
 
 name: Greetings
 
@@ -47,6 +50,7 @@ permissions: {}
 
 jobs:
   greeting:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ inputs.runs-on && fromJson(inputs.runs-on) || 'ubuntu-latest' }}
     permissions:
       contents: read
