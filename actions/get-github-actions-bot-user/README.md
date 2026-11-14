@@ -39,7 +39,7 @@ Useful to commit, comment, etc.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/get-github-actions-bot-user@90211d735aa0289702ddbd7eb95b218020ccadad # 2.0.2
+- uses: hoverkraft-tech/ci-github-common/actions/get-github-actions-bot-user@2fa562bd44f9e752a99a374c85ae14644e7f2bdd # 4.2.2
 ```
 
 <!-- usage:end -->

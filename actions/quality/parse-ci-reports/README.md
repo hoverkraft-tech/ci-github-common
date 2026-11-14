@@ -412,7 +412,7 @@ Only comment on PRs if there are failures:
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@90211d735aa0289702ddbd7eb95b218020ccadad # 2.0.2
+- uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@2fa562bd44f9e752a99a374c85ae14644e7f2bdd # 4.2.2
   with:
     # Paths to report files (glob patterns supported, one per line or comma-separated).
     # Each explicit path or glob must match a file after exclusions; missing reports fail the action.
