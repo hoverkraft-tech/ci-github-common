@@ -37,7 +37,7 @@ to discover packages, install dependencies and verify checked-in distributions.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/quality/test-action-distribution@ce885f8dd6bf7191a79e3eebdf37bca805d40932 # 3.0.0
+- uses: hoverkraft-tech/ci-github-common/actions/quality/test-action-distribution@2fa562bd44f9e752a99a374c85ae14644e7f2bdd # 4.2.2
   with:
     # Package directory containing the distribution contract test script.
     # Default: `.`
