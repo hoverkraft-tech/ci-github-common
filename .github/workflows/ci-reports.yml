@@ -87,14 +87,23 @@ jobs:
         with:
           pattern: ${{ steps.directory.outputs.pattern }}
           path: ${{ steps.directory.outputs.path }}
+      - name: Discover native reports
+        id: native-reports
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          REPORT_DIRECTORY: ${{ steps.directory.outputs.path }}
+        with:
+          script: |
+            const directory = process.env.REPORT_DIRECTORY;
+            const reports = await glob.create(`${directory}/**/*\n!${directory}/**/super-linter-summary.md`, { matchDirectories: false });
+            core.setOutput('paths', (await reports.glob()).join('\n'));
       - name: Parse reports
         id: parse
+        if: steps.native-reports.outputs.paths != ''
         uses: $/actions/quality/parse-ci-reports
         with:
           working-directory: ${{ steps.directory.outputs.path }}
-          report-paths: |
-            **/*
-            !**/super-linter-summary.md
+          report-paths: ${{ steps.native-reports.outputs.paths }}
           report-name: CI results
           output-format: markdown
       - name: Compose reports and check publication eligibility
