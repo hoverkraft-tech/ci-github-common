@@ -67,7 +67,7 @@ on:
 permissions: {}
 jobs:
   ci-reports:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@c63b4ce928082260ab263abc01faf3c1fa20c52b # 4.2.3
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@d606f77fad305ef07dfde3db5270f5e324019c97 # 4.2.4
     permissions:
       contents: read
       pull-requests: write

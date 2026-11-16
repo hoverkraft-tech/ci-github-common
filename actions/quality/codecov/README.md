@@ -33,7 +33,7 @@ permissions:
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/quality/codecov@c63b4ce928082260ab263abc01faf3c1fa20c52b # 4.2.3
+- uses: hoverkraft-tech/ci-github-common/actions/quality/codecov@d606f77fad305ef07dfde3db5270f5e324019c97 # 4.2.4
   with:
     # Working directory where coverage files are located.
     # Can be absolute or relative to the repository root.
