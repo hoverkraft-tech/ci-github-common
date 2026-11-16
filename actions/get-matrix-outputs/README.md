@@ -39,7 +39,7 @@ Workaround for <https://github.com/orgs/community/discussions/26639>.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/get-matrix-outputs@c63b4ce928082260ab263abc01faf3c1fa20c52b # 4.2.3
+- uses: hoverkraft-tech/ci-github-common/actions/get-matrix-outputs@d606f77fad305ef07dfde3db5270f5e324019c97 # 4.2.4
   with:
     # The name of the artifact to download.
     # This input is required.

@@ -39,7 +39,7 @@ default-branch workflow_run job and never execute or check out PR code.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/action-distributions@c63b4ce928082260ab263abc01faf3c1fa20c52b # 4.2.3
+- uses: hoverkraft-tech/ci-github-common/actions/action-distributions@d606f77fad305ef07dfde3db5270f5e324019c97 # 4.2.4
   with:
     # Operation to execute (discover, prepare-build, build, prepare-commit or commit).
     # This input is required.
