@@ -49,6 +49,16 @@ jobs:
       contents: read
     uses: $/.github/workflows/__test-action-matrix-outputs.yml
 
+  test-action-create-and-merge-pull-request:
+    needs: lint
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: write
+      security-events: write
+    uses: $/.github/workflows/__test-action-create-and-merge-pull-request.yml
+
   test-action-lint-pull-request-title:
     needs: lint
     permissions:
@@ -135,6 +145,7 @@ jobs:
       - test-action-distributions
       - test-action-test-action-distribution
       - test-action-lint-pull-request-title
+      - test-action-create-and-merge-pull-request
       - test-action-parse-ci-reports
       - test-action-need-fix-to-issue
     if: always()

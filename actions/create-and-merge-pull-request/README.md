@@ -30,7 +30,11 @@
 ## Overview
 
 Action to create and merge Pull Request.
-Opinionated, set GitHub Actions bot as author, then merge with the configured strategy.
+Set GitHub Actions bot as author, then merge the created commit with the configured strategy.
+Run generation and validation before calling this action. It attempts the merge immediately;
+it does not wait for the pull request's CI or enable GitHub's optional auto-merge feature.
+Administrator bypass is enabled by default. Set bypass-branch-protection to false to request a normal merge.
+A pull request head change after creation prevents the merge.
 
 For this action to work you must explicitly allow GitHub Actions to create pull requests.
 See <https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository>.
@@ -42,7 +46,7 @@ See <https://docs.github.com/en/repositories/managing-your-repositorys-settings-
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@d606f77fad305ef07dfde3db5270f5e324019c97 # 4.2.4
+- uses: hoverkraft-tech/ci-github-common/actions/create-and-merge-pull-request@056e536d188309c226a762dc0e677be6c1e7e009 # fix/compatible-automatic-merges-20261117
   with:
     # GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write).
     # See https://github.com/peter-evans/create-pull-request#action-inputs.
@@ -66,6 +70,16 @@ See <https://docs.github.com/en/repositories/managing-your-repositorys-settings-
     # This input is required.
     commit-message: ""
 
+    # Newline-separated paths to include in the commit, forwarded to peter-evans/create-pull-request.
+    # Empty includes all changes. Use this to restrict generated updates to their intended files.
+    add-paths: ""
+
+    # Request administrator merge privileges with --admin. Requires a token allowed to bypass the repository's rules.
+    # This can bypass required reviews, status checks and merge queues. The expected PR head is still checked.
+    #
+    # Default: `true`
+    bypass-branch-protection: "true"
+
     # Merge strategy for the created pull request.
     # Valid values: `merge`, `rebase`, `squash`.
     #
@@ -79,16 +93,20 @@ See <https://docs.github.com/en/repositories/managing-your-repositorys-settings-
 
 ## Inputs
 
-| **Input**            | **Description**                                                                                            | **Required** | **Default**           |
-| -------------------- | ---------------------------------------------------------------------------------------------------------- | ------------ | --------------------- |
-| **`github-token`**   | GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write). | **false**    | `${{ github.token }}` |
-|                      | See <https://github.com/peter-evans/create-pull-request#action-inputs>.                                    |              |                       |
-| **`branch`**         | The pull request branch name                                                                               | **true**     | -                     |
-| **`title`**          | The pull request title and, for merge/squash merges, the merged commit title                               | **true**     | -                     |
-| **`body`**           | The pull request body                                                                                      | **true**     | -                     |
-| **`commit-message`** | The commit message for the pull request and, for merge/squash merges, the merged commit body               | **true**     | -                     |
-| **`merge-method`**   | Merge strategy for the created pull request.                                                               | **false**    | `rebase`              |
-|                      | Valid values: `merge`, `rebase`, `squash`.                                                                 |              |                       |
+| **Input**                      | **Description**                                                                                                 | **Required** | **Default**           |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------- | ------------ | --------------------- |
+| **`github-token`**             | GitHub token for creating and merging pull request (permissions contents: write and pull-requests: write).      | **false**    | `${{ github.token }}` |
+|                                | See <https://github.com/peter-evans/create-pull-request#action-inputs>.                                         |              |                       |
+| **`branch`**                   | The pull request branch name                                                                                    | **true**     | -                     |
+| **`title`**                    | The pull request title and, for merge/squash merges, the merged commit title                                    | **true**     | -                     |
+| **`body`**                     | The pull request body                                                                                           | **true**     | -                     |
+| **`commit-message`**           | The commit message for the pull request and, for merge/squash merges, the merged commit body                    | **true**     | -                     |
+| **`add-paths`**                | Newline-separated paths to include in the commit, forwarded to peter-evans/create-pull-request.                 | **false**    | -                     |
+|                                | Empty includes all changes. Use this to restrict generated updates to their intended files.                     |              |                       |
+| **`bypass-branch-protection`** | Request administrator merge privileges with --admin. Requires a token allowed to bypass the repository's rules. | **false**    | `true`                |
+|                                | This can bypass required reviews, status checks and merge queues. The expected PR head is still checked.        |              |                       |
+| **`merge-method`**             | Merge strategy for the created pull request.                                                                    | **false**    | `rebase`              |
+|                                | Valid values: `merge`, `rebase`, `squash`.                                                                      |              |                       |
 
 <!-- inputs:end -->
 

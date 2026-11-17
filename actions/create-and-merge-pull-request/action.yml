@@ -3,7 +3,11 @@
 name: "Create and merge Pull Request"
 description: |
   Action to create and merge Pull Request.
-  Opinionated, set GitHub Actions bot as author, then merge with the configured strategy.
+  Set GitHub Actions bot as author, then merge the created commit with the configured strategy.
+  Run generation and validation before calling this action. It attempts the merge immediately;
+  it does not wait for the pull request's CI or enable GitHub's optional auto-merge feature.
+  Administrator bypass is enabled by default. Set bypass-branch-protection to false to request a normal merge.
+  A pull request head change after creation prevents the merge.
 author: hoverkraft
 branding:
   icon: git-pull-request
@@ -28,6 +32,17 @@ inputs:
   commit-message:
     description: "The commit message for the pull request and, for merge/squash merges, the merged commit body"
     required: true
+  add-paths:
+    description: |
+      Newline-separated paths to include in the commit, forwarded to peter-evans/create-pull-request.
+      Empty includes all changes. Use this to restrict generated updates to their intended files.
+    required: false
+  bypass-branch-protection:
+    description: |
+      Request administrator merge privileges with --admin. Requires a token allowed to bypass the repository's rules.
+      This can bypass required reviews, status checks and merge queues. The expected PR head is still checked.
+    default: "true"
+    required: false
   merge-method:
     description: |
       Merge strategy for the created pull request.
@@ -61,6 +76,7 @@ runs:
         title: ${{ inputs.title }}
         body: ${{ inputs.body }}
         commit-message: ${{ inputs.commit-message }}
+        add-paths: ${{ inputs.add-paths }}
         author: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
         committer: ${{ steps.github-actions-bot-user.outputs.name }} <${{ steps.github-actions-bot-user.outputs.email }}>
 
@@ -69,170 +85,19 @@ runs:
       if: steps.create-pull-request.outputs.pull-request-number && steps.create-pull-request.outputs.pull-request-operation != 'closed'
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
+        ACTION_PATH: ${{ github.action_path }}
         GH_TOKEN: ${{ inputs.github-token }}
         PULL_REQUEST_NUMBER: ${{ steps.create-pull-request.outputs.pull-request-number }}
+        PULL_REQUEST_HEAD_SHA: ${{ steps.create-pull-request.outputs.pull-request-head-sha }}
+        BYPASS_BRANCH_PROTECTION: ${{ inputs.bypass-branch-protection }}
         MERGE_METHOD: ${{ inputs.merge-method }}
         PULL_REQUEST_TITLE: ${{ inputs.title }}
         PULL_REQUEST_COMMIT_MESSAGE: ${{ inputs.commit-message }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          const maxAttempts = 10;
-          const requiredWorkflowsError = 'Required workflow';
-          const repository = `${context.repo.owner}/${context.repo.repo}`;
-          const mergeMethod = (process.env.MERGE_METHOD ?? 'rebase').trim();
-          const mergeCommitTitle = (process.env.PULL_REQUEST_TITLE ?? '').trim();
-          const mergeCommitMessage = process.env.PULL_REQUEST_COMMIT_MESSAGE ?? '';
-          const mergeMethodFlags = {
-            merge: '--merge',
-            rebase: '--rebase',
-            squash: '--squash',
-          };
-          const getRetryDelayMs = attempt => Math.min(1000 * (2 ** attempt), 10000);
-
-          const sleep = delayMs => new Promise(resolve => setTimeout(resolve, delayMs));
-
-          if (!(mergeMethod in mergeMethodFlags)) {
-            throw new Error(
-              `Invalid merge method: ${mergeMethod}. Expected one of: ${Object.keys(mergeMethodFlags).join(', ')}`,
-            );
-          }
-
-          const waitFor = async ({
-            run,
-            isComplete,
-            shouldRetry = () => true,
-            onAttempt = () => {},
-            getRetryMessage,
-            getFailureMessage,
-            getTimeoutMessage,
-          }) => {
-            for (let attempt = 0; attempt < maxAttempts; attempt++) {
-              const result = await run();
-
-              onAttempt(result);
-
-              if (isComplete(result)) {
-                return result;
-              }
-
-              if (!shouldRetry(result)) {
-                throw new Error(getFailureMessage(result));
-              }
-
-              const retryDelayMs = getRetryDelayMs(attempt);
-              core.debug(getRetryMessage(result, retryDelayMs));
-              await sleep(retryDelayMs);
-            }
-
-            throw new Error(getTimeoutMessage());
-          };
-
-          const parsePullRequestNumber = pullNumberRaw => {
-            if (!/^[0-9]+$/.test(pullNumberRaw)) {
-              throw new Error(`Invalid pull request number: ${pullNumberRaw}`);
-            }
-
-            return Number.parseInt(pullNumberRaw, 10);
-          };
-
-          const getPullRequest = async pullNumber => {
-            const { data: pullRequest } = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pullNumber,
-            });
-
-            return pullRequest;
-          };
-
-          const waitForMergeablePullRequest = pullNumber =>
-            waitFor({
-              run: () => getPullRequest(pullNumber),
-              isComplete: pullRequest => pullRequest.mergeable === true,
-              onAttempt: pullRequest => {
-                if (pullRequest.mergeable !== true) {
-                  core.debug(`Pull request is not mergeable, mergeable_state: ${pullRequest.mergeable_state}`);
-                }
-              },
-              getRetryMessage: (_pullRequest, retryDelayMs) => `Retrying mergeability check in ${retryDelayMs}ms...`,
-              getFailureMessage: () => `Pull request #${pullNumber} cannot be retried because it is not mergeable.`,
-              getTimeoutMessage: () => `Pull request #${pullNumber} is not mergeable after ${maxAttempts} attempts`,
-            });
-
-          const getMergeArguments = pullNumber => {
-            const args = [
-              'pr',
-              'merge',
-              '-R',
-              repository,
-              mergeMethodFlags[mergeMethod],
-              '--admin',
-              String(pullNumber),
-            ];
-
-            if (mergeMethod !== 'rebase' && mergeCommitTitle) {
-              args.push('--subject', mergeCommitTitle);
-            }
-
-            if (mergeMethod !== 'rebase' && mergeCommitMessage.trim()) {
-              args.push('--body', mergeCommitMessage);
-            }
-
-            return args;
-          };
-
-          const mergePullRequest = async pullNumber => {
-            core.debug(`Merging pull request #${pullNumber} for repository ${repository} with method ${mergeMethod}...`);
-
-            const { exitCode, stdout, stderr } = await exec.getExecOutput(
-              'gh',
-              getMergeArguments(pullNumber),
-              {
-                env: process.env,
-                ignoreReturnCode: true,
-                silent: true,
-              },
-            );
-
-            return {
-              mergeExitCode: exitCode,
-              mergeOutputs: [stdout, stderr].filter(Boolean).join('\n').trim(),
-            };
-          };
-
-          const verifyMergedPullRequest = async (pullNumber, mergeOutputs) => {
-            const pullRequest = await waitFor({
-              run: () => getPullRequest(pullNumber),
-              isComplete: currentPullRequest => Boolean(
-                currentPullRequest.merged
-                  && currentPullRequest.base.ref
-                  && currentPullRequest.merge_commit_sha,
-              ),
-              getRetryMessage: (_pullRequest, retryDelayMs) => `Pull request merge has not been reflected by the REST API yet, retrying in ${retryDelayMs}ms...`,
-              getFailureMessage: () => `Pull request merge verification stopped before completion: ${mergeOutputs}`,
-              getTimeoutMessage: () => `Pull request merge succeeded but timed out while waiting for REST API verification: ${mergeOutputs}`,
-            });
-
-            core.setOutput('merged-ref', `refs/heads/${pullRequest.base.ref}`);
-            core.setOutput('merged-sha', pullRequest.merge_commit_sha);
-          };
-
-          const pullNumber = parsePullRequestNumber(process.env.PULL_REQUEST_NUMBER ?? '');
-
-          await waitForMergeablePullRequest(pullNumber);
-
-          const { mergeOutputs } = await waitFor({
-            run: () => mergePullRequest(pullNumber),
-            isComplete: ({ mergeExitCode }) => mergeExitCode === 0,
-            shouldRetry: ({ mergeOutputs }) => mergeOutputs.includes(requiredWorkflowsError),
-            onAttempt: ({ mergeExitCode, mergeOutputs }) => {
-              core.debug(`Merge outputs: ${mergeOutputs}`);
-              core.debug(`Merge exit code: ${mergeExitCode}`);
-            },
-            getRetryMessage: (_result, retryDelayMs) => `Pull request is not mergeable yet because some of required workflow check issues, retrying in ${retryDelayMs}ms...`,
-            getFailureMessage: ({ mergeOutputs }) => `Failed to merge pull request: ${mergeOutputs}`,
-            getTimeoutMessage: () => `Failed to merge pull request after ${maxAttempts} attempts`,
-          });
-
-          await verifyMergedPullRequest(pullNumber, mergeOutputs);
+          const { pathToFileURL } = require('node:url');
+          const { join } = require('node:path');
+          const moduleUrl = pathToFileURL(join(process.env.ACTION_PATH, 'src', 'index.js'));
+          const { run } = await import(moduleUrl.href);
+          await run({ core, context, github, exec });
