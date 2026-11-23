@@ -58,7 +58,7 @@ on:
 permissions: {}
 jobs:
   test-action-distributions:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/test-action-distributions.yml@d606f77fad305ef07dfde3db5270f5e324019c97 # 4.2.4
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/test-action-distributions.yml@33462c06bcbbd9144d7f661929e61953604b444d # 4.3.2
     permissions:
       contents: read
     with:

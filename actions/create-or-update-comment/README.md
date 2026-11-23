@@ -46,7 +46,7 @@ permissions:
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@d606f77fad305ef07dfde3db5270f5e324019c97 # 4.2.4
+- uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@33462c06bcbbd9144d7f661929e61953604b444d # 4.3.2
   with:
     # The comment title.
     # Must be static and unique, will be used to retrieve the comment if exists already.
