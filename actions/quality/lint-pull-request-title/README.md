@@ -27,7 +27,7 @@ See the [common commit process](../../../docs/usage/commits.md).
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/quality/lint-pull-request-title@d606f77fad305ef07dfde3db5270f5e324019c97 # 4.2.4
+- uses: hoverkraft-tech/ci-github-common/actions/quality/lint-pull-request-title@33462c06bcbbd9144d7f661929e61953604b444d # 4.3.2
 ```
 
 <!-- usage:end -->
