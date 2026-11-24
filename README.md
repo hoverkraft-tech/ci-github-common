@@ -26,6 +26,7 @@ See the [documentation](docs/README.md) for detailed guides.
 - [Checkout](actions/checkout/README.md) - event-aware drop-in replacement for `actions/checkout` that supports issue comment triggers.
 - [Create and merge pull request](actions/create-and-merge-pull-request/README.md) - opens a pull request and merges it with the configured strategy and GitHub Actions bot identity.
 - [Create or update comment](actions/create-or-update-comment/README.md) - adds or updates comments on issues and pull requests idempotently.
+- [Download artifacts](actions/download-artifact/README.md) - downloads every requested artifact ID with bounded retries for delayed availability and digest verification.
 - [Get GitHub Actions bot user](actions/get-github-actions-bot-user/README.md) - retrieves the profile information for the GitHub Actions bot.
 - [Get issue number](actions/get-issue-number/README.md) - extracts the relevant issue number from the current workflow context.
 - [Need fix to Issue](actions/need-fix-to-issue/README.md) - creates and categorizes TODO/FIXME issues and closes duplicates.
