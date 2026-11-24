@@ -1,0 +1,17 @@
+# Public constants bundled by the official Azure SDK, not credentials.
+# https://github.com/Azure/Azurite#default-storage-account
+# https://github.com/Azure/azure-sdk-for-js/blob/main/sdk/storage/storage-common/src/crc64.ts
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Exact Azure emulator key and CRC64 WebAssembly fragment in the artifact SDK bundle"
+condition = "AND"
+paths = ['(^|/)actions/wait-for-artifacts/dist/index\.js$']
+regexes = [
+  '^Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==$',
+  '^sgByAFNgIMIAUgBzYCCAsgACADQQNyNgIEIAAgA2oiByAEQQN0IgQgA2siBUEBcjYCBCAAIARqIAU2AgACQ$',
+]
