@@ -1,7 +1,7 @@
 {
-	"name": "wait-for-artifacts",
+	"name": "download-artifact",
 	"version": "1.0.0",
-	"description": "Wait for uploaded artifacts to become discoverable in the current workflow run",
+	"description": "Download artifact IDs with bounded retries for delayed availability",
 	"scripts": {
 		"test": "node --test",
 		"test:watch": "node --test --watch",

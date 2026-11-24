@@ -126,7 +126,7 @@ jobs:
       contents: read
     uses: $/.github/workflows/__test-action-slugify.yml
 
-  test-action-wait-for-artifacts:
+  test-action-download-artifact:
     needs: lint
     permissions:
       contents: read
@@ -134,7 +134,7 @@ jobs:
       packages: read
       pull-requests: write
       security-events: write
-    uses: $/.github/workflows/__test-action-wait-for-artifacts.yml
+    uses: $/.github/workflows/__test-action-download-artifact.yml
 
   test-action-working-directory:
     needs: lint
@@ -158,7 +158,7 @@ jobs:
       - test-action-create-and-merge-pull-request
       - test-action-parse-ci-reports
       - test-action-need-fix-to-issue
-      - test-action-wait-for-artifacts
+      - test-action-download-artifact
     if: always()
     uses: $/.github/workflows/ci-reports.yml
     permissions:

@@ -1,0 +1,74 @@
+---
+# Download every requested artifact, retrying delayed visibility at consumption time.
+#
+# ```yaml
+# - uses: hoverkraft-tech/ci-github-common/actions/download-artifact@<commit-sha>
+#   with:
+#     artifact-ids: ${{ steps.upload.outputs.artifact-id }}
+#     path: downloaded
+# ```
+name: Download artifacts
+description: |
+  Download every requested artifact ID with the official artifact SDK.
+  Retry missing metadata and unavailable downloads with bounded backoff, up to
+  61 seconds of waiting. Completed downloads are not repeated. Digest mismatches,
+  invalid inputs, permission errors and other service failures remain failures.
+  No runtime installation is required. Only GitHub.com is supported.
+author: hoverkraft
+branding:
+  icon: download
+  color: blue
+
+inputs:
+  artifact-ids:
+    description: Comma-separated positive artifact IDs. Every ID must download successfully.
+    required: true
+  path:
+    description: Destination directory. Multiple artifacts use named subdirectories unless merge-multiple is true.
+    default: ${{ github.workspace }}
+  merge-multiple:
+    description: Download multiple artifacts into the same destination directory.
+    default: "false"
+  skip-decompress:
+    description: Keep the uploaded file as-is, for example a package tarball uploaded without archiving.
+    default: "false"
+  github-token:
+    description: Optional token with actions:read permission for REST downloads. Empty uses the current run's runtime token.
+    default: ""
+  repository:
+    description: Repository containing the artifacts, used with github-token.
+    default: ${{ github.repository }}
+  run-id:
+    description: Workflow run containing the artifacts, used with github-token.
+    default: ${{ github.run_id }}
+
+outputs:
+  download-path:
+    description: Absolute destination path, set only after every artifact downloads successfully.
+    value: ${{ steps.download.outputs.download-path }}
+
+runs:
+  using: composite
+  steps:
+    - id: download
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        ARTIFACT_IDS: ${{ inputs.artifact-ids }}
+        DOWNLOAD_PATH: ${{ inputs.path }}
+        MERGE_MULTIPLE: ${{ inputs.merge-multiple }}
+        SKIP_DECOMPRESS: ${{ inputs.skip-decompress }}
+        ARTIFACT_TOKEN: ${{ inputs.github-token }}
+        ARTIFACT_REPOSITORY: ${{ inputs.repository }}
+        ARTIFACT_RUN_ID: ${{ inputs.run-id }}
+      with:
+        script: |
+          const path = require('node:path');
+          const { pathToFileURL } = require('node:url');
+          const { run } = await import(pathToFileURL(path.join(process.env.ACTION_PATH, 'dist/index.js')));
+          await run({
+            core, artifactIds: process.env.ARTIFACT_IDS, destination: process.env.DOWNLOAD_PATH,
+            mergeMultiple: process.env.MERGE_MULTIPLE, skipDecompress: process.env.SKIP_DECOMPRESS,
+            githubToken: process.env.ARTIFACT_TOKEN, repository: process.env.ARTIFACT_REPOSITORY,
+            runId: process.env.ARTIFACT_RUN_ID
+          });
