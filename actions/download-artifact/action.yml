@@ -48,6 +48,10 @@ outputs:
     value: ${{ steps.download.outputs.download-path }}
 
 runs:
+  # TODO: Replace this workaround with actions/download-artifact once a release
+  # includes its fix for delayed artifact visibility:
+  # https://github.com/actions/download-artifact/issues/505
+  # https://github.com/actions/download-artifact/pull/506
   using: composite
   steps:
     - id: download
