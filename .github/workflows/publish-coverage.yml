@@ -1,0 +1,77 @@
+# Publish the complete Cobertura collection produced by ci-reports.
+#
+# Enable GitHub Code Quality on the repository first. Its documented plans are
+# GitHub Team and Enterprise Cloud. This workflow does not change repository
+# settings, enable AI features or configure rulesets.
+#
+# Call this workflow after ci-reports with its coverage-artifact-id and
+# coverage-reports outputs. Grant code-quality: write only to this calling job.
+# Keep ci-reports, producer checks and Coverage publication complete required.
+# GitHub coverage rules do not wait for uploads; 0 disables a rule threshold.
+# For supported events and the latest commit, the uploader waits for processing
+# and fails on upload or processing errors. Its documented skips (forks,
+# merge_group events and outdated commits) do not establish native coverage.
+#
+# Reports from forks and merge_group events remain available as artifacts and
+# summaries; the official uploader does not support native coverage for them.
+# Native comparisons use the default branch baseline. Generate the same labeled
+# components on pull requests and default-branch pushes. Keep branch/function
+# coverage thresholds in the test framework because GitHub evaluates lines only.
+# This workflow downloads report data and executes no code from the tested project.
+name: Publish coverage
+on:
+  workflow_call:
+    inputs:
+      artifact-id:
+        description: Validated coverage artifact ID from ci-reports in this run and attempt.
+        type: string
+        required: true
+      reports:
+        description: JSON report array from ci-reports coverage-reports output. Each entry includes file, language and label.
+        type: string
+        required: true
+permissions: {}
+jobs:
+  publish:
+    name: Coverage (${{ matrix.report.label }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      code-quality: write
+      pull-requests: read
+    strategy:
+      fail-fast: false
+      matrix:
+        report: ${{ fromJSON(inputs.reports) }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ inputs.artifact-id }}
+          path: ${{ runner.temp }}/validated-coverage
+          merge-multiple: true
+      - id: verify
+        uses: $/actions/quality/coverage-reports
+        with:
+          operation: verify
+          working-directory: ${{ runner.temp }}/validated-coverage
+          reports: ${{ format('[{0}]', toJSON(matrix.report)) }}
+      - uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1.4.4
+        with:
+          file: ${{ steps.verify.outputs.file }}
+          language: ${{ matrix.report.language }}
+          label: ${{ matrix.report.label }}
+          fail-on-error: true
+          wait-for-processing-timeout: 160
+  complete:
+    name: Coverage publication complete
+    needs: publish
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PUBLICATION_RESULT: ${{ needs.publish.result }}
+        with:
+          script: |
+            if (process.env.PUBLICATION_RESULT !== 'success') core.setFailed('Every coverage verification and upload job must succeed. Check uploader logs for unsupported-event or outdated-commit skips.');

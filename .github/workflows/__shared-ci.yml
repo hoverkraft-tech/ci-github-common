@@ -94,6 +94,16 @@ jobs:
       contents: read
     uses: $/.github/workflows/__test-action-get-issue-number.yml
 
+  test-action-coverage-reports:
+    needs: lint
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: write
+      security-events: write
+    uses: $/.github/workflows/__test-action-coverage-reports.yml
+
   test-action-parse-ci-reports:
     needs: lint
     permissions:
@@ -157,6 +167,7 @@ jobs:
       - test-action-lint-pull-request-title
       - test-action-create-and-merge-pull-request
       - test-action-parse-ci-reports
+      - test-action-coverage-reports
       - test-action-need-fix-to-issue
       - test-action-download-artifact
     if: always()

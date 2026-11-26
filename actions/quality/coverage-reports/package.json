@@ -1,0 +1,25 @@
+{
+	"name": "coverage-reports",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Prepare and validate complete Cobertura report artifacts for GitHub Code Quality",
+	"type": "module",
+	"scripts": {
+		"test": "node --test src/*.test.js",
+		"test:ci": "node --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=coverage/junit.xml --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test src/*.test.js",
+		"pretest:ci": "node -e \"require('node:fs').mkdirSync('coverage', {recursive:true})\"",
+		"build": "node -e \"require('node:fs').rmSync('dist', {recursive:true,force:true})\" && ncc build src/index.js --out dist --target es2022 --no-cache --license licenses.txt",
+		"check:dist": "npm run build && git diff --exit-code -- dist && test -z \"$(git ls-files --others --exclude-standard -- dist)\"",
+		"test:distribution": "node --test src/CoverageReports.test.js"
+	},
+	"engines": {
+		"node": ">=24.0.0"
+	},
+	"dependencies": {
+		"fast-xml-parser": "^5.12.1"
+	},
+	"devDependencies": {
+		"@vercel/ncc": "0.45.0"
+	},
+	"license": "MIT"
+}

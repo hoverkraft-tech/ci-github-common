@@ -1,0 +1,123 @@
+name: Coverage reports
+description: |
+  Prepare, collect and verify Cobertura artifacts for native GitHub Code Quality.
+
+  Test jobs use `operation: prepare` without write permissions. Reports must come
+  from the PR head commit or current push commit. Each report has a Linguist
+  language and a stable component label. With one report, the label defaults to
+  its repository-relative working directory, or `root`. Multiple reports require
+  explicit, unique labels. Shards and overlapping suites must be merged first.
+
+  Pass `reports` as a JSON array, for example:
+  `[{"file":"cobertura.xml","language":"Python","label":"backend"}]`.
+  Source filenames are resolved against the checkout and Cobertura sources, then
+  normalized to repository-relative paths. Missing files, ambiguous paths and
+  invalid XML fail. Zero covered lines are valid; zero instrumented lines are not.
+
+  The [CI reports workflow](../../../.github/workflows/ci-reports.md) uses
+  `operation: collect` to validate the expected components, producer outcomes,
+  commit, run attempt, checksums and source overlap before preparing publication.
+  The [publication workflow](../../../.github/workflows/publish-coverage.md) uses
+  `operation: verify` before invoking GitHub's official uploader for each report.
+  Native coverage artifacts are retained for seven days, including after test
+  failures. A failed producer cannot publish an incomplete coverage baseline.
+author: hoverkraft
+branding:
+  icon: bar-chart-2
+  color: blue
+inputs:
+  operation:
+    description: "Operation: prepare in a test job, collect after producers, or verify one publication report."
+    default: prepare
+  working-directory:
+    description: Project directory for prepare; downloaded artifact directory for collect or verify.
+    default: .
+  reports:
+    description: JSON array of file, language and optional label for prepare; exactly one collected report for verify. Filenames must be explicit relative paths, without globs.
+    default: "[]"
+  report-group:
+    description: Outer calling job ID used by ci-reports job-results. Defaults to the current job ID.
+    default: ""
+  expected-reports:
+    description: JSON array of job and label identifying every required component for collect. Missing, additional or duplicate components fail.
+    default: "[]"
+  job-results:
+    description: JSON needs context for collect. Every expected producer must have succeeded.
+    default: "{}"
+  source-sha:
+    description: Explicit tested commit for a prebuilt container without Git metadata. Must match the PR head or current push. A checkout's actual commit is always checked when available.
+    default: ""
+  source-prefix:
+    description: Repository-relative directory represented by working-directory in a prebuilt container; use a dot for the repository root. Required with source-sha when Git metadata is absent.
+    default: ""
+outputs:
+  artifact-id:
+    description: Uploaded native coverage artifact ID for prepare or collect.
+    value: ${{ steps.upload.outputs.artifact-id }}
+  reports:
+    description: JSON report collection with file, language and stable label, suitable for the publication workflow.
+    value: ${{ steps.reports.outputs.reports }}
+  file:
+    description: Verified absolute Cobertura file for the official uploader.
+    value: ${{ steps.reports.outputs.file }}
+runs:
+  using: composite
+  steps:
+    - id: reports
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        COVERAGE_ACTION_PATH: ${{ github.action_path }}
+        COVERAGE_OPERATION: ${{ inputs.operation }}
+        COVERAGE_DIRECTORY: ${{ inputs.working-directory }}
+        COVERAGE_REPORTS: ${{ inputs.reports }}
+        COVERAGE_EXPECTED: ${{ inputs.expected-reports }}
+        COVERAGE_JOBS: ${{ inputs.job-results }}
+        COVERAGE_GROUP: ${{ inputs.report-group || github.job }}
+        COVERAGE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        COVERAGE_SOURCE_SHA: ${{ inputs.source-sha }}
+        COVERAGE_SOURCE_PREFIX: ${{ inputs.source-prefix }}
+      with:
+        script: |
+          const path = require('node:path');
+          const { pathToFileURL } = require('node:url');
+          const { CoverageReports } = await import(pathToFileURL(path.join(process.env.COVERAGE_ACTION_PATH, 'dist/index.js')));
+          const reports = new CoverageReports({
+            identity: {
+              repository: process.env.GITHUB_REPOSITORY,
+              sha: process.env.COVERAGE_SHA,
+              runId: process.env.GITHUB_RUN_ID,
+              attempt: process.env.GITHUB_RUN_ATTEMPT
+            },
+            temporaryDirectory: process.env.RUNNER_TEMP
+          });
+          const options = {
+            directory: path.resolve(process.env.COVERAGE_DIRECTORY),
+            workspace: process.env.GITHUB_WORKSPACE,
+            reports: process.env.COVERAGE_REPORTS,
+            expected: process.env.COVERAGE_EXPECTED,
+            jobs: JSON.parse(process.env.COVERAGE_JOBS),
+            group: process.env.COVERAGE_GROUP,
+            sourceSha: process.env.COVERAGE_SOURCE_SHA,
+            sourcePrefix: process.env.COVERAGE_SOURCE_PREFIX
+          };
+          const operation = process.env.COVERAGE_OPERATION;
+          if (!['prepare', 'collect', 'verify'].includes(operation)) throw new Error('operation must be prepare, collect or verify.');
+          const result = reports[operation](options);
+          for (const [key, value] of Object.entries(result)) {
+            core.setOutput(key, key === 'reports' ? value.map(({file, language, label}) => ({file, language, label})) : value);
+          }
+    - id: upload
+      if: steps.reports.outputs.directory != ''
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ steps.reports.outputs.name }}
+        path: ${{ steps.reports.outputs.directory }}/
+        if-no-files-found: error
+        retention-days: 7
+    - name: Clean temporary coverage files
+      if: always() && steps.reports.outputs.directory != ''
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        COVERAGE_DIRECTORY: ${{ steps.reports.outputs.directory }}
+      with:
+        script: await io.rmRF(process.env.COVERAGE_DIRECTORY);

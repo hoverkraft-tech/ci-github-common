@@ -5,3 +5,4 @@
 - [ADR 0001: Bundle the CI report parser](adr/0001-bundle-ci-report-parser.md)
 - [ADR 0002: Distribute and maintain action-owned dependencies](adr/0002-audit-action-dependency-distributions.md)
 - [ADR 0003: Retry artifact consumption](adr/0003-retry-artifact-consumption.md)
+- [ADR 0004: Native GitHub coverage](adr/0004-native-github-coverage.md)
