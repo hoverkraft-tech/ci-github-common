@@ -5,3 +5,8 @@ paths:
   .github/workflows/__test-action-distributions.yml:
     ignore:
       - '^property "workflow_(repository|sha)" is not defined in object type '
+  # FIXME: Remove when actionlint supports GitHub's code-quality permission.
+  # https://github.com/rhysd/actionlint/pull/674
+  .github/workflows/publish-coverage.yml:
+    ignore:
+      - '^unknown permission scope "code-quality"\.'
