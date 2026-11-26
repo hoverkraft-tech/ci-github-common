@@ -9653,6 +9653,8 @@ class ReportParserCore {
 	 */
 	parseReports(files) {
 		const aggregatedData = new ReportData();
+		aggregatedData.parseErrors = [];
+		aggregatedData.parsedReports = [];
 
 		// Log path rewriting configuration if enabled
 		if (this.pathRewriter.isEnabled()) {
@@ -9667,9 +9669,19 @@ class ReportParserCore {
 
 		for (const file of files) {
 			this.logger.info(`Parsing ${file}...`);
-			const reportData = this.parserFactory.parse(file);
+			let reportData;
+			try {
+				reportData = this.parserFactory.parse(file);
+			} catch (error) {
+				aggregatedData.parseErrors.push(`${file}: ${error.message}`);
+				continue;
+			}
 
 			// Apply path rewriting to test results
+			aggregatedData.parsedReports.push({
+				file,
+				type: reportData.coverage ? "coverage" : reportData.reportType,
+			});
 			for (const test of reportData.tests) {
 				test.file = this.pathRewriter.rewritePath(test.file);
 			}
@@ -9951,15 +9963,27 @@ async function run({ core, glob: globModule, inputs }) {
 		const uniqueFiles = await pathResolver.findFiles(patternList, globModule);
 		logger.info(`Found ${uniqueFiles.length} report file(s)`);
 		core.setOutput("parsed-files", JSON.stringify(uniqueFiles));
-		await pathResolver.assertExplicitMatches(inputs.reportPaths, globModule);
+		const collectionErrors = [];
+		try {
+			await pathResolver.assertExplicitMatches(inputs.reportPaths, globModule);
+		} catch (error) {
+			collectionErrors.push(error.message);
+		}
 
 		if (uniqueFiles.length === 0) {
+			if (collectionErrors.length) throw new Error(collectionErrors.join("\n"));
 			logger.warning("No report files found");
 			return;
 		}
 
 		// Parse reports using core
 		const aggregatedData = parserCore.parseReports(uniqueFiles);
+		collectionErrors.push(...aggregatedData.parseErrors);
+		core.setOutput("parsed-reports", aggregatedData.parsedReports);
+		core.setOutput(
+			"executed-tests",
+			aggregatedData.getPassedCount() + aggregatedData.getFailedCount(),
+		);
 
 		// Generate GitHub annotations if requested
 		if (outputFormats.includes("annotations")) {
@@ -9985,8 +10009,12 @@ async function run({ core, glob: globModule, inputs }) {
 		core.setOutput("test-markdown", testMarkdown);
 		core.setOutput("coverage-markdown", coverageMarkdown);
 		core.setOutput("lint-markdown", lintMarkdown);
-		core.setOutput("has-errors", aggregatedData.hasErrors());
+		core.setOutput(
+			"has-errors",
+			collectionErrors.length > 0 || aggregatedData.hasErrors(),
+		);
 		core.setOutput("summary", summary);
+		if (collectionErrors.length) throw new Error(collectionErrors.join("\n"));
 
 		// Log summary
 		logger.info("\n--- Summary ---");

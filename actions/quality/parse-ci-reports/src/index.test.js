@@ -133,6 +133,17 @@ for (const [name, { kind, hasErrors }] of Object.entries(fixtures)) {
 	});
 }
 describe("run", () => {
+	it("retains valid diagnostics when another required report is missing or malformed", async () => {
+		for (const other of ["absent.xml", "malformed.json"]) {
+			const result = recorder();
+			await assert.rejects(
+				run({ core: result.core, glob, inputs: inputs(`junit.xml,${other}`) }),
+			);
+			assert.ok(result.outputs["test-markdown"]);
+			assert.equal(result.outputs["has-errors"], true);
+			assert.equal(result.failures.length, 1);
+		}
+	});
 	it("rewrites annotations and exposes failures without failing reporting", async () => {
 		const result = recorder();
 		await run({

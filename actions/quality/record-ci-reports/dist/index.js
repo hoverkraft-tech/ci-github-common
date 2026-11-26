@@ -25,7 +25,9 @@ var __webpack_exports__ = {};
 
 // EXPORTS
 __nccwpck_require__.d(__webpack_exports__, {
-  g: () => (/* reexport */ CoverageReports)
+  gi: () => (/* reexport */ CoverageReports),
+  zC: () => (/* reexport */ ReportBundle),
+  OU: () => (/* reexport */ ReportPlan)
 });
 
 ;// CONCATENATED MODULE: external "node:child_process"
@@ -8528,7 +8530,7 @@ class CoverageReports {
 	}
 
 	static label(value) {
-		if (typeof value !== "string" || !/^[\w][\w./-]{0,199}$/.test(value))
+		if (typeof value !== "string" || !/^[\w.-][\w./-]{0,199}$/.test(value))
 			throw new Error(
 				"Coverage labels must contain 1-200 letters, numbers, underscores, dots, slashes or hyphens.",
 			);
@@ -8800,8 +8802,637 @@ class CoverageReports {
 	}
 }
 
+;// CONCATENATED MODULE: external "node:util"
+const external_node_util_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:util");
+;// CONCATENATED MODULE: ./src/ReportPlan.js
+
+
+
+
+/** Expected producer executions, created from the same configuration as the jobs. */
+class ReportPlan {
+	constructor(identity) {
+		this.identity = identity;
+	}
+	static parse(value) {
+		return typeof value === "string" ? JSON.parse(value) : value;
+	}
+
+	create(producers) {
+		const identity = this.identity;
+		producers = ReportPlan.parse(producers);
+		if (!Array.isArray(producers) || producers.length > 256) {
+			throw new Error("producers must be an array with at most 256 entries.");
+		}
+		const plan = { version: 1, identity, group: (0,external_node_crypto_namespaceObject.randomUUID)(), producers };
+		this.validate(plan);
+		return plan;
+	}
+
+	validate(value) {
+		const identity = this.identity;
+		const plan = ReportPlan.parse(value);
+		if (
+			plan?.version !== 1 ||
+			!/^[a-f0-9-]{36}$/.test(plan.group) ||
+			!Array.isArray(plan.producers) ||
+			plan.producers.length > 256 ||
+			Object.entries(identity).some(
+				([key, value]) => plan.identity?.[key] !== value,
+			)
+		) {
+			throw new Error(
+				"Report plan belongs to a different repository, run or attempt, or has an unsupported schema.",
+			);
+		}
+		const keys = new Set();
+		for (const producer of plan.producers) {
+			if (
+				!producer ||
+				!/^[\w.-]{1,100}$/.test(producer.key) ||
+				keys.has(producer.key)
+			) {
+				throw new Error("Every planned producer needs a unique key.");
+			}
+			keys.add(producer.key);
+			if (producer.job !== undefined && !/^[\w-]+$/.test(producer.job))
+				throw new Error("An outer matrix producer job must be a job ID.");
+			if (!["test", "lint"].includes(producer.type))
+				throw new Error("Producer type must be test or lint.");
+			const directory = producer.directory ?? ".";
+			if (
+				typeof directory !== "string" ||
+				external_node_path_namespaceObject.posix.isAbsolute(directory) ||
+				directory.includes("\\") ||
+				directory.split("/").includes("..")
+			) {
+				throw new Error(
+					"Planned working directories must be repository-relative.",
+				);
+			}
+			producer.directory = external_node_path_namespaceObject.posix.normalize(directory);
+			producer.label ??=
+				producer.directory === "." ? "root" : producer.directory;
+			if (
+				!/^[\w.-][\w./-]{0,199}$/.test(producer.label) ||
+				producer.label
+					.split("/")
+					.some((part) => !part || part === "." || part === "..")
+			)
+				throw new Error("Invalid report label.");
+			producer.coverage ??= [];
+			if (!Array.isArray(producer.coverage))
+				throw new Error(
+					"Producer coverage must be an array of report descriptions.",
+				);
+			const labels = new Set();
+			for (const report of producer.coverage) {
+				if (
+					!report ||
+					typeof report.file !== "string" ||
+					!report.file ||
+					external_node_path_namespaceObject.posix.isAbsolute(report.file) ||
+					report.file.includes("\\") ||
+					report.file.split("/").includes("..") ||
+					/[\r\n*?]/.test(report.file)
+				) {
+					throw new Error(
+						"Coverage reports need explicit project-relative file paths.",
+					);
+				}
+				report.label ??= producer.coverage.length === 1 ? producer.label : "";
+				if (
+					!/^[\w.-][\w./-]{0,199}$/.test(report.label) ||
+					report.label
+						.split("/")
+						.some((part) => !part || part === "." || part === "..") ||
+					labels.has(report.label)
+				)
+					throw new Error(
+						"Every coverage component needs a unique stable label.",
+					);
+				if (
+					typeof report.language !== "string" ||
+					!/^[A-Za-z][A-Za-z0-9 #+.-]{0,79}$/.test(report.language)
+				)
+					throw new Error("Coverage needs a Linguist language name.");
+				labels.add(report.label);
+			}
+		}
+		return plan;
+	}
+
+	static selections(plan) {
+		const selections = Object.fromEntries(
+			plan.producers.map((producer) => [
+				producer.key,
+				{ ...plan, producers: [producer] },
+			]),
+		);
+		// Single-kind invocations can keep an outer matrix's unique execution key.
+		for (const type of ["lint", "test"]) {
+			const producers = plan.producers.filter(
+				(producer) => producer.type === type,
+			);
+			if (producers.length === 1 && !selections[type])
+				selections[type] = { ...plan, producers };
+		}
+		return selections;
+	}
+
+	fromJobs(jobs) {
+		const plans = new Map();
+		for (const [job, result] of Object.entries(jobs)) {
+			if (
+				!/^[\w-]+$/.test(job) ||
+				!["success", "failure", "cancelled", "skipped", "abandoned"].includes(
+					result?.result,
+				)
+			) {
+				throw new Error("job-results must contain completed job results.");
+			}
+			const value = result.outputs?.["report-plan"];
+			if (!value) continue;
+			const forwarded = ReportPlan.parse(value);
+			const inventory = Array.isArray(forwarded) ? forwarded : [forwarded];
+			for (const entry of inventory) {
+				const plan = this.validate(entry);
+				for (const producer of plan.producers) {
+					const id = `${plan.group}-${producer.key}`;
+					const owner = producer.job || job;
+					if (!jobs[owner])
+						throw new Error(
+							`Planned producer job ${owner} is absent from job-results.`,
+						);
+					const expected = {
+						plan: { ...plan, producers: [producer] },
+						producer,
+						job: owner,
+						result: jobs[owner].result,
+					};
+					if (plans.has(id)) {
+						// An explicit outer inventory and the matrix's last output can overlap.
+						// Only an identical definition tied to the same outer job is redundant.
+						if (producer.job && (0,external_node_util_namespaceObject.isDeepStrictEqual)(plans.get(id), expected))
+							continue;
+						throw new Error(
+							`Duplicate report plan for ${producer.label}. Forward a matrix's complete plan once, from its configuration job.`,
+						);
+					}
+					plans.set(id, expected);
+				}
+			}
+		}
+		return plans;
+	}
+}
+
+;// CONCATENATED MODULE: ./src/ReportBundle.js
+
+
+
+
+
+
+
+/** Transfer report data independently of producer job names and publication policy. */
+class ReportBundle {
+	static compose({ directory, runUrl, tests, lint, coverage, parseOutcome }) {
+		const collection = ReportBundle.readJson(directory, "collection.json");
+		if (collection.reportFiles.length && parseOutcome !== "success")
+			collection.errors.push(
+				"Some report data could not be parsed. Available diagnostics are shown below.",
+			);
+		collection.complete = collection.errors.length === 0;
+		const outcomes = ["success", "failure", "cancelled", "skipped", "abandoned"]
+			.map(
+				(result) =>
+					`${Object.values(collection.jobs).filter((job) => job.result === result).length} ${result}`,
+			)
+			.join(" · ");
+		const lines = [
+			`[Workflow run and full artifacts](${runUrl})`,
+			`**Jobs:** ${outcomes}.`,
+		];
+		if (collection.errors.length)
+			lines.push(
+				"**Reporting incomplete:**\n" +
+					collection.errors
+						.slice(0, 50)
+						.map((error) => `- ${error.replace(/[<>]/g, "").slice(0, 500)}`)
+						.join("\n"),
+			);
+		if (tests) lines.push(tests);
+		if (lint) lines.push(lint);
+		for (const summary of collection.summaries) {
+			const content = external_node_fs_namespaceObject.readFileSync(
+				ReportBundle.file(directory, summary.file),
+				"utf8",
+			);
+			lines.push(
+				`<details>\n<summary>${summary.label}</summary>\n\n${content.length < 15000 ? content : `See the full artifact in the [workflow run](${runUrl}).`}\n\n</details>`,
+			);
+		}
+		if (collection.provider === "github")
+			lines.push(
+				"**Coverage:** Native GitHub publication requested. The completion check includes publication.",
+			);
+		else if (coverage) lines.push(coverage);
+		const rows = collection.statuses
+			.map(
+				(item) =>
+					`| ${item.label} | ${item.key} | ${item.job} | ${item.reports} | ${item.sha ? item.sha.slice(0, 7) : "unknown"} |`,
+			)
+			.join("\n");
+		lines.push(
+			`<details>\n<summary>Report availability</summary>\n\n| Component | Execution | Job | Files | Commit |\n| --- | --- | --- | --- | --- |\n${rows}\n\nOnly the current attempt is included. Rerun all producers after a partial rerun.\n\n</details>`,
+		);
+		let markdown = lines.join("\n\n");
+		if (markdown.length > 60000)
+			markdown = `${lines.slice(0, collection.errors.length ? 3 : 2).join("\n\n")}\n\nDetailed results exceed the comment limit. [Read the full artifacts](${runUrl}).`;
+		external_node_fs_namespaceObject.writeFileSync(external_node_path_namespaceObject.join(directory, "summary.md"), markdown);
+		external_node_fs_namespaceObject.writeFileSync(
+			external_node_path_namespaceObject.join(directory, "collection.json"),
+			JSON.stringify(collection),
+		);
+		return { markdown, complete: collection.complete };
+	}
+	constructor({ identity, temporaryDirectory }) {
+		this.identity = identity;
+		this.planIdentity = Object.fromEntries(
+			Object.entries(identity).filter(([key]) => key !== "sha"),
+		);
+		this.plans = new ReportPlan(this.planIdentity);
+		this.temporaryDirectory = external_node_fs_namespaceObject.realpathSync(temporaryDirectory);
+		this.coverage = new CoverageReports({ identity, temporaryDirectory });
+	}
+
+	plan({ producers, plan }) {
+		const result = plan
+			? this.plans.validate(plan)
+			: this.plans.create(producers);
+		return { plan: result, selections: ReportPlan.selections(result) };
+	}
+
+	static file(directory, filename) {
+		if (
+			!filename ||
+			external_node_path_namespaceObject.isAbsolute(filename) ||
+			filename.includes("\\") ||
+			filename.split("/").some((part) => !part || part === "." || part === "..")
+		)
+			throw new Error("Unsafe report artifact path.");
+		const file = external_node_path_namespaceObject.join(directory, filename);
+		if (!external_node_fs_namespaceObject.lstatSync(file).isFile() || external_node_fs_namespaceObject.realpathSync(file) !== file)
+			throw new Error(
+				"Report artifacts must contain regular files, not symlinks.",
+			);
+		return file;
+	}
+
+	static readJson(directory, filename) {
+		const file = ReportBundle.file(directory, filename);
+		if (external_node_fs_namespaceObject.statSync(file).size > 4 * 1024 * 1024)
+			throw new Error("Report metadata exceeds 4 MiB.");
+		return JSON.parse(external_node_fs_namespaceObject.readFileSync(file, "utf8"));
+	}
+
+	record({
+		directory,
+		workspace,
+		plan,
+		files = [],
+		categories = [],
+		testCount,
+		summaryFile = "",
+		sourceSha = "",
+		sourcePrefix = "",
+		parseOutcome = "success",
+		summaries = {},
+		metadata = {},
+	}) {
+		plan = this.plans.validate(plan);
+		if (plan.producers.length !== 1)
+			throw new Error("Record exactly one planned producer execution.");
+		const producer = plan.producers[0];
+		metadata = ReportPlan.parse(metadata);
+		if (!metadata || typeof metadata !== "object" || Array.isArray(metadata))
+			throw new Error("Report metadata must be a JSON object.");
+		const project = external_node_fs_namespaceObject.realpathSync(directory);
+		const stage = external_node_fs_namespaceObject.mkdtempSync(
+			external_node_path_namespaceObject.join(this.temporaryDirectory, "ci-report-"),
+		);
+		const errors = [];
+		let actualSha = sourceSha;
+		try {
+			actualSha = (0,external_node_child_process_namespaceObject.execFileSync)("git", ["-C", project, "rev-parse", "HEAD"], {
+				encoding: "utf8",
+				stdio: ["ignore", "pipe", "pipe"],
+			}).trim();
+		} catch {
+			// Diagnostics from prebuilt containers may have no source metadata.
+			// Coverage preparation below still requires an explicit, matching revision.
+			actualSha = sourceSha;
+		}
+		if (actualSha && !/^[a-f0-9]{40}$/.test(actualSha))
+			errors.push("Invalid report source commit.");
+		if (sourceSha && sourceSha !== actualSha)
+			errors.push("source-sha differs from the actual checkout.");
+		if (parseOutcome !== "success" && !summaryFile)
+			errors.push(
+				"Report parsing did not complete. Available diagnostics are retained.",
+			);
+		const records = [];
+		categories = ReportPlan.parse(categories);
+		if (
+			producer.type === "test" &&
+			testCount !== undefined &&
+			Number(testCount) < 1
+		)
+			errors.push(
+				"No executed tests were reported. Disable intentionally absent producers in the plan.",
+			);
+		files = ReportPlan.parse(files);
+		if (!Array.isArray(files))
+			throw new Error("Parsed files must be an array.");
+		if (summaryFile) files.push(external_node_path_namespaceObject.resolve(project, summaryFile));
+		const coverageFiles = new Set(
+			producer.coverage.map((report) => external_node_path_namespaceObject.resolve(project, report.file)),
+		);
+		for (const [index, input] of [...new Set(files)].entries()) {
+			try {
+				const real = external_node_fs_namespaceObject.realpathSync(input);
+				if (
+					!external_node_fs_namespaceObject.lstatSync(input).isFile() ||
+					real !== input ||
+					!real.startsWith(`${project}${external_node_path_namespaceObject.sep}`)
+				)
+					throw new Error(
+						"Report file is outside the project or is not a regular file.",
+					);
+				if (external_node_fs_namespaceObject.statSync(real).size > 64 * 1024 * 1024)
+					throw new Error("Report file exceeds 64 MiB.");
+				if (coverageFiles.has(real)) continue;
+				const file = `reports/${index}/${external_node_path_namespaceObject.basename(real)}`;
+				external_node_fs_namespaceObject.mkdirSync(external_node_path_namespaceObject.dirname(external_node_path_namespaceObject.join(stage, file)), { recursive: true });
+				const content = external_node_fs_namespaceObject.readFileSync(real);
+				external_node_fs_namespaceObject.writeFileSync(external_node_path_namespaceObject.join(stage, file), content);
+				const type =
+					categories.find((item) => item.file === input)?.type || producer.type;
+				records.push({
+					file,
+					sha256: CoverageReports.digest(content),
+					type:
+						summaryFile && real === external_node_path_namespaceObject.resolve(project, summaryFile)
+							? "summary"
+							: type === "coverage" && producer.coverage.length
+								? "attachment"
+								: type,
+				});
+			} catch (error) {
+				errors.push(`${input}: ${error.message}`);
+			}
+		}
+		if (!records.length)
+			errors.push(
+				`No ${producer.type} reports were produced for ${producer.label}. Configure a native report in the tool command.`,
+			);
+		if (producer.coverage.length) {
+			let prepared;
+			try {
+				prepared = this.coverage.prepare({
+					directory: project,
+					workspace,
+					reports: producer.coverage,
+					group: "coverage",
+					sourceSha,
+					sourcePrefix,
+				});
+				external_node_fs_namespaceObject.renameSync(prepared.directory, external_node_path_namespaceObject.join(stage, "coverage"));
+				for (const report of prepared.reports)
+					records.push({
+						file: `coverage/${report.file}`,
+						sha256: report.sha256,
+						type: "coverage",
+					});
+			} catch (error) {
+				errors.push(error.message);
+			}
+		}
+		const manifest = {
+			version: 1,
+			identity: this.planIdentity,
+			sha: actualSha,
+			plan,
+			files: records,
+			errors,
+			summaries,
+			metadata,
+		};
+		external_node_fs_namespaceObject.writeFileSync(
+			external_node_path_namespaceObject.join(stage, "ci-report.json"),
+			JSON.stringify(manifest),
+		);
+		return {
+			directory: stage,
+			name: `ci-reports-${this.identity.attempt}-${plan.group}-${producer.key}`,
+			complete: errors.length === 0,
+			errors,
+			plan,
+		};
+	}
+
+	read(directory, expected) {
+		const manifest = ReportBundle.readJson(directory, "ci-report.json");
+		if (manifest.version !== 1 || !(0,external_node_util_namespaceObject.isDeepStrictEqual)(manifest.plan, expected))
+			throw new Error("Report bundle does not match its expected plan.");
+		if (
+			Object.entries(this.planIdentity).some(
+				([key, value]) => manifest.identity?.[key] !== value,
+			)
+		)
+			throw new Error("Stale report bundle repository, run or attempt.");
+		if (manifest.sha !== "" && !/^[a-f0-9]{40}$/.test(manifest.sha))
+			throw new Error("Report bundle has no valid source commit.");
+		if (!Array.isArray(manifest.files) || !Array.isArray(manifest.errors))
+			throw new Error("Invalid report bundle metadata.");
+		for (const record of manifest.files) {
+			const file = ReportBundle.file(directory, record.file);
+			if (CoverageReports.digest(external_node_fs_namespaceObject.readFileSync(file)) !== record.sha256)
+				throw new Error("Report artifact checksum mismatch.");
+		}
+		return manifest;
+	}
+
+	discover({ jobs }) {
+		const plans = this.plans.fromJobs(jobs);
+		if (!Object.keys(jobs).length)
+			throw new Error("job-results must not be empty.");
+		const names = [...plans.keys()].map(
+			(id) => `ci-reports-${this.identity.attempt}-${id}`,
+		);
+		return {
+			pattern:
+				names.length > 1
+					? `{${names.join(",")}}`
+					: names[0] || "ci-reports-no-producers",
+			count: plans.size,
+		};
+	}
+
+	collect({ directory, jobs, provider = "none" }) {
+		if (!["none", "github", "codecov"].includes(provider))
+			throw new Error("coverage must be none, github or codecov.");
+		const plans = this.plans.fromJobs(jobs);
+		const errors = [];
+		for (const [job, value] of Object.entries(jobs)) {
+			if (value.result !== "success")
+				errors.push(
+					`${job}: ${value.result}. Required producer jobs must succeed.`,
+				);
+			if (
+				!value.outputs?.["report-plan"] &&
+				![...plans.values()].some((entry) => entry.producer.job === job)
+			)
+				errors.push(
+					`${job}: no report-plan output. Use an updated producer workflow, or forward the recording action's report-plan output. For an outer matrix, forward its complete configuration plan.`,
+				);
+		}
+		const root = external_node_fs_namespaceObject.realpathSync(directory);
+		const flat = external_node_fs_namespaceObject.existsSync(external_node_path_namespaceObject.join(root, "ci-report.json"));
+		const stage = external_node_fs_namespaceObject.mkdtempSync(
+			external_node_path_namespaceObject.join(this.temporaryDirectory, "ci-report-collection-"),
+		);
+		const coverageIncoming = external_node_path_namespaceObject.join(stage, "coverage-incoming");
+		external_node_fs_namespaceObject.mkdirSync(coverageIncoming);
+		const reportFiles = [],
+			summaries = [],
+			expectedCoverage = [];
+		const statuses = [];
+		for (const [id, expected] of plans) {
+			const artifact =
+				flat && plans.size === 1
+					? root
+					: external_node_path_namespaceObject.join(root, `ci-reports-${this.identity.attempt}-${id}`);
+			const producer = expected.producer;
+			try {
+				const manifest = this.read(artifact, expected.plan);
+				errors.push(
+					...manifest.errors.map(
+						(error) => `${producer.label} (${producer.key}): ${error}`,
+					),
+				);
+				const prefix = `${producer.label} (${producer.key})`;
+				statuses.push({
+					label: producer.label,
+					key: producer.key,
+					job: expected.job,
+					reports: manifest.files.length,
+					sha: manifest.sha,
+					metadata: manifest.metadata || {},
+				});
+				for (const record of manifest.files) {
+					const relative = `reports/${producer.label}/${producer.key}/${record.file}`;
+					const destination = external_node_path_namespaceObject.join(stage, relative);
+					if (external_node_fs_namespaceObject.existsSync(destination))
+						throw new Error(
+							`Duplicate logical report ${producer.label} (${producer.key}). Give independent producers distinct labels.`,
+						);
+					external_node_fs_namespaceObject.mkdirSync(external_node_path_namespaceObject.dirname(destination), { recursive: true });
+					external_node_fs_namespaceObject.copyFileSync(
+						ReportBundle.file(artifact, record.file),
+						destination,
+					);
+					if (record.type === "summary")
+						summaries.push({ label: prefix, file: relative });
+					else if (record.type !== "attachment") reportFiles.push(relative);
+				}
+				if (producer.coverage.length) {
+					const reports = this.coverage.read(external_node_path_namespaceObject.join(artifact, "coverage"));
+					if (
+						JSON.stringify(
+							reports.map(({ label, language }) => ({ label, language })),
+						) !==
+						JSON.stringify(
+							producer.coverage.map(({ label, language }) => ({
+								label,
+								language,
+							})),
+						)
+					)
+						throw new Error(
+							"Coverage components differ from the declared plan.",
+						);
+					external_node_fs_namespaceObject.cpSync(
+						external_node_path_namespaceObject.join(artifact, "coverage"),
+						external_node_path_namespaceObject.join(coverageIncoming, id),
+						{ recursive: true },
+					);
+					for (const report of producer.coverage)
+						expectedCoverage.push({ job: "coverage", label: report.label });
+				}
+			} catch (error) {
+				errors.push(
+					`${producer.label} (${producer.key}): ${error.code === "ENOENT" ? "Reports unavailable. Rerun all producer jobs for this attempt." : error.message}`,
+				);
+			}
+		}
+		let coverageReports = [];
+		if (!errors.length && expectedCoverage.length) {
+			try {
+				const collection = this.coverage.collect({
+					directory: coverageIncoming,
+					expected: expectedCoverage,
+					jobs: { coverage: { result: "success" } },
+				});
+				external_node_fs_namespaceObject.renameSync(collection.directory, external_node_path_namespaceObject.join(stage, "coverage"));
+				coverageReports = collection.reports.map(
+					({ file, language, label }) => ({ file, language, label }),
+				);
+			} catch (error) {
+				errors.push(error.message);
+			}
+		}
+		if (provider !== "none" && !expectedCoverage.length)
+			errors.push(
+				"Coverage publication requires coverage-producing tests in the report plan.",
+			);
+		external_node_fs_namespaceObject.rmSync(coverageIncoming, { recursive: true, force: true });
+		const result = {
+			version: 1,
+			identity: this.identity,
+			jobs,
+			statuses,
+			errors,
+			summaries,
+			reportFiles,
+			coverageReports,
+			provider,
+			complete: errors.length === 0,
+		};
+		external_node_fs_namespaceObject.writeFileSync(
+			external_node_path_namespaceObject.join(stage, "collection.json"),
+			JSON.stringify(result),
+		);
+		return {
+			directory: stage,
+			name: `ci-report-collection-${this.identity.attempt}-${external_node_path_namespaceObject.basename(stage)}`,
+			complete: result.complete,
+			reports: coverageReports,
+			"report-paths": reportFiles
+				.map((file) => external_node_path_namespaceObject.join(stage, file))
+				.join("\n"),
+			collection: result,
+		};
+	}
+}
+
 ;// CONCATENATED MODULE: ./src/index.js
 
 
-var __webpack_exports__CoverageReports = __webpack_exports__.g;
-export { __webpack_exports__CoverageReports as CoverageReports };
+
+
+var __webpack_exports__CoverageReports = __webpack_exports__.gi;
+var __webpack_exports__ReportBundle = __webpack_exports__.zC;
+var __webpack_exports__ReportPlan = __webpack_exports__.OU;
+export { __webpack_exports__CoverageReports as CoverageReports, __webpack_exports__ReportBundle as ReportBundle, __webpack_exports__ReportPlan as ReportPlan };

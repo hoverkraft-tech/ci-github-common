@@ -34,7 +34,7 @@ export class CoverageReports {
 	}
 
 	static label(value) {
-		if (typeof value !== "string" || !/^[\w][\w./-]{0,199}$/.test(value))
+		if (typeof value !== "string" || !/^[\w.-][\w./-]{0,199}$/.test(value))
 			throw new Error(
 				"Coverage labels must contain 1-200 letters, numbers, underscores, dots, slashes or hyphens.",
 			);

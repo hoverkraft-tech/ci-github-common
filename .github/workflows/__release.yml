@@ -1,7 +1,8 @@
 ---
 name: Internal - Release
 
-on: # yamllint disable-line rule:truthy
+on:
+  # yamllint disable-line rule:truthy
   workflow_dispatch:
     # checkov:skip=CKV_GHA_7: force only bypasses the no-changes guard; source and CI settings stay fixed.
     inputs:
@@ -33,6 +34,7 @@ jobs:
       pull-requests: write
       security-events: write
       statuses: write
+      code-quality: write
 
   release:
     name: Create and publish release

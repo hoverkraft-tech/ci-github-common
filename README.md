@@ -38,7 +38,7 @@ See the [documentation](docs/README.md) for detailed guides.
 
 ### Quality checks & reporting
 
-- [Coverage reports](actions/quality/coverage-reports/README.md) - prepares and validates complete Cobertura collections for native GitHub coverage.
+- [Record CI reports](actions/quality/record-ci-reports/README.md) - retains test, lint and coverage results for consolidated reporting.
 - [Codecov](actions/quality/codecov/README.md) - uploads coverage from any language using OIDC, with optional explicit report selection.
 - [Lint pull request title](actions/quality/lint-pull-request-title/README.md) - checks pull request titles against the common Conventional Commits policy.
 - [Test action distribution](actions/quality/test-action-distribution/README.md) - checks a bundle against package-owned contract tests in isolation.
@@ -62,8 +62,7 @@ See the [documentation](docs/README.md) for detailed guides.
 
 - [Test action distributions](.github/workflows/test-action-distributions.md) - discovers bundled packages and validates their distributions on host and container runners.
 - [Action distributions](.github/workflows/action-distributions.md) - regenerates committed action bundles in dependency pull requests.
-- [Publish coverage](.github/workflows/publish-coverage.md) - publishes validated components to GitHub Code Quality with isolated permissions.
-- [CI reports](.github/workflows/ci-reports.md) - consolidates tests, coverage and lint into three compact PR comments.
+- [CI reports](.github/workflows/ci-reports.md) - consolidates lint, tests and coverage into one CI comment and publishes validated coverage.
 - [Linter](.github/workflows/linter.md) - runs Super Linter and shared formatting checks across the repository.
 - [Semantic pull request](.github/workflows/semantic-pull-request.md) - enforces semantic pull request titles before merging.
 

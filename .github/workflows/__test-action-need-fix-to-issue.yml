@@ -2,13 +2,16 @@ name: Internal - Tests for need-fix-to-issue action
 
 on:
   workflow_call:
-
+    outputs:
+      report-plan:
+        description: Expected native report plan.
+        value: ${{ jobs.continuous-integration.outputs.report-plan }}
 permissions:
   contents: read
 
 jobs:
   continuous-integration:
-    uses: hoverkraft-tech/ci-github-nodejs/.github/workflows/continuous-integration.yml@191d7230d57982bfc11d57f68b005f386a6d7fbf # 3.1.1
+    uses: hoverkraft-tech/ci-github-nodejs/.github/workflows/continuous-integration.yml@aeab7d712c734308587b10eb22d14c511f8e846a # unified reports (PR #624, unreleased)
     permissions:
       contents: read
       id-token: write
@@ -20,4 +23,4 @@ jobs:
       build: ""
       lint: ""
       code-ql: '{"languages":"typescript","config-file":".github/codeql/config.yml"}'
-      test: '{"comment":false,"report-group":"test-action-need-fix-to-issue"}'
+      test: '{"coverage":false}'

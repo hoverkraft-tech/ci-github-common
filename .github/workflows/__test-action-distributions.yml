@@ -2,14 +2,17 @@ name: Internal - Tests for action-distributions action
 
 on:
   workflow_call:
-
+    outputs:
+      report-plan:
+        description: Expected native report plan.
+        value: ${{ jobs.continuous-integration.outputs.report-plan }}
 permissions:
   contents: read
   pull-requests: read
 
 jobs:
   continuous-integration:
-    uses: hoverkraft-tech/ci-github-nodejs/.github/workflows/continuous-integration.yml@191d7230d57982bfc11d57f68b005f386a6d7fbf # 3.1.1
+    uses: hoverkraft-tech/ci-github-nodejs/.github/workflows/continuous-integration.yml@aeab7d712c734308587b10eb22d14c511f8e846a # unified reports (PR #624, unreleased)
     permissions:
       contents: read
       id-token: write
@@ -21,7 +24,7 @@ jobs:
       build: ""
       lint: ""
       code-ql: '{"languages":"typescript","config-file":".github/codeql/config.yml"}'
-      test: '{"comment":false,"report-group":"test-action-distributions"}'
+      test: '{"coverage":false}'
 
   integration-tests:
     runs-on: ubuntu-latest
@@ -31,6 +34,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Exercise public action on an unrelated package
         id: prepare-build
         uses: $/actions/action-distributions

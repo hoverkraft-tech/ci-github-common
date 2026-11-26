@@ -40,8 +40,6 @@ jobs:
       security-events: write
       statuses: write
     uses: $/.github/workflows/linter.yml
-    with:
-      comment: false
 
   test-action-matrix-outputs:
     needs: lint
@@ -93,16 +91,6 @@ jobs:
     permissions:
       contents: read
     uses: $/.github/workflows/__test-action-get-issue-number.yml
-
-  test-action-coverage-reports:
-    needs: lint
-    permissions:
-      contents: read
-      id-token: write
-      packages: read
-      pull-requests: write
-      security-events: write
-    uses: $/.github/workflows/__test-action-coverage-reports.yml
 
   test-action-parse-ci-reports:
     needs: lint
@@ -158,6 +146,8 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      code-quality: write
+      id-token: write
 
   reports:
     needs:
@@ -167,7 +157,7 @@ jobs:
       - test-action-lint-pull-request-title
       - test-action-create-and-merge-pull-request
       - test-action-parse-ci-reports
-      - test-action-coverage-reports
+      - test-action-record-ci-reports
       - test-action-need-fix-to-issue
       - test-action-download-artifact
     if: always()
@@ -175,5 +165,17 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      code-quality: write
+      id-token: write
     with:
       job-results: ${{ toJSON(needs) }}
+  test-action-record-ci-reports:
+    needs: lint
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: write
+      security-events: write
+      code-quality: write
+    uses: $/.github/workflows/__test-action-record-ci-reports.yml

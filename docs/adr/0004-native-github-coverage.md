@@ -1,21 +1,21 @@
 # ADR 0004: Unify CI reporting across the Hoverkraft actions
 
-- Status: proposed, implementation pending
+- Status: accepted, implementation validation in progress
 - Date: 2026-11-26
 - Scope: common reporting, language CI and container test producers
 
 ## Context
 
 The current coverage proposal adds a second artifact stream and a separate public
-publication workflow. Callers select providers in test actions, repeat component
+publication workflow. The previous proposal selected providers in test actions, repeat component
 labels in the collector and forward artifact IDs to another job. Producers also
 duplicate parsing, artifact naming and comments. The shared linter requires a
 particular calling job name. These details make ordinary CI configuration harder.
 
 Breaking changes are allowed. The target is one coherent lint, test and coverage
-reporting process. This revision replaces the earlier proposal in this
-still-proposed ADR. The companion PRs currently demonstrate coverage validation;
-they do not implement the contract below yet.
+reporting process. This revision replaces the earlier proposal before acceptance. The language
+producer PRs adopt the shared contract. Live native publication remains a separate
+acceptance step on an eligible repository.
 
 ## Decision
 
@@ -53,7 +53,6 @@ reports:
   uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@<commit-sha>
   permissions:
     contents: read
-    actions: read
     pull-requests: write
     code-quality: write
     id-token: write
@@ -62,7 +61,6 @@ reports:
     coverage: github
 ```
 
-This is a target API example, not a working example for the current branch.
 Producer workflows expose their report plans through `needs` automatically. There
 is no mandatory configuration file, repeated inventory, per-producer
 `comment: false`, outer job naming convention or public artifact ID plumbing.
@@ -88,9 +86,10 @@ component labels. Logs may remain separate diagnostic artifacts.
 
 Use that bundle for summaries and coverage publication. Do not maintain a parallel
 coverage-only artifact stream. When several formats represent the same coverage,
-mark one canonical summary source and a supported representation for each provider.
-Do not count them as separate coverage. Preserve provider-supported raw formats,
-including Go profiles or Clover for Codecov.
+use Cobertura as the canonical representation for both GitHub and Codecov. Other
+parsed formats can remain diagnostic attachments, without being counted twice.
+A Clover-only or LCOV-only project must add Cobertura generation to use this
+publishing path. This keeps one validation contract across providers.
 
 Reuse supported native test/lint formats and Super-Linter summaries. CodeQL
 findings stay in code scanning. Container results retain image digest, engine and
@@ -114,7 +113,9 @@ complete inventory. The implementation must make this distinction explicit.
 Discovery locates results; it does not establish what was expected. Missing
 required bundles, unexplained skips, failures, cancellations and abandoned
 executions prevent completeness. Disabled producers are declared in the plan.
-Build and scan jobs can contribute their status without promising report data.
+A disabled producer workflow exposes an empty plan. Status-only jobs must also
+forward an empty plan explicitly; an absent output cannot silently excuse a
+misconfigured producer.
 
 ### Multiple results and source identity
 
@@ -188,7 +189,7 @@ receive it. No settings, subscriptions, AI features or rulesets change implicitl
    multiple components and provider errors, before recommending coverage gates.
    Regenerate action/workflow references with CI Dokumentor after the API works.
 
-Prior hosted CI validates the previous implementation only. This target contract
+Prior hosted CI validates the previous implementation only. The shared contract
 and live publication need their own validation. Repository enablement and ruleset
 changes remain separate maintainer decisions.
 

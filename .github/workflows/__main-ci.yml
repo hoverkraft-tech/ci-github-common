@@ -1,7 +1,8 @@
 ---
 name: Internal - Main - Continuous Integration
 
-on: # yamllint disable-line rule:truthy
+on:
+  # yamllint disable-line rule:truthy
   push:
     branches: [main]
     tags: ["*"]
@@ -29,6 +30,7 @@ jobs:
       pull-requests: write
       security-events: write
       statuses: write
+      code-quality: write
 
   release:
     needs: ci
