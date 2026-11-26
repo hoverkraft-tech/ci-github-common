@@ -19,6 +19,7 @@ jobs:
       working-directory: actions/quality/record-ci-reports
       build: ""
       lint: ""
+      code-ql: '{"languages":"typescript","config-file":".github/codeql/config.yml"}'
       test: '{"coverage":false}'
   configuration:
     runs-on: ubuntu-latest
