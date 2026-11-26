@@ -47,6 +47,8 @@ they do not establish success, even when individual reports contain no failures.
 Grant contents: read and pull-requests: write. Fork PRs retain
 summaries without commenting. Use the caller's concurrency to cancel superseded
 runs. This workflow serializes publication and rejects an outdated PR head.
+Independent previews with comment: false should each set a unique
+concurrency-group to prevent pending preview jobs from cancelling each other.
 
 ## Native GitHub coverage
 
@@ -102,7 +104,7 @@ on:
 permissions: {}
 jobs:
   ci-reports:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@6535a964c5ba86fe0baab0fb5a41a066587a8688 # feat/native-github-coverage
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@4f17e6322e6f6421a66870c26be68e64414cec9c # feat/native-github-coverage
     permissions:
       contents: read
       pull-requests: write
@@ -110,6 +112,9 @@ jobs:
       # Publish combined PR comments. Disable for report previews or workflow tests; summaries and outputs remain available.
       # Default: `true`
       comment: true
+
+      # Concurrency group for independent previews with comment false. Empty retains the default PR group. Commenting runs always share the default group.
+      concurrency-group: ""
 
       # Opt-in native coverage inventory as a JSON array of job and label.
       # Example: [{"job":"backend","label":"backend"},{"job":"frontend","label":"frontend"}].
@@ -134,17 +139,18 @@ jobs:
 
 ### Workflow Call Inputs
 
-| **Input**              | **Description**                                                                                                      | **Required** | **Type**    | **Default** |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- | ----------- |
-| **`comment`**          | Publish combined PR comments. Disable for report previews or workflow tests; summaries and outputs remain available. | **false**    | **boolean** | `true`      |
-| **`coverage-reports`** | Opt-in native coverage inventory as a JSON array of job and label.                                                   | **false**    | **string**  | `[]`        |
-|                        | Example: [{"job":"backend","label":"backend"},{"job":"frontend","label":"frontend"}].                                |              |             |             |
-|                        | Producers use coverage-reports prepare with matching report-group and labels.                                        |              |             |             |
-|                        | Every component must be present exactly once in this run and attempt, from successful jobs.                          |              |             |             |
-|                        | Overlapping source files must be merged by the test framework before collection.                                     |              |             |             |
-|                        | Disables our coverage PR comment; summaries and test/lint comments remain.                                           |              |             |             |
-|                        | Pass the coverage outputs to publish-coverage with code-quality write permission.                                    |              |             |             |
-| **`job-results`**      | JSON needs context containing lint and test jobs and their results.                                                  | **true**     | **string**  | -           |
+| **Input**               | **Description**                                                                                                                                    | **Required** | **Type**    | **Default** |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- | ----------- |
+| **`comment`**           | Publish combined PR comments. Disable for report previews or workflow tests; summaries and outputs remain available.                               | **false**    | **boolean** | `true`      |
+| **`concurrency-group`** | Concurrency group for independent previews with comment false. Empty retains the default PR group. Commenting runs always share the default group. | **false**    | **string**  | -           |
+| **`coverage-reports`**  | Opt-in native coverage inventory as a JSON array of job and label.                                                                                 | **false**    | **string**  | `[]`        |
+|                         | Example: [{"job":"backend","label":"backend"},{"job":"frontend","label":"frontend"}].                                                              |              |             |             |
+|                         | Producers use coverage-reports prepare with matching report-group and labels.                                                                      |              |             |             |
+|                         | Every component must be present exactly once in this run and attempt, from successful jobs.                                                        |              |             |             |
+|                         | Overlapping source files must be merged by the test framework before collection.                                                                   |              |             |             |
+|                         | Disables our coverage PR comment; summaries and test/lint comments remain.                                                                         |              |             |             |
+|                         | Pass the coverage outputs to publish-coverage with code-quality write permission.                                                                  |              |             |             |
+| **`job-results`**       | JSON needs context containing lint and test jobs and their results.                                                                                | **true**     | **string**  | -           |
 
 <!-- inputs:end -->
 <!-- secrets:start -->

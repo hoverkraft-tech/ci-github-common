@@ -53,7 +53,7 @@ on:
 permissions: {}
 jobs:
   publish-coverage:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/publish-coverage.yml@6535a964c5ba86fe0baab0fb5a41a066587a8688 # feat/native-github-coverage
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/publish-coverage.yml@4f17e6322e6f6421a66870c26be68e64414cec9c # feat/native-github-coverage
     permissions:
       code-quality: write
       pull-requests: read

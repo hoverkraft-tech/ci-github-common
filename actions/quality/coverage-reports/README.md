@@ -41,7 +41,7 @@ failures. A failed producer cannot publish an incomplete coverage baseline.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/quality/coverage-reports@6535a964c5ba86fe0baab0fb5a41a066587a8688 # feat/native-github-coverage
+- uses: hoverkraft-tech/ci-github-common/actions/quality/coverage-reports@4f17e6322e6f6421a66870c26be68e64414cec9c # feat/native-github-coverage
   with:
     # Operation: prepare in a test job, collect after producers, or verify one publication report.
     # Default: `prepare`
