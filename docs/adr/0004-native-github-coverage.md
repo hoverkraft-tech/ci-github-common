@@ -3,6 +3,7 @@
 - Status: accepted, implementation validation in progress
 - Date: 2026-11-26
 - Scope: common reporting, language CI and container test producers
+- Related: [ADR 0005](0005-independent-reporting-releases.md) defines independent CI and release ordering.
 
 ## Context
 

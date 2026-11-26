@@ -51,9 +51,6 @@ jobs:
     needs: lint
     permissions:
       contents: read
-      id-token: write
-      packages: read
-      pull-requests: write
       security-events: write
     uses: $/.github/workflows/__test-action-create-and-merge-pull-request.yml
 
@@ -106,9 +103,6 @@ jobs:
     needs: lint
     permissions:
       contents: read
-      id-token: write
-      packages: read
-      pull-requests: write
       security-events: write
     uses: $/.github/workflows/__test-action-need-fix-to-issue.yml
 

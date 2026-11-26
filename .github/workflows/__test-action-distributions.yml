@@ -12,19 +12,12 @@ permissions:
 
 jobs:
   continuous-integration:
-    uses: hoverkraft-tech/ci-github-nodejs/.github/workflows/continuous-integration.yml@11636b817040a2a7d61b389c28fa1b401c37a2fa # unified reports (PR #624, unreleased)
+    uses: $/.github/workflows/__test-nodejs-action.yml
     permissions:
       contents: read
-      id-token: write
-      packages: read
-      pull-requests: write
       security-events: write
     with:
       working-directory: actions/action-distributions
-      build: ""
-      lint: ""
-      code-ql: '{"languages":"typescript","config-file":".github/codeql/config.yml"}'
-      test: '{"coverage":false}'
 
   integration-tests:
     runs-on: ubuntu-latest

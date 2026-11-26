@@ -6,3 +6,4 @@
 - [ADR 0002: Distribute and maintain action-owned dependencies](adr/0002-audit-action-dependency-distributions.md)
 - [ADR 0003: Retry artifact consumption](adr/0003-retry-artifact-consumption.md)
 - [ADR 0004: Unified CI reporting](adr/0004-native-github-coverage.md)
+- [ADR 0005: Independent reporting releases](adr/0005-independent-reporting-releases.md)
