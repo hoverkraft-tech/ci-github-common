@@ -1,77 +1,210 @@
-# ADR 0004: Publish complete coverage collections to GitHub Code Quality
+# ADR 0004: Unify CI reporting across the Hoverkraft actions
 
-- Status: proposed
+- Status: proposed, implementation pending
 - Date: 2026-11-26
+- Scope: common reporting, language CI and container test producers
 
 ## Context
 
-Language test actions retain coverage reports and the common CI reports workflow
-renders summaries and comments. GitHub Code Quality accepts Cobertura XML with a
-language and label per upload, compares line coverage against the default branch,
-and offers coverage rulesets. Independent actions and monorepo projects produce
-multiple reports. Shards and runtime matrices can produce duplicate or partial
-coverage for the same source.
+The current coverage proposal adds a second artifact stream and a separate public
+publication workflow. Callers select providers in test actions, repeat component
+labels in the collector and forward artifact IDs to another job. Producers also
+duplicate parsing, artifact naming and comments. The shared linter requires a
+particular calling job name. These details make ordinary CI configuration harder.
 
-GitHub requires PR head coverage, whereas existing CI normally tests the PR merge
-commit. Its uploader skips fork PRs and merge queues. Coverage rules do not wait
-for expected uploads and a zero threshold disables that rule. These constraints
-come from the upstream documentation checked on this date; they are not evidence
-that publication has been exercised on every consumer.
+Breaking changes are allowed. The target is one coherent lint, test and coverage
+reporting process. This revision replaces the earlier proposal in this
+still-proposed ADR. The companion PRs currently demonstrate coverage validation;
+they do not implement the contract below yet.
 
 ## Decision
 
-Keep existing coverage destinations unchanged and add explicit native publication.
-Language actions produce Cobertura artifacts through the common coverage-reports
-action. The action normalizes source paths and records stable labels, language,
-producer job, actual tested commit, repository, run, attempt and file checksums.
-Container consumers without Git metadata explicitly provide the image's source
-commit and repository-relative project prefix. A claimed SHA cannot override an
-available checkout's actual revision.
+### One reporting entry point
 
-CI reports accepts an explicit inventory of expected component labels and producer
-jobs. Collection rejects missing, extra, duplicate, stale or modified results and
-overlapping source files. It requires successful producers; failed test reports
-remain diagnostic artifacts and summaries. Partial reruns require all producers
-to rerun. Native framework mergers own shard and overlapping-suite aggregation.
-Only one designated runtime version publishes coverage. Percentages are never
-averaged and different components remain separate uploads.
+Keep `ci-reports.yml` as the only public reporting workflow. It collects results,
+validates completeness, publishes a summary and one persistent CI comment, and
+uploads coverage when requested. Internal jobs retain separate permissions;
+callers do not wire another publication workflow or forward artifact IDs.
 
-Use the official upload-code-coverage action, pinned by release commit. A small
-publish-coverage reusable workflow consumes the validated collection, verifies
-each report and waits for successful processing. This separate permission boundary
-is necessary: adding code-quality write permission to ci-reports would require
-existing callers to grant it even when native publication is disabled. Reporting
-keeps its existing permissions. Publication downloads only data and executes no
-project scripts. The caller must require producer, collection and publication
-completion checks, alongside any coverage rules.
+```mermaid
+flowchart LR
+    P[Lint, test and container actions] --> B[Common report bundles]
+    B --> R[ci-reports: validate and summarize]
+    R --> S[Job summary and one CI comment]
+    R --> C[GitHub coverage or Codecov]
+    S --> G[CI reports complete]
+    C --> G
+```
 
-Native mode in language workflows explicitly checks out the PR head for matching
-builds and reports. Existing destinations retain their checkout behavior. Callers
-that require tested merge-result validation retain a separate merge validation
-invocation; head coverage does not establish merge-result compatibility. Prebuilt
-containers must be built from the same source revision.
+Language and container actions own execution, native report generation and local
+job diagnostics. They use one common `record-ci-reports` action to retain results,
+without selecting providers or posting PR comments. Reuse the existing parser
+and coverage validators. The recorder does not install a test framework or guess
+how a project generates coverage.
 
-Keep summaries and test/lint comments when native coverage is selected, and let
-GitHub own its coverage comment. Keep branch, function and statement thresholds
-in the project test framework because GitHub evaluates line coverage only.
+### Caller experience
 
-## Consequences and rollout
+For standard reusable workflows, the target caller configuration is:
 
-No repository setting, subscription, AI feature or ruleset is enabled by these
-actions. Confirm Code Quality eligibility and enable it explicitly before using
-the publication workflow. Public repositories have no per-committer charge, but
-the documented plans are Team and Enterprise Cloud. The organization API reported
-Free and the Node.js/Python setup APIs reported not-configured during research.
+```yaml
+reports:
+  needs: [lint, backend, frontend]
+  if: ${{ always() }}
+  uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@<commit-sha>
+  permissions:
+    contents: read
+    actions: read
+    pull-requests: write
+    code-quality: write
+    id-token: write
+  with:
+    job-results: ${{ toJSON(needs) }}
+    coverage: github
+```
 
-Pilot a Python consumer and a Node.js consumer, checking source paths, multiple
-components, default-branch baselines, missing reports and fork behavior before
-enabling coverage gates. Go converts native profiles to Cobertura; PHP and Python
-generate it directly. Node.js projects select a Cobertura reporter in their own
-test tooling. This integration does not install a different test framework.
+This is a target API example, not a working example for the current branch.
+Producer workflows expose their report plans through `needs` automatically. There
+is no mandatory configuration file, repeated inventory, per-producer
+`comment: false`, outer job naming convention or public artifact ID plumbing.
+
+The central `coverage` input selects `none` (default), `github` or `codecov`.
+`none` disables external uploads, not local coverage summaries. `github` means
+native GitHub Code Quality. Never infer the provider from credentials or silently
+switch after failure. GitHub must already be enabled on an eligible repository.
+
+Producer configuration describes required report types and paths. Defaults use
+the language's native formats and project directory; custom commands specify
+other paths when needed. A missing required report is an error. Optional discovery
+is allowed for explicitly optional reports. Collection is distinct from the test
+framework's instrumentation; selecting a provider does not enable instrumentation.
+
+### One report contract
+
+Retain one versioned bundle per producer execution: native files plus a small
+manifest with component, report type and format, language where applicable,
+repository-relative paths, tested commit, run, attempt, execution identity and
+checksums. Runtime, suite and platform dimensions remain distinct from stable
+component labels. Logs may remain separate diagnostic artifacts.
+
+Use that bundle for summaries and coverage publication. Do not maintain a parallel
+coverage-only artifact stream. When several formats represent the same coverage,
+mark one canonical summary source and a supported representation for each provider.
+Do not count them as separate coverage. Preserve provider-supported raw formats,
+including Go profiles or Clover for Codecov.
+
+Reuse supported native test/lint formats and Super-Linter summaries. CodeQL
+findings stay in code scanning. Container results retain image digest, engine and
+platform; reporting does not replace image-promotion validation or change Goss
+and Testcontainers execution and cleanup rules.
+
+### Completeness without repeated configuration
+
+A report plan declares expected executions and required report types before tests
+or lint run. Standard reusable workflows derive it from their existing configuration
+and internal matrix and expose it as a workflow output. The reporter reads it from
+`job-results`. An opaque invocation identifier connects plans and bundles, without
+requiring the caller's job name inside the reusable workflow.
+
+Standalone jobs forward the recording action's plan output. Custom outer matrices
+supply an explicit plan derived from the same data that defines their matrix.
+GitHub returns only one successful matrix invocation's workflow output; it cannot
+represent the whole expected matrix. Do not silently use that last result as a
+complete inventory. The implementation must make this distinction explicit.
+
+Discovery locates results; it does not establish what was expected. Missing
+required bundles, unexplained skips, failures, cancellations and abandoned
+executions prevent completeness. Disabled producers are declared in the plan.
+Build and scan jobs can contribute their status without promising report data.
+
+### Multiple results and source identity
+
+- Independent components keep stable labels and separate coverage uploads.
+- Runtime matrices retain all test results, with their runtime visible; one
+  designated runtime contributes each component's coverage.
+- Frameworks merge shards and overlapping suites before recording final coverage.
+  The reporter neither averages percentages nor invents a generic coverage merger.
+- Reject missing, duplicate, modified or overlapping canonical coverage reports.
+- Record the actual tested revision. Native GitHub coverage requires the PR head;
+  relabeling merge-result coverage does not make it valid head coverage.
+- Make the tested revision a producer workflow choice, independent of provider
+  selection. Builds, tests and prebuilt images must refer to the same revision.
+  Retain merge-result validation where the repository needs it.
+
+Initially, only the current run attempt establishes a complete collection. Partial
+reruns identify missing producers and explain how to rerun the whole workflow.
+Do not silently reuse older artifacts: safe reuse requires proof that each producer
+execution is still authoritative, beyond matching a filename or commit.
+
+### Feedback and failure behavior
+
+Publish one compact CI comment with lint, test and coverage sections, stable
+component names, collapsed details and links to jobs and full artifacts. When
+native coverage is selected, GitHub owns the coverage comparison; the CI comment
+shows publication state and a link. Job summaries remain available on forks and
+outside PRs, and standalone actions retain immediate diagnostics.
+
+Distinguish execution, collection and publication failures. An invalid report must
+not hide other available diagnostics. Retain failed-test artifacts and publish
+diagnostics before evaluating the final result. Missing or empty required data
+must never become zero failures or zero-percent coverage. Valid coverage with
+zero covered lines remains valid.
+
+Expose one stable `CI reports complete` check, failing when required producers,
+collection or requested publication fail. Keep existing producer checks during
+adoption. Coverage rules complement these checks; they do not prove that all
+uploads have finished. Unsupported events must say publication was skipped, not
+uploaded. Forks, merge queues and outdated commits follow upstream limitations;
+this change does not claim native coverage enforcement for those cases.
+
+Comment publication rejects stale PR heads and serializes writes for the same PR
+and workflow. Independent previews need no shared write lock.
+
+### Permissions
+
+Collection, comments and provider uploads run in isolated internal jobs.
+Publishing jobs download validated data and execute no project scripts. Only the
+relevant job receives PR write, Code Quality write or Codecov OIDC permission.
+Use official upload actions pinned by release commit, with processing failures
+fatal for a requested provider.
+
+A single reusable workflow with explicitly scoped jobs has a permission cost:
+callers grant the union of those declared scopes even when a provider is disabled.
+The example makes this visible. Accept that reporting-only permission budget
+instead of another public workflow or a separate app token. Producer jobs do not
+receive it. No settings, subscriptions, AI features or rulesets change implicitly.
+
+## Implementation and acceptance
+
+1. Implement the common bundle/plan contract and consolidated workflow together.
+   Absorb the new coverage-only action and publication workflow into this flow.
+2. Migrate common's linter and the Node.js, Go, Python and PHP producer PRs. Remove
+   provider selection, individual comments and duplicated artifact plumbing.
+   Mark the API change in breaking-change commits and release notes.
+3. Adapt the container action's reporting integration, retaining its existing
+   execution, cleanup, promotion and strict report-validation contracts.
+4. Reuse existing tests and cover new failures across ordinary callers, monorepos,
+   internal/outer matrices, shards, malformed reports, partial reruns and forks.
+5. Pilot native uploads on an eligible repository, with default-branch baselines,
+   multiple components and provider errors, before recommending coverage gates.
+   Regenerate action/workflow references with CI Dokumentor after the API works.
+
+Prior hosted CI validates the previous implementation only. This target contract
+and live publication need their own validation. Repository enablement and ruleset
+changes remain separate maintainer decisions.
+
+## Alternatives
+
+- Adding native coverage beside the existing pipeline preserves compatibility but
+  duplicates responsibilities and configuration. Rejected for this redesign.
+- Uploading from every producer repeats provider policy, exposes write permissions
+  around project code and cannot verify global completeness.
+- Discovery without a plan cannot detect an entirely missing component.
+- A universal report-merging service is unnecessary; frameworks own merge semantics.
 
 ## References
 
 - [Coverage setup](https://docs.github.com/en/code-security/how-tos/maintain-quality-code/set-up-code-coverage)
 - [Multiple reports and publication jobs](https://github.com/actions/upload-code-coverage/blob/main/docs/workflow-strategies.md)
 - [Coverage rules](https://docs.github.com/en/code-security/how-tos/maintain-quality-code/restrict-code-coverage)
-- [Reusable workflow permissions](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations)
+- [Reusable workflow permissions and matrix outputs](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)
+- [Container test contract](https://github.com/hoverkraft-tech/ci-github-container/pull/1002)
