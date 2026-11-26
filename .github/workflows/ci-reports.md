@@ -78,7 +78,7 @@ on:
 permissions: {}
 jobs:
   ci-reports:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@af0bdd6313bd49aaf4a8a7f0de005fb0db856b03 # 4.3.3
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@fd204f923a549ec621468c03cc898c54706fa294 # feat/native-github-coverage
     permissions:
       code-quality: write
       contents: read

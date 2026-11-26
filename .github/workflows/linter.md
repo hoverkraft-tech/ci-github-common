@@ -100,7 +100,7 @@ on:
 permissions: {}
 jobs:
   linter:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@af0bdd6313bd49aaf4a8a7f0de005fb0db856b03 # 4.3.3
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@fd204f923a549ec621468c03cc898c54706fa294 # feat/native-github-coverage
     permissions:
       actions: read
       contents: read

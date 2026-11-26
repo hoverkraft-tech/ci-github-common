@@ -29,7 +29,7 @@ first. Coverage must describe the PR head or current push revision.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/quality/record-ci-reports@af0bdd6313bd49aaf4a8a7f0de005fb0db856b03 # 4.3.3
+- uses: hoverkraft-tech/ci-github-common/actions/quality/record-ci-reports@fd204f923a549ec621468c03cc898c54706fa294 # feat/native-github-coverage
   with:
     # Internal orchestration operation, plan, discover, collect or verify. Ordinary producers use record.
     # Default: `record`
