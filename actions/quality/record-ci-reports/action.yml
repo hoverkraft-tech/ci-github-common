@@ -51,7 +51,7 @@ inputs:
     description: JSON needs context for discover and collect, including report-plan outputs.
     default: "{}"
   provider:
-    description: Internal collector publication selection, none, github or codecov.
+    description: Internal collector publication selection, `none`, `github` or `codecov`.
     default: none
   reports:
     description: Validated coverage descriptors for verify. Empty verifies the entire validated collection.

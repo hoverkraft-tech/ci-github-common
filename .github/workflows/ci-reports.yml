@@ -9,7 +9,7 @@
 # Collection, previews and uploads run independently. Only PR comment updates are
 # serialized. There is no caller concurrency group or repeated coverage inventory.
 #
-# Select coverage: github for native Code Quality, codecov for Codecov, or none
+# Select `coverage: github` for native Code Quality, `codecov` for Codecov, or `none`
 # (default) for summaries only. Producers must generate Cobertura for publication.
 # GitHub Code Quality must already be enabled. Use PR head coverage and also run on
 # default-branch pushes for a baseline. Frameworks merge shards before recording.
@@ -47,7 +47,7 @@ on:
         type: string
         required: true
       coverage:
-        description: External coverage destination, none (summaries only), github (native Code Quality) or codecov. Requires planned Cobertura reports when enabled.
+        description: External coverage destination, `none` (summaries only), `github` (native Code Quality) or `codecov`. Requires planned Cobertura reports when enabled.
         type: string
         default: none
       comment:
