@@ -1,9 +1,9 @@
 <!-- header:start -->
 
-# ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItYmFyLWNoYXJ0LTIiIGNvbG9yPSJibHVlIj48bGluZSB4MT0iMTgiIHkxPSIyMCIgeDI9IjE4IiB5Mj0iMTAiPjwvbGluZT48bGluZSB4MT0iMTIiIHkxPSIyMCIgeDI9IjEyIiB5Mj0iNCI+PC9saW5lPjxsaW5lIHgxPSI2IiB5MT0iMjAiIHgyPSI2IiB5Mj0iMTQiPjwvbGluZT48L3N2Zz4=) GitHub Action: Coverage reports
+# ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItZmlsZS10ZXh0IiBjb2xvcj0iYmx1ZSI+PHBhdGggZD0iTTE0IDJINmEyIDIgMCAwIDAtMiAydjE2YTIgMiAwIDAgMCAyIDJoMTJhMiAyIDAgMCAwIDItMlY4eiI+PC9wYXRoPjxwb2x5bGluZSBwb2ludHM9IjE0IDIgMTQgOCAyMCA4Ij48L3BvbHlsaW5lPjxsaW5lIHgxPSIxNiIgeTE9IjEzIiB4Mj0iOCIgeTI9IjEzIj48L2xpbmU+PGxpbmUgeDE9IjE2IiB5MT0iMTciIHgyPSI4IiB5Mj0iMTciPjwvbGluZT48cG9seWxpbmUgcG9pbnRzPSIxMCA5IDkgOSA4IDkiPjwvcG9seWxpbmU+PC9zdmc+) GitHub Action: Record CI reports
 
 <div align="center">
-  <img src="../../../.github/logo.svg" width="60px" align="center" alt="Coverage reports" />
+  <img src="../../../.github/logo.svg" width="60px" align="center" alt="Record CI reports" />
 </div>
 
 ---
@@ -13,27 +13,21 @@
 
 ## Overview
 
-Prepare, collect and verify Cobertura artifacts for native GitHub Code Quality.
+Retain native test, lint and Cobertura reports in one checked artifact.
+Language actions normally call this action automatically. It posts no PR comments.
+Forward its `report-plan` output from a standalone job to the common CI reports
+workflow. Reusable producer workflows expose their complete plan automatically.
 
-Test jobs use `operation: prepare` without write permissions. Reports must come
-from the PR head commit or current push commit. Each report has a Linguist
-language and a stable component label. With one report, the label defaults to
-its repository-relative working directory, or `root`. Multiple reports require
-explicit, unique labels. Shards and overlapping suites must be merged first.
+Plans identify expected executions before tools run. A custom matrix creates one
+complete plan from its matrix configuration and passes each selection to its
+producer. Forward the complete plan from the configuration job, because matrix
+workflow outputs retain only one invocation.
 
-Pass `reports` as a JSON array, for example:
-`[{"file":"cobertura.xml","language":"Python","label":"backend"}]`.
-Source filenames are resolved against the checkout and Cobertura sources, then
-normalized to repository-relative paths. Missing files, ambiguous paths and
-invalid XML fail. Zero covered lines are valid; zero instrumented lines are not.
-
-The [CI reports workflow](../../../.github/workflows/ci-reports.md) uses
-`operation: collect` to validate the expected components, producer outcomes,
-commit, run attempt, checksums and source overlap before preparing publication.
-The [publication workflow](../../../.github/workflows/publish-coverage.md) uses
-`operation: verify` before invoking GitHub's official uploader for each report.
-Native coverage artifacts are retained for seven days, including after test
-failures. A failed producer cannot publish an incomplete coverage baseline.
+The plan, discover, collect and verify operations support reusable workflow
+orchestration. Ordinary producers use record. Required reports remain required
+after failed commands; available diagnostics are uploaded before failure.
+Coverage is Cobertura XML with stable component labels. Frameworks merge shards
+first. Coverage must describe the PR head or current push revision.
 
 <!-- overview:end -->
 <!-- usage:start -->
@@ -41,35 +35,60 @@ failures. A failed producer cannot publish an incomplete coverage baseline.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/quality/coverage-reports@4f17e6322e6f6421a66870c26be68e64414cec9c # feat/native-github-coverage
+- uses: hoverkraft-tech/ci-github-common/actions/quality/record-ci-reports@af0bdd6313bd49aaf4a8a7f0de005fb0db856b03 # 4.3.3
   with:
-    # Operation: prepare in a test job, collect after producers, or verify one publication report.
-    # Default: `prepare`
-    operation: prepare
+    # Internal orchestration operation, plan, discover, collect or verify. Ordinary producers use record.
+    # Default: `record`
+    operation: record
 
-    # Project directory for prepare; downloaded artifact directory for collect or verify.
+    # Project directory for record, downloaded artifact directory for collect or verify.
     # Default: `.`
     working-directory: .
 
-    # JSON array of file, language and optional label for prepare; exactly one collected report for verify. Filenames must be explicit relative paths, without globs.
+    # JSON plan supplied by the producer workflow. Empty creates a standalone plan.
+    report-plan: ""
+
+    # JSON array of producer definitions for plan, with key, type, directory and coverage descriptions.
     # Default: `[]`
-    reports: "[]"
+    producers: "[]"
 
-    # Outer calling job ID used by ci-reports job-results. Defaults to the current job ID.
-    report-group: ""
+    # Standalone producer type, test or lint.
+    # Default: `test`
+    type: test
 
-    # JSON array of job and label identifying every required component for collect. Missing, additional or duplicate components fail.
+    # Native report paths or auto selectors. Empty discovers the producer type and adds planned coverage paths.
+    report-paths: ""
+
+    # Native Super-Linter summary relative to working-directory, instead of parsed lint diagnostics.
+    summary-file: ""
+
+    # JSON array of Cobertura file, language and optional label for a standalone producer.
     # Default: `[]`
-    expected-reports: "[]"
+    coverage: "[]"
 
-    # JSON needs context for collect. Every expected producer must have succeeded.
+    # Source mappings forwarded to the native report parser.
+    path-mapping: ""
+
+    # JSON needs context for discover and collect, including report-plan outputs.
     # Default: `{}`
     job-results: "{}"
 
-    # Explicit tested commit for a prebuilt container without Git metadata. Must match the PR head or current push. A checkout's actual commit is always checked when available.
+    # Internal collector publication selection, none, github or codecov.
+    # Default: `none`
+    provider: none
+
+    # Validated coverage descriptors for verify. Empty verifies the entire validated collection.
+    # Default: `[]`
+    reports: "[]"
+
+    # Optional JSON context retained with diagnostics, such as tested image identity, engine and platform. It does not establish successful validation.
+    # Default: `{}`
+    metadata: "{}"
+
+    # Tested commit for a prebuilt container without Git metadata.
     source-sha: ""
 
-    # Repository-relative directory represented by working-directory in a prebuilt container; use a dot for the repository root. Required with source-sha when Git metadata is absent.
+    # Repository-relative project directory for a prebuilt container without Git metadata.
     source-prefix: ""
 ```
 
@@ -78,26 +97,39 @@ failures. A failed producer cannot publish an incomplete coverage baseline.
 
 ## Inputs
 
-| **Input**               | **Description**                                                                                                                                                                  | **Required** | **Default** |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- |
-| **`operation`**         | Operation: prepare in a test job, collect after producers, or verify one publication report.                                                                                     | **false**    | `prepare`   |
-| **`working-directory`** | Project directory for prepare; downloaded artifact directory for collect or verify.                                                                                              | **false**    | `.`         |
-| **`reports`**           | JSON array of file, language and optional label for prepare; exactly one collected report for verify. Filenames must be explicit relative paths, without globs.                  | **false**    | `[]`        |
-| **`report-group`**      | Outer calling job ID used by ci-reports job-results. Defaults to the current job ID.                                                                                             | **false**    | -           |
-| **`expected-reports`**  | JSON array of job and label identifying every required component for collect. Missing, additional or duplicate components fail.                                                  | **false**    | `[]`        |
-| **`job-results`**       | JSON needs context for collect. Every expected producer must have succeeded.                                                                                                     | **false**    | `{}`        |
-| **`source-sha`**        | Explicit tested commit for a prebuilt container without Git metadata. Must match the PR head or current push. A checkout's actual commit is always checked when available.       | **false**    | -           |
-| **`source-prefix`**     | Repository-relative directory represented by working-directory in a prebuilt container; use a dot for the repository root. Required with source-sha when Git metadata is absent. | **false**    | -           |
+| **Input**               | **Description**                                                                                                                                   | **Required** | **Default** |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- |
+| **`operation`**         | Internal orchestration operation, plan, discover, collect or verify. Ordinary producers use record.                                               | **false**    | `record`    |
+| **`working-directory`** | Project directory for record, downloaded artifact directory for collect or verify.                                                                | **false**    | `.`         |
+| **`report-plan`**       | JSON plan supplied by the producer workflow. Empty creates a standalone plan.                                                                     | **false**    | -           |
+| **`producers`**         | JSON array of producer definitions for plan, with key, type, directory and coverage descriptions.                                                 | **false**    | `[]`        |
+| **`type`**              | Standalone producer type, test or lint.                                                                                                           | **false**    | `test`      |
+| **`report-paths`**      | Native report paths or auto selectors. Empty discovers the producer type and adds planned coverage paths.                                         | **false**    | -           |
+| **`summary-file`**      | Native Super-Linter summary relative to working-directory, instead of parsed lint diagnostics.                                                    | **false**    | -           |
+| **`coverage`**          | JSON array of Cobertura file, language and optional label for a standalone producer.                                                              | **false**    | `[]`        |
+| **`path-mapping`**      | Source mappings forwarded to the native report parser.                                                                                            | **false**    | -           |
+| **`job-results`**       | JSON needs context for discover and collect, including report-plan outputs.                                                                       | **false**    | `{}`        |
+| **`provider`**          | Internal collector publication selection, none, github or codecov.                                                                                | **false**    | `none`      |
+| **`reports`**           | Validated coverage descriptors for verify. Empty verifies the entire validated collection.                                                        | **false**    | `[]`        |
+| **`metadata`**          | Optional JSON context retained with diagnostics, such as tested image identity, engine and platform. It does not establish successful validation. | **false**    | `{}`        |
+| **`source-sha`**        | Tested commit for a prebuilt container without Git metadata.                                                                                      | **false**    | -           |
+| **`source-prefix`**     | Repository-relative project directory for a prebuilt container without Git metadata.                                                              | **false**    | -           |
 
 <!-- inputs:end -->
 <!-- outputs:start -->
 
 ## Outputs
 
-| **Output**        | **Description**                                                                                     |
-| ----------------- | --------------------------------------------------------------------------------------------------- |
-| **`artifact-id`** | Uploaded native coverage artifact ID for prepare or collect.                                        |
-| **`reports`**     | JSON report collection with file, language and stable label, suitable for the publication workflow. |
-| **`file`**        | Verified absolute Cobertura file for the official uploader.                                         |
+| **Output**        | **Description**                                                   |
+| ----------------- | ----------------------------------------------------------------- |
+| **`report-plan`** | Expected producer plan. Forward this from standalone jobs.        |
+| **`selections`**  | Plans indexed by producer key, for internal matrix orchestration. |
+| **`pattern`**     | Exact artifact pattern for the plans in job-results.              |
+| **`artifact-id`** | Uploaded report or validated collection artifact ID.              |
+| **`complete`**    | Whether the required report collection is complete.               |
+| **`reports`**     | Validated coverage descriptors used by internal publication jobs. |
+| **`markdown`**    | Consolidated CI feedback.                                         |
+| **`file`**        | Verified Cobertura file for an official uploader.                 |
+| **`files`**       | Comma-separated verified Cobertura files for Codecov.             |
 
 <!-- outputs:end -->

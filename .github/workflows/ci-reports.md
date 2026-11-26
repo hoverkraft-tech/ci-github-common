@@ -22,72 +22,52 @@
 
 ## Overview
 
-Collect native reports after lint and test jobs and update one PR comment per report type.
+Consolidate lint, test and coverage results after producer jobs.
 
-Call once with `needs` listing the lint and test jobs, `if: always()` and
-`job-results: ${{ toJSON(needs) }}`. Keep producer jobs as required checks.
-Producers must disable individual comments and upload only report files in
-artifacts named `ci-reports-<run_attempt>-<job ID>-<unique name>`. Use the same
-job IDs in the caller and its reusable workflows, or set the producer's report
-group to its outer calling job ID. Only artifacts belonging to these jobs are
-downloaded. Directories are kept
-separate so identically named reports cannot overwrite one another.
-The shared linter uploads its native `super-linter-summary.md`; call it from
-a job named `lint` with `comment: false`. Other lint producers can upload any
-lint format supported by parse-ci-reports (ESLint, SARIF, Checkstyle, etc.).
-Comments show concise totals with report and job details collapsed by default.
+Call once with producer jobs in needs, if: always(), and job-results: toJSON(needs).
+Updated producer workflows supply their expected report plans automatically.
+Standalone jobs forward the recording action's report-plan output. A custom
+outer matrix forwards its complete plan from configuration, with producer.job
+naming the matrix job; never use its last successful invocation as the inventory.
 
-Only this run's current attempt is read. When rerunning failed jobs, reports
-from jobs that did not rerun are explicitly unavailable; rerun all jobs for a
-complete report. Missing reports never imply successful tests. Coverage stays
-separate per source report; percentages are never averaged.
-GitHub's abandoned reusable-job results remain visible with a warning;
-they do not establish success, even when individual reports contain no failures.
+Collection, previews and uploads run independently. Only PR comment updates are
+serialized. There is no caller concurrency group or repeated coverage inventory.
 
-Grant contents: read and pull-requests: write. Fork PRs retain
-summaries without commenting. Use the caller's concurrency to cancel superseded
-runs. This workflow serializes publication and rejects an outdated PR head.
-Independent previews with comment: false should each set a unique
-concurrency-group to prevent pending preview jobs from cancelling each other.
+Select coverage: github for native Code Quality, codecov for Codecov, or none
+(default) for summaries only. Producers must generate Cobertura for publication.
+GitHub Code Quality must already be enabled. Use PR head coverage and also run on
+default-branch pushes for a baseline. Frameworks merge shards before recording.
+Required missing reports, failed producers and publication errors fail the
+stable completion check. Partial reruns require rerunning all producer jobs.
 
-## Native GitHub coverage
-
-Configure producers with stable labels and report-group matching the outer job.
-Test the PR head SHA when collecting native coverage. Supply every expected
-component, including those in a job matrix; discovery alone cannot detect a
-missing component. Source paths must match repository files. Do not upload
-separate reports for shards or suites that cover overlapping files.
+Example, after lint and tests:
 
 ```yaml
 reports:
-  needs: [backend, frontend]
-  if: always()
+  needs: [lint, tests]
+  if: ${{ always() }}
   uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@<commit-sha>
   permissions:
     contents: read
     pull-requests: write
+    code-quality: write
+    id-token: write
   with:
     job-results: ${{ toJSON(needs) }}
-    coverage-reports: '[{"job":"backend","label":"backend"},{"job":"frontend","label":"frontend"}]'
-coverage:
-  needs: reports
-  if: needs.reports.outputs.coverage-artifact-id != ''
-  uses: hoverkraft-tech/ci-github-common/.github/workflows/publish-coverage.yml@<commit-sha>
-  permissions:
-    code-quality: write
-    pull-requests: read
-  with:
-    artifact-id: ${{ needs.reports.outputs.coverage-artifact-id }}
-    reports: ${{ needs.reports.outputs.coverage-reports }}
+    coverage: github
 ```
 
-Keep producer checks, this collector and Coverage publication complete required.
-Publication requires Code Quality enabled on an eligible repository; collection
-and diagnostics work without it. Re-run all producers after a partial rerun.
+Grant the union of the workflow's declared permissions at the calling job;
+only the corresponding internal job receives each write permission.
+Publishers execute no project scripts. Forks keep diagnostics without comments
+or uploads. Native coverage also skips merge groups and upstream unsupported
+contexts; a skipped upload does not establish native coverage enforcement.
 
 ### Permissions
 
+- **`code-quality`**: `write`
 - **`contents`**: `read`
+- **`id-token`**: `write`
 - **`pull-requests`**: `write`
 
 <!-- overview:end -->
@@ -104,32 +84,24 @@ on:
 permissions: {}
 jobs:
   ci-reports:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@4f17e6322e6f6421a66870c26be68e64414cec9c # feat/native-github-coverage
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@af0bdd6313bd49aaf4a8a7f0de005fb0db856b03 # 4.3.3
     permissions:
+      code-quality: write
       contents: read
+      id-token: write
       pull-requests: write
     with:
-      # Publish combined PR comments. Disable for report previews or workflow tests; summaries and outputs remain available.
-      # Default: `true`
-      comment: true
-
-      # Concurrency group for independent previews with comment false. Empty retains the default PR group. Commenting runs always share the default group.
-      concurrency-group: ""
-
-      # Opt-in native coverage inventory as a JSON array of job and label.
-      # Example: [{"job":"backend","label":"backend"},{"job":"frontend","label":"frontend"}].
-      # Producers use coverage-reports prepare with matching report-group and labels.
-      # Every component must be present exactly once in this run and attempt, from successful jobs.
-      # Overlapping source files must be merged by the test framework before collection.
-      # Disables our coverage PR comment; summaries and test/lint comments remain.
-      # Pass the coverage outputs to publish-coverage with code-quality write permission.
-      #
-      # Default: `[]`
-      coverage-reports: "[]"
-
-      # JSON needs context containing lint and test jobs and their results.
+      # JSON needs context containing completed producer jobs and their automatic report-plan outputs.
       # This input is required.
       job-results: ""
+
+      # External coverage destination, none (summaries only), github (native Code Quality) or codecov. Requires planned Cobertura reports when enabled.
+      # Default: `none`
+      coverage: none
+
+      # Update one persistent CI comment on same-repository pull requests. Summaries remain available when false.
+      # Default: `true`
+      comment: true
 ```
 
 <!-- usage:end -->
@@ -139,18 +111,11 @@ jobs:
 
 ### Workflow Call Inputs
 
-| **Input**               | **Description**                                                                                                                                    | **Required** | **Type**    | **Default** |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- | ----------- |
-| **`comment`**           | Publish combined PR comments. Disable for report previews or workflow tests; summaries and outputs remain available.                               | **false**    | **boolean** | `true`      |
-| **`concurrency-group`** | Concurrency group for independent previews with comment false. Empty retains the default PR group. Commenting runs always share the default group. | **false**    | **string**  | -           |
-| **`coverage-reports`**  | Opt-in native coverage inventory as a JSON array of job and label.                                                                                 | **false**    | **string**  | `[]`        |
-|                         | Example: [{"job":"backend","label":"backend"},{"job":"frontend","label":"frontend"}].                                                              |              |             |             |
-|                         | Producers use coverage-reports prepare with matching report-group and labels.                                                                      |              |             |             |
-|                         | Every component must be present exactly once in this run and attempt, from successful jobs.                                                        |              |             |             |
-|                         | Overlapping source files must be merged by the test framework before collection.                                                                   |              |             |             |
-|                         | Disables our coverage PR comment; summaries and test/lint comments remain.                                                                         |              |             |             |
-|                         | Pass the coverage outputs to publish-coverage with code-quality write permission.                                                                  |              |             |             |
-| **`job-results`**       | JSON needs context containing lint and test jobs and their results.                                                                                | **true**     | **string**  | -           |
+| **Input**         | **Description**                                                                                                                                 | **Required** | **Type**    | **Default** |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- | ----------- |
+| **`job-results`** | JSON needs context containing completed producer jobs and their automatic report-plan outputs.                                                  | **true**     | **string**  | -           |
+| **`coverage`**    | External coverage destination, none (summaries only), github (native Code Quality) or codecov. Requires planned Cobertura reports when enabled. | **false**    | **string**  | `none`      |
+| **`comment`**     | Update one persistent CI comment on same-repository pull requests. Summaries remain available when false.                                       | **false**    | **boolean** | `true`      |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -159,13 +124,10 @@ jobs:
 
 ## Outputs
 
-| **Output**                 | **Description**                                                                           |
-| -------------------------- | ----------------------------------------------------------------------------------------- |
-| **`coverage-artifact-id`** | Validated native coverage artifact for publish-coverage, empty when disabled or invalid.  |
-| **`coverage-reports`**     | Validated JSON report collection for publish-coverage.                                    |
-| **`lint-markdown`**        | Consolidated lint report, including native Super-Linter summaries and parsed diagnostics. |
-| **`test-markdown`**        | Consolidated test report, including job status and missing-report information.            |
-| **`coverage-markdown`**    | Consolidated coverage report with separate source sections.                               |
+| **Output**        | **Description**                                                          |
+| ----------------- | ------------------------------------------------------------------------ |
+| **`markdown`**    | Consolidated CI feedback with producer outcomes and report availability. |
+| **`artifact-id`** | Validated collection and diagnostics artifact ID.                        |
 
 <!-- outputs:end -->
 <!-- examples:start -->

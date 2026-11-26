@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   continuous-integration:
-    uses: hoverkraft-tech/ci-github-nodejs/.github/workflows/continuous-integration.yml@aeab7d712c734308587b10eb22d14c511f8e846a # unified reports (PR #624, unreleased)
+    uses: hoverkraft-tech/ci-github-nodejs/.github/workflows/continuous-integration.yml@11636b817040a2a7d61b389c28fa1b401c37a2fa # unified reports (PR #624, unreleased)
     permissions:
       contents: read
       id-token: write

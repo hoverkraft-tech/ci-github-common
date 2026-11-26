@@ -412,7 +412,7 @@ Only comment on PRs if there are failures:
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@33462c06bcbbd9144d7f661929e61953604b444d # 4.3.2
+- uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@af0bdd6313bd49aaf4a8a7f0de005fb0db856b03 # 4.3.3
   with:
     # Paths to report files (glob patterns supported, one per line or comma-separated).
     # Each explicit path or glob must match a file after exclusions; missing reports fail the action.
@@ -498,6 +498,8 @@ Only comment on PRs if there are failures:
 
 | **Output**              | **Description**                                                                                                                             |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`parsed-reports`**    | Parsed report files and categories as a JSON array, used by the common recorder.                                                            |
+| **`executed-tests`**    | Number of passed or failed tests, excluding skipped tests.                                                                                  |
 | **`test-markdown`**     | Compact test-only Markdown with collapsed details. Empty when no test results were parsed.                                                  |
 | **`coverage-markdown`** | Compact coverage-only Markdown with collapsed per-source details. Empty when no coverage was parsed.                                        |
 | **`lint-markdown`**     | Compact lint-only Markdown with collapsed diagnostics. Empty when no lint reports were parsed; clean reports explicitly show zero findings. |
