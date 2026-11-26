@@ -62,7 +62,11 @@ function fixture(t) {
 
 test("independent components with identical report basenames survive collection and publication verification", (t) => {
 	const f = fixture(t);
-	f.prepare("frontend", { hits: 0 });
+	const frontend = f.prepare("frontend", { hits: 0 });
+	assert.equal(
+		f.collect(["frontend"], { directory: frontend.directory }).reports[0].label,
+		"frontend",
+	);
 	f.prepare("backend");
 	const result = f.collect(["frontend", "backend"]);
 	assert.deepEqual(

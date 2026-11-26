@@ -66,6 +66,7 @@ jobs:
       pull-requests: write
     with:
       comment: false
+      concurrency-group: test-ci-reports-${{ github.run_id }}-${{ github.run_attempt }}
       job-results: '{"frontend":{"result":"failure"},"backend":{"result":"success"},"missing":{"result":"skipped"},"abandoned-fixture":{"result":"abandoned"}}'
 
   lint-only-reports:
@@ -77,6 +78,7 @@ jobs:
       pull-requests: write
     with:
       comment: false
+      concurrency-group: test-lint-reports-${{ github.run_id }}-${{ github.run_attempt }}
       job-results: '{"lint-only":{"result":"success"}}'
 
   assert:

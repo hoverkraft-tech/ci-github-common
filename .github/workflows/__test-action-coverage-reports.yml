@@ -59,6 +59,7 @@ jobs:
       pull-requests: write
     with:
       comment: false
+      concurrency-group: test-native-coverage-${{ github.run_id }}-${{ github.run_attempt }}
       job-results: ${{ toJSON(needs) }}
       coverage-reports: '[{"job":"fixtures","label":"frontend"},{"job":"fixtures","label":"backend"}]'
   verify:

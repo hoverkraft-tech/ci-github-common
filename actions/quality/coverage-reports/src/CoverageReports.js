@@ -236,12 +236,21 @@ export class CoverageReports {
 		}
 		const found = new Map();
 		const sources = new Map();
-		for (const artifact of fs.readdirSync(directory, { withFileTypes: true })) {
-			if (!artifact.isDirectory())
-				throw new Error(
-					"Coverage collection expects separate artifact directories.",
-				);
-			for (const report of this.read(path.join(directory, artifact.name))) {
+		const entries = fs.readdirSync(directory, { withFileTypes: true });
+		// The official downloader extracts a single matching artifact directly.
+		const single = entries.some((entry) => entry.name === "manifest.json");
+		if (
+			entries.some((entry) => (single ? !entry.isFile() : !entry.isDirectory()))
+		) {
+			throw new Error(
+				"Coverage collection expects one flat artifact or separate artifact directories.",
+			);
+		}
+		const directories = single
+			? [directory]
+			: entries.map((entry) => path.join(directory, entry.name));
+		for (const artifact of directories) {
+			for (const report of this.read(artifact)) {
 				if (labels.get(report.label) !== report.group)
 					throw new Error(
 						`Unexpected coverage component or producer: ${report.label}`,

@@ -23,6 +23,8 @@
 # Grant contents: read and pull-requests: write. Fork PRs retain
 # summaries without commenting. Use the caller's concurrency to cancel superseded
 # runs. This workflow serializes publication and rejects an outdated PR head.
+# Independent previews with comment: false should each set a unique
+# concurrency-group to prevent pending preview jobs from cancelling each other.
 #
 # ## Native GitHub coverage
 #
@@ -67,6 +69,10 @@ on:
         description: Publish combined PR comments. Disable for report previews or workflow tests; summaries and outputs remain available.
         type: boolean
         default: true
+      concurrency-group:
+        description: Concurrency group for independent previews with comment false. Empty retains the default PR group. Commenting runs always share the default group.
+        type: string
+        default: ""
       coverage-reports:
         description: |
           Opt-in native coverage inventory as a JSON array of job and label.
@@ -109,7 +115,7 @@ jobs:
       contents: read
       pull-requests: write
     concurrency:
-      group: ci-reports-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+      group: ${{ !inputs.comment && inputs.concurrency-group || format('ci-reports-{0}-{1}', github.workflow, github.event.pull_request.number || github.ref) }}
       cancel-in-progress: false
     outputs:
       coverage-artifact-id: ${{ steps.collect-coverage.outputs.artifact-id }}
