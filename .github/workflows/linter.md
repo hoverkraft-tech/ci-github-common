@@ -2,12 +2,6 @@
 
 # GitHub Reusable Workflow: Linter
 
-<div align="center">
-  <img src="../logo.svg" width="60px" align="center" alt="Linter" />
-</div>
-
----
-
 <!-- header:end -->
 
 <!-- jscpd:ignore-start -->

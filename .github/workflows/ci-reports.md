@@ -2,12 +2,6 @@
 
 # GitHub Reusable Workflow: CI reports
 
-<div align="center">
-  <img src="../logo.svg" width="60px" align="center" alt="CI reports" />
-</div>
-
----
-
 <!-- header:end -->
 <!-- badges:start -->
 
@@ -33,7 +27,7 @@ naming the matrix job; never use its last successful invocation as the inventory
 Collection, previews and uploads run independently. Only PR comment updates are
 serialized. There is no caller concurrency group or repeated coverage inventory.
 
-Select coverage: github for native Code Quality, codecov for Codecov, or none
+Select `coverage: github` for native Code Quality, `codecov` for Codecov, or `none`
 (default) for summaries only. Producers must generate Cobertura for publication.
 GitHub Code Quality must already be enabled. Use PR head coverage and also run on
 default-branch pushes for a baseline. Frameworks merge shards before recording.
@@ -95,7 +89,7 @@ jobs:
       # This input is required.
       job-results: ""
 
-      # External coverage destination, none (summaries only), github (native Code Quality) or codecov. Requires planned Cobertura reports when enabled.
+      # External coverage destination, `none` (summaries only), `github` (native Code Quality) or `codecov`. Requires planned Cobertura reports when enabled.
       # Default: `none`
       coverage: none
 
@@ -111,11 +105,11 @@ jobs:
 
 ### Workflow Call Inputs
 
-| **Input**         | **Description**                                                                                                                                 | **Required** | **Type**    | **Default** |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- | ----------- |
-| **`job-results`** | JSON needs context containing completed producer jobs and their automatic report-plan outputs.                                                  | **true**     | **string**  | -           |
-| **`coverage`**    | External coverage destination, none (summaries only), github (native Code Quality) or codecov. Requires planned Cobertura reports when enabled. | **false**    | **string**  | `none`      |
-| **`comment`**     | Update one persistent CI comment on same-repository pull requests. Summaries remain available when false.                                       | **false**    | **boolean** | `true`      |
+| **Input**         | **Description**                                                                                                                                       | **Required** | **Type**    | **Default** |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- | ----------- |
+| **`job-results`** | JSON needs context containing completed producer jobs and their automatic report-plan outputs.                                                        | **true**     | **string**  | -           |
+| **`coverage`**    | External coverage destination, `none` (summaries only), `github` (native Code Quality) or `codecov`. Requires planned Cobertura reports when enabled. | **false**    | **string**  | `none`      |
+| **`comment`**     | Update one persistent CI comment on same-repository pull requests. Summaries remain available when false.                                             | **false**    | **boolean** | `true`      |
 
 <!-- inputs:end -->
 <!-- secrets:start -->

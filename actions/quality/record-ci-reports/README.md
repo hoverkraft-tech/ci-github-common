@@ -2,12 +2,6 @@
 
 # ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItZmlsZS10ZXh0IiBjb2xvcj0iYmx1ZSI+PHBhdGggZD0iTTE0IDJINmEyIDIgMCAwIDAtMiAydjE2YTIgMiAwIDAgMCAyIDJoMTJhMiAyIDAgMCAwIDItMlY4eiI+PC9wYXRoPjxwb2x5bGluZSBwb2ludHM9IjE0IDIgMTQgOCAyMCA4Ij48L3BvbHlsaW5lPjxsaW5lIHgxPSIxNiIgeTE9IjEzIiB4Mj0iOCIgeTI9IjEzIj48L2xpbmU+PGxpbmUgeDE9IjE2IiB5MT0iMTciIHgyPSI4IiB5Mj0iMTciPjwvbGluZT48cG9seWxpbmUgcG9pbnRzPSIxMCA5IDkgOSA4IDkiPjwvcG9seWxpbmU+PC9zdmc+) GitHub Action: Record CI reports
 
-<div align="center">
-  <img src="../../../.github/logo.svg" width="60px" align="center" alt="Record CI reports" />
-</div>
-
----
-
 <!-- header:end -->
 <!-- overview:start -->
 
@@ -73,7 +67,7 @@ first. Coverage must describe the PR head or current push revision.
     # Default: `{}`
     job-results: "{}"
 
-    # Internal collector publication selection, none, github or codecov.
+    # Internal collector publication selection, `none`, `github` or `codecov`.
     # Default: `none`
     provider: none
 
@@ -109,7 +103,7 @@ first. Coverage must describe the PR head or current push revision.
 | **`coverage`**          | JSON array of Cobertura file, language and optional label for a standalone producer.                                                              | **false**    | `[]`        |
 | **`path-mapping`**      | Source mappings forwarded to the native report parser.                                                                                            | **false**    | -           |
 | **`job-results`**       | JSON needs context for discover and collect, including report-plan outputs.                                                                       | **false**    | `{}`        |
-| **`provider`**          | Internal collector publication selection, none, github or codecov.                                                                                | **false**    | `none`      |
+| **`provider`**          | Internal collector publication selection, `none`, `github` or `codecov`.                                                                          | **false**    | `none`      |
 | **`reports`**           | Validated coverage descriptors for verify. Empty verifies the entire validated collection.                                                        | **false**    | `[]`        |
 | **`metadata`**          | Optional JSON context retained with diagnostics, such as tested image identity, engine and platform. It does not establish successful validation. | **false**    | `{}`        |
 | **`source-sha`**        | Tested commit for a prebuilt container without Git metadata.                                                                                      | **false**    | -           |
