@@ -3,7 +3,6 @@
 - Status: accepted, implementation validation in progress
 - Date: 2026-11-26
 - Scope: common reporting, language CI and container test producers
-- Related: [ADR 0005](0005-independent-reporting-releases.md) defines independent CI and release ordering.
 
 ## Context
 
@@ -193,6 +192,26 @@ receive it. No settings, subscriptions, AI features or rulesets change implicitl
 Prior hosted CI validates the previous implementation only. The shared contract
 and live publication need their own validation. Repository enablement and ruleset
 changes remain separate maintainer decisions.
+
+### Release order
+
+The reporting contract and its language producers span several repositories.
+Common's own repository CI must not depend on an unreleased Node.js producer
+that already depends on this common change.
+
+1. Keep common's action tests on the released Node.js CI workflow and its own
+   lint/report orchestration on the matching released common workflows. The
+   dedicated reporting fixtures continue to exercise the new local contract.
+2. Merge and release the common reporting implementation first.
+3. Replace the producer PRs' development common pins with that release, then
+   merge and release the language producers.
+4. Adopt the new released Node.js workflow and local reporting contract in
+   common's own CI together, in a follow-up PR.
+
+This stages repository adoption without replacing shared Node.js CI or adding a
+compatibility layer. Keep external references pinned to release commits with
+version comments. Development producer pins are temporary and must be replaced
+before those producer PRs merge.
 
 ## Alternatives
 

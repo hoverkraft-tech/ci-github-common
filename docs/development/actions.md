@@ -12,21 +12,20 @@ Keep `*.test.js` beside the code they cover. Use `npm test` for Node's test runn
 `coverage/lcov.info` and `coverage/junit.xml`. The CI command creates the coverage directory on a clean
 checkout; coverage output is not committed.
 
-Each JavaScript action keeps a dedicated test workflow. Its source-test job calls
-[`__test-nodejs-action.yml`](../../.github/workflows/__test-nodejs-action.yml) with
-only the package's working directory. This internal helper uses the released
-Node.js setup action, runs the package-owned `test:ci` script, and retains native
-test reports through the local recorder even when tests fail. It creates the
-report plan before installation and exposes that plan to its caller.
+Follow `parse-ci-reports` for each JavaScript action: call the released Node.js
+`continuous-integration` workflow with the action's working directory and explicit
+job permissions. Disable its build and lint jobs; keep CodeQL with the repository
+config, dependency review and GitHub coverage enabled. Set `test.comment` to false
+and `test.report-group` to the calling job ID in `__shared-ci.yml`. Source tests
+run through the package-owned `test:ci` script. One `ci-reports` job collects the
+native reports through the released common workflow after all source-test jobs,
+including failures, and updates one coverage comment with separate figures for
+each action. It also combines test
+results and lint summaries; individual producer comments stay disabled.
 
-CodeQL with the repository configuration and dependency review run in separate
-jobs. Source tests receive read-only repository permissions. One `ci-reports` job
-collects the source-test plans and native lint summary after the producer jobs,
-including failures, and publishes consolidated feedback.
-
-Common's CI consumes released Node.js tooling. Language producer workflows may
-then adopt a new common release without requiring both repositories to release
-together. See [ADR 0005](../adr/0005-independent-reporting-releases.md).
+The reporting integration fixtures call local actions and workflows to validate
+the new reporting contract. Keep repository CI on matching released producers and
+collectors; see the [release order in ADR 0004](../adr/0004-native-github-coverage.md#release-order).
 
 Each action's integration workflow exercises its public entrypoint. Actions with
 runtime dependencies bundle them with their licenses; dependency-free helpers

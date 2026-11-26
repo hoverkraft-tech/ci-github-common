@@ -39,7 +39,11 @@ jobs:
       pull-requests: write
       security-events: write
       statuses: write
-    uses: $/.github/workflows/linter.yml
+    # Keep repository CI on released producer/reporting contracts until Node.js is released.
+    # Release order: docs/adr/0004-native-github-coverage.md#release-order
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@af0bdd6313bd49aaf4a8a7f0de005fb0db856b03 # 4.3.3
+    with:
+      comment: false
 
   test-action-matrix-outputs:
     needs: lint
@@ -51,6 +55,9 @@ jobs:
     needs: lint
     permissions:
       contents: read
+      id-token: write
+      packages: read
+      pull-requests: write
       security-events: write
     uses: $/.github/workflows/__test-action-create-and-merge-pull-request.yml
 
@@ -103,6 +110,9 @@ jobs:
     needs: lint
     permissions:
       contents: read
+      id-token: write
+      packages: read
+      pull-requests: write
       security-events: write
     uses: $/.github/workflows/__test-action-need-fix-to-issue.yml
 
@@ -155,12 +165,10 @@ jobs:
       - test-action-need-fix-to-issue
       - test-action-download-artifact
     if: always()
-    uses: $/.github/workflows/ci-reports.yml
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@af0bdd6313bd49aaf4a8a7f0de005fb0db856b03 # 4.3.3
     permissions:
       contents: read
       pull-requests: write
-      code-quality: write
-      id-token: write
     with:
       job-results: ${{ toJSON(needs) }}
   test-action-record-ci-reports:

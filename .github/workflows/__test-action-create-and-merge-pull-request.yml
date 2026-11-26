@@ -2,17 +2,20 @@ name: Internal - Tests for create-and-merge-pull-request action
 
 on:
   workflow_call:
-    outputs:
-      report-plan:
-        description: Expected native report plan.
-        value: ${{ jobs.continuous-integration.outputs.report-plan }}
 permissions: {}
 
 jobs:
   continuous-integration:
-    uses: $/.github/workflows/__test-nodejs-action.yml
+    uses: hoverkraft-tech/ci-github-nodejs/.github/workflows/continuous-integration.yml@191d7230d57982bfc11d57f68b005f386a6d7fbf # 3.1.1
     permissions:
       contents: read
+      id-token: write
+      packages: read
+      pull-requests: write
       security-events: write
     with:
       working-directory: ./actions/create-and-merge-pull-request
+      build: ""
+      lint: ""
+      code-ql: '{"languages":"typescript","config-file":".github/codeql/config.yml"}'
+      test: '{"comment":false,"report-group":"test-action-create-and-merge-pull-request"}'
