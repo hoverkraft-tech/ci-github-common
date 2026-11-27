@@ -1,0 +1,31 @@
+name: Experiment nested report completion
+on:
+  workflow_call:
+    inputs:
+      job-results:
+        type: string
+        required: true
+permissions: {}
+jobs:
+  collect:
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: echo 'Nested collection started.'
+  complete:
+    needs: collect
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - env:
+          JOB_RESULTS: ${{ inputs.job-results }}
+          COLLECTION_RESULT: ${{ needs.collect.result }}
+        shell: python
+        run: |
+          import json, os
+          outcomes = json.loads(os.environ['JOB_RESULTS'])
+          print(json.dumps({'producers': outcomes, 'collection': os.environ['COLLECTION_RESULT']}))
+          if any(job['result'] != 'success' for job in outcomes.values()):
+              raise SystemExit(1)

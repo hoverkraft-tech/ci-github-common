@@ -1,0 +1,63 @@
+name: Experiment nested report cancellation
+on:
+  push:
+    branches: [test/ci-reporting-feasibility-20261127]
+permissions: {}
+jobs:
+  producer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - run: python3 -c 'import signal; signal.pause()'
+  feature-no-permission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import json, os, pathlib, subprocess
+          result = subprocess.run(['gh', 'api', f"repos/{os.environ['GITHUB_REPOSITORY']}/code-quality/findings?per_page=1"], capture_output=True, text=True)
+          data = {'exit_code': result.returncode, 'body': result.stdout, 'error': result.stderr}
+          pathlib.Path('capability.json').write_text(json.dumps(data, indent=2))
+          print(json.dumps(data))
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: experiment-capability-without-permission
+          path: capability.json
+          retention-days: 1
+          if-no-files-found: error
+  cancel-this-experiment:
+    needs: feature-no-permission
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import json, os, subprocess, time
+          root = f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+          for _ in range(30):
+              jobs = json.loads(subprocess.check_output(['gh', 'api', f'{root}/jobs?per_page=100']))['jobs']
+              if any(job['name'] == 'producer' and job['status'] == 'in_progress' for job in jobs):
+                  subprocess.run(['gh', 'api', '--method', 'POST', f'{root}/cancel'], check=True)
+                  break
+              time.sleep(2)
+          else:
+              raise RuntimeError('Producer did not start within the experiment deadline')
+  report-call-unless-cancelled:
+    needs: producer
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/__experiment-report-finish.yml
+    with:
+      job-results: ${{ toJSON(needs) }}
+  report-call-always:
+    needs: producer
+    if: always()
+    uses: ./.github/workflows/__experiment-report-finish.yml
+    with:
+      job-results: ${{ toJSON(needs) }}
