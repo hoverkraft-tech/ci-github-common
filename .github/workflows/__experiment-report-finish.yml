@@ -8,7 +8,7 @@ on:
 permissions: {}
 jobs:
   collect:
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && !contains(fromJSON(inputs.job-results).*.result, 'cancelled') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
