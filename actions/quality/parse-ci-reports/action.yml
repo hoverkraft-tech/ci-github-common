@@ -501,7 +501,7 @@ runs:
             pathMapping: process.env.PATH_MAPPING || null
           };
 
-          await run({ core, glob, inputs });
+          await run({ core, inputs });
 
     - name: Fail if errors detected
       if: inputs.fail-on-error == 'true' && steps.parse-reports.outputs.has-errors == 'true'

@@ -39,6 +39,7 @@ See the [documentation](docs/README.md) for detailed guides.
 ### Quality checks & reporting
 
 - [Record CI reports](actions/quality/record-ci-reports/README.md) - retains test, lint and coverage results for consolidated reporting.
+- [Run check](actions/quality/run-check/README.md) - runs a custom command with fresh, validated native reports and automatic retention.
 - [Codecov](actions/quality/codecov/README.md) - uploads coverage from any language using OIDC, with optional explicit report selection.
 - [Lint pull request title](actions/quality/lint-pull-request-title/README.md) - checks pull request titles against the common Conventional Commits policy.
 - [Test action distribution](actions/quality/test-action-distribution/README.md) - checks a bundle against package-owned contract tests in isolation.

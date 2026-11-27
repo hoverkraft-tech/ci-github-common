@@ -25,19 +25,517 @@ var __webpack_exports__ = {};
 
 // EXPORTS
 __nccwpck_require__.d(__webpack_exports__, {
-  gi: () => (/* reexport */ CoverageReports),
-  zC: () => (/* reexport */ ReportBundle),
-  OU: () => (/* reexport */ ReportPlan)
+  gR: () => (/* reexport */ Collector),
+  K4: () => (/* reexport */ Recording),
+  Tr: () => (/* reexport */ Reporters),
+  vY: () => (/* reexport */ Runtime)
 });
 
-;// CONCATENATED MODULE: external "node:child_process"
-const external_node_child_process_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:child_process");
-;// CONCATENATED MODULE: external "node:crypto"
-const external_node_crypto_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:crypto");
 ;// CONCATENATED MODULE: external "node:fs"
 const external_node_fs_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:fs");
 ;// CONCATENATED MODULE: external "node:path"
 const external_node_path_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:path");
+;// CONCATENATED MODULE: external "node:os"
+const external_node_os_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:os");
+;// CONCATENATED MODULE: external "node:timers/promises"
+const promises_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:timers/promises");
+;// CONCATENATED MODULE: ../../download-artifact/src/ArtifactDownload.js
+
+
+
+
+const RETRY_DELAYS = [1000, 2000, 4000, 8000, 16000, 30000];
+
+class ArtifactDownload {
+	constructor({ client, core, sleep = promises_namespaceObject.setTimeout }) {
+		this.client = client;
+		this.core = core;
+		this.sleep = sleep;
+	}
+
+	async download({
+		artifactIds,
+		destination,
+		mergeMultiple,
+		skipDecompress,
+		findBy,
+	}) {
+		const ids = this.parseIds(artifactIds);
+		const pending = new Set(ids);
+		const downloadPath = external_node_path_namespaceObject.resolve(
+			destination.replace(/^~(?=\/|$)/, (0,external_node_os_namespaceObject.homedir)()),
+		);
+		const options = findBy ? { findBy } : {};
+
+		for (let attempt = 0; ; attempt += 1) {
+			const { artifacts } = await this.client.listArtifacts({
+				latest: true,
+				...options,
+			});
+			for (const artifact of artifacts) {
+				if (!pending.has(artifact.id)) continue;
+				if (
+					!artifact.name ||
+					/[\\/]/.test(artifact.name) ||
+					[".", ".."].includes(artifact.name)
+				) {
+					throw new Error(`Invalid artifact name for ID ${artifact.id}`);
+				}
+				let result;
+				try {
+					result = await this.client.downloadArtifact(artifact.id, {
+						...options,
+						path:
+							mergeMultiple || ids.length === 1
+								? downloadPath
+								: external_node_path_namespaceObject.join(downloadPath, artifact.name),
+						expectedHash: artifact.digest,
+						skipDecompress,
+					});
+				} catch (error) {
+					// Metadata visibility can regress between listing and downloading.
+					if (
+						error.name === "ArtifactNotFoundError" ||
+						(findBy && error.status === 404)
+					)
+						continue;
+					throw error;
+				}
+				if (result.digestMismatch)
+					throw new Error(
+						`Digest validation failed for artifact ${artifact.id}`,
+					);
+				pending.delete(artifact.id);
+			}
+			if (pending.size === 0) {
+				this.core.setOutput("download-path", downloadPath);
+				return;
+			}
+			if (attempt === RETRY_DELAYS.length) {
+				throw new Error(
+					`Artifacts could not be downloaded: ${[...pending].join(", ")}`,
+				);
+			}
+			const delay = RETRY_DELAYS[attempt];
+			this.core.info(
+				`Retrying artifacts ${[...pending].join(", ")} in ${delay / 1000}s`,
+			);
+			await this.sleep(delay);
+		}
+	}
+
+	parseIds(value) {
+		const ids = (value ?? "").split(",").map((id) => id.trim());
+		if (
+			ids.some(
+				(id) => !/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id)),
+			)
+		) {
+			throw new Error(
+				"artifact-ids must contain comma-separated positive safe integers",
+			);
+		}
+		return [...new Set(ids.map(Number))];
+	}
+}
+
+;// CONCATENATED MODULE: external "node:crypto"
+const external_node_crypto_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:crypto");
+;// CONCATENATED MODULE: ./src/Protocol.js
+
+
+
+
+/** Shared validation for immutable registrations, results and retained assets. */
+const Protocol = {
+	version: 2,
+	prefix: "ci-report-v2-",
+	kinds: ["test", "lint", "coverage"],
+	maxFileBytes: 64 * 1024 * 1024,
+	maxBundleBytes: 256 * 1024 * 1024,
+
+	digest(value) {
+		return (0,external_node_crypto_namespaceObject.createHash)("sha256").update(value).digest("hex");
+	},
+
+	hasControl(value) {
+		return [...value].some(
+			(character) =>
+				character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+		);
+	},
+
+	object(value, label) {
+		if (!value || typeof value !== "object" || Array.isArray(value))
+			throw new Error(`${label} must be an object.`);
+		return value;
+	},
+
+	relative(value, { root = false, pattern = false } = {}) {
+		if (root && value === ".") return value;
+		if (
+			typeof value !== "string" ||
+			!value ||
+			value.length > 1024 ||
+			value.includes("\\") ||
+			Protocol.hasControl(value) ||
+			external_node_path_namespaceObject.isAbsolute(value) ||
+			value.split("/").some((part) => !part || part === "." || part === "..") ||
+			(!pattern && /[*?{}[\]]/.test(value))
+		)
+			throw new Error(
+				`Unsafe relative report path: ${String(value).slice(0, 120)}`,
+			);
+		return value;
+	},
+
+	file(directory, relative) {
+		const root = external_node_fs_namespaceObject.realpathSync(directory);
+		const file = external_node_path_namespaceObject.join(root, Protocol.relative(relative));
+		const stat = external_node_fs_namespaceObject.lstatSync(file);
+		if (!stat.isFile() || external_node_fs_namespaceObject.realpathSync(file) !== file)
+			throw new Error("Report assets must be regular files without symlinks.");
+		if (stat.size > Protocol.maxFileBytes)
+			throw new Error("Report asset exceeds 64 MiB.");
+		return file;
+	},
+
+	read(directory, filename) {
+		const file = Protocol.file(directory, filename);
+		if (external_node_fs_namespaceObject.statSync(file).size > 4 * 1024 * 1024)
+			throw new Error("Report metadata exceeds 4 MiB.");
+		return JSON.parse(external_node_fs_namespaceObject.readFileSync(file, "utf8"));
+	},
+
+	write(directory, filename, value) {
+		const content = JSON.stringify(value);
+		if (Buffer.byteLength(content) > 4 * 1024 * 1024)
+			throw new Error("Report metadata exceeds 4 MiB.");
+		external_node_fs_namespaceObject.writeFileSync(external_node_path_namespaceObject.join(directory, filename), content);
+	},
+
+	definition(value) {
+		const definition = Protocol.object(structuredClone(value), "definition");
+		const allowed = [
+			"name",
+			"project",
+			"suite",
+			"variant",
+			"reports",
+			"source",
+			"subject",
+			"path-mapping",
+		];
+		if (Object.keys(definition).some((key) => !allowed.includes(key)))
+			throw new Error("Unknown check definition field.");
+		definition.name ??= "Custom check";
+		definition.project ??= ".";
+		definition.suite ??= "default";
+		for (const key of ["name", "suite"])
+			if (
+				typeof definition[key] !== "string" ||
+				!definition[key].trim() ||
+				definition[key].length > 200
+			)
+				throw new Error(`Invalid check ${key}.`);
+		Protocol.relative(definition.project, { root: true });
+		definition.variant ??= {};
+		Protocol.object(definition.variant, "variant");
+		if (
+			Object.entries(definition.variant).some(
+				([key, value]) =>
+					!/^[\w-]{1,40}$/.test(key) ||
+					typeof value !== "string" ||
+					value.length > 120,
+			)
+		)
+			throw new Error("Variant dimensions must be bounded string values.");
+		if (definition["path-mapping"]) {
+			Protocol.object(definition["path-mapping"], "path-mapping");
+			for (const [prefix, target] of Object.entries(
+				definition["path-mapping"],
+			)) {
+				if (!prefix || prefix.length > 1024 || Protocol.hasControl(prefix))
+					throw new Error("Invalid source path prefix.");
+				Protocol.relative(target, { root: true });
+			}
+		}
+		if (
+			definition.source &&
+			(!/^[a-f0-9]{40}$/.test(definition.source.sha) ||
+				Object.keys(definition.source).some((key) => key !== "sha"))
+		)
+			throw new Error("Source must contain the exact tested commit SHA.");
+		if (definition.subject) {
+			Protocol.object(definition.subject, "subject");
+			const subject = definition.subject;
+			if (
+				Object.keys(subject).some(
+					(key) =>
+						!["kind", "name", "digest", "platform", "engine"].includes(key),
+				)
+			)
+				throw new Error("Unknown tested subject field.");
+			if (
+				!["image", "archive"].includes(subject.kind) ||
+				!/^sha256:[a-f0-9]{64}$/.test(subject.digest || "") ||
+				typeof subject.name !== "string" ||
+				!subject.name ||
+				subject.name.length > 500
+			)
+				throw new Error(
+					"Tested subjects require an image/archive kind, name and SHA-256 digest.",
+				);
+			for (const field of ["platform", "engine"])
+				if (
+					subject[field] !== undefined &&
+					(typeof subject[field] !== "string" || subject[field].length > 100)
+				)
+					throw new Error("Invalid tested subject metadata.");
+		}
+		if (
+			!Array.isArray(definition.reports) ||
+			!definition.reports.length ||
+			definition.reports.length > 128
+		)
+			throw new Error("A recording requires 1-128 typed report selectors.");
+		for (const report of definition.reports) {
+			Protocol.object(report, "report selector");
+			if (
+				Object.keys(report).some(
+					(key) =>
+						![
+							"kind",
+							"pattern",
+							"optional",
+							"owner",
+							"language",
+							"dataset",
+							"role",
+							"shards",
+						].includes(key),
+				)
+			)
+				throw new Error("Unknown report selector field.");
+			if (!Protocol.kinds.includes(report.kind))
+				throw new Error("Unknown report kind.");
+			Protocol.relative(report.pattern, { pattern: true });
+			if (report.optional !== undefined && typeof report.optional !== "boolean")
+				throw new Error("optional must be a boolean.");
+			if (
+				report.owner !== undefined &&
+				!["collector", "tool"].includes(report.owner)
+			)
+				throw new Error("Unknown diagnostic owner.");
+			if (report.kind === "coverage") {
+				if (
+					report.language !== undefined &&
+					!/^[A-Za-z][A-Za-z0-9 #+.-]{0,79}$/.test(report.language)
+				)
+					throw new Error("Invalid coverage language.");
+				report.dataset ??= definition.suite;
+				Protocol.relative(report.dataset);
+				if (!/^[\w.-][\w./-]{0,199}$/.test(report.dataset))
+					throw new Error("Invalid coverage dataset key.");
+				report.role ??= "primary";
+				if (!["primary", "diagnostic"].includes(report.role))
+					throw new Error("Invalid coverage role.");
+				if (report.shards) {
+					Protocol.object(report.shards, "coverage shards");
+					for (const field of ["expected", "included"])
+						if (
+							!Array.isArray(report.shards[field]) ||
+							report.shards[field].some(
+								(id) => typeof id !== "string" || !/^[\w.-]{1,80}$/.test(id),
+							) ||
+							new Set(report.shards[field]).size !== report.shards[field].length
+						)
+							throw new Error(
+								"Shards must contain unique expected and included identifiers.",
+							);
+					if (
+						!report.shards.expected.length ||
+						JSON.stringify([...report.shards.expected].sort()) !==
+							JSON.stringify([...report.shards.included].sort())
+					)
+						throw new Error(
+							"Native coverage merge is missing promised shards.",
+						);
+				}
+			}
+		}
+		return definition;
+	},
+
+	registration(value, identity) {
+		Protocol.object(value, "registration");
+		if (
+			value.version !== Protocol.version ||
+			!/^[0-9a-f-]{36}$/.test(value.id || "")
+		)
+			throw new Error("Unsupported or invalid recording identity.");
+		for (const key of ["repository", "repositoryId", "runId"])
+			if (String(value.execution?.[key]) !== String(identity[key]))
+				throw new Error(`Recording ${key} does not match the originating run.`);
+		if (
+			!/^[a-f0-9]{40}$/.test(value.source?.sha || "") ||
+			!["pr-head", "pr-merge", "branch"].includes(value.source.kind)
+		)
+			throw new Error("Invalid tested source revision.");
+		Protocol.definition(value.check);
+		return value;
+	},
+};
+
+;// CONCATENATED MODULE: ./src/CoverageBaseline.js
+
+
+
+
+
+/** Compare only retained default-branch evidence for the exact PR base commit. */
+class CoverageBaseline {
+	constructor({ github, context, artifacts, core, token, temporaryDirectory }) {
+		Object.assign(this, {
+			github,
+			context,
+			artifacts,
+			core,
+			token,
+			temporaryDirectory,
+		});
+	}
+
+	static comparable(current, previous, currentChecks, previousChecks) {
+		const check = currentChecks.find((item) => item.id === current.checkId);
+		const baseCheck = previousChecks.find(
+			(item) => item.id === previous.checkId,
+		);
+		return (
+			current.label === previous.label &&
+			current.project === previous.project &&
+			current.language === previous.language &&
+			current.role === previous.role &&
+			!previous.errors.length &&
+			baseCheck?.result?.outcome === "success" &&
+			!baseCheck.result.errors.length &&
+			JSON.stringify(check?.check.variant) ===
+				JSON.stringify(baseCheck.check.variant) &&
+			current.assets[0]?.format === previous.assets[0]?.format
+		);
+	}
+
+	async attach(collection) {
+		const sha = this.context.payload.pull_request?.base.sha;
+		for (const dataset of collection.datasets)
+			dataset.baseline = {
+				reason: sha
+					? "No comparable report retained for the exact PR base commit."
+					: "This event has no PR base commit.",
+			};
+		if (!sha || !collection.datasets.length) return;
+		const directory = external_node_fs_namespaceObject.mkdtempSync(
+			external_node_path_namespaceObject.join(this.temporaryDirectory, "ci-baseline-"),
+		);
+		try {
+			const { data } = await this.github.rest.actions.listWorkflowRunsForRepo({
+				...this.context.repo,
+				branch: this.context.payload.repository.default_branch,
+				head_sha: sha,
+				event: "push",
+				status: "success",
+				per_page: 30,
+			});
+			for (const run of data.workflow_runs.slice(0, 10)) {
+				if (
+					run.head_sha !== sha ||
+					run.conclusion !== "success" ||
+					run.head_repository?.id !== this.context.payload.repository.id
+				)
+					continue;
+				const artifacts = await this.github.paginate(
+					this.github.rest.actions.listWorkflowRunArtifacts,
+					{ ...this.context.repo, run_id: run.id, per_page: 100 },
+				);
+				const matches = artifacts.filter(
+					(item) =>
+						item.name === `${Protocol.prefix}collection-${run.run_attempt}` &&
+						!item.expired,
+				);
+				if (
+					matches.length !== 1 ||
+					matches[0].size_in_bytes > Protocol.maxBundleBytes
+				)
+					continue;
+				await new ArtifactDownload({
+					client: this.artifacts,
+					core: this.core,
+				}).download({
+					artifactIds: String(matches[0].id),
+					destination: directory,
+					mergeMultiple: true,
+					skipDecompress: false,
+					findBy: {
+						token: this.token,
+						repositoryOwner: this.context.repo.owner,
+						repositoryName: this.context.repo.repo,
+						workflowRunId: run.id,
+					},
+				});
+				const baseline = Protocol.read(directory, "collection.json");
+				if (
+					baseline.version !== Protocol.version ||
+					baseline.identity.sha !== sha ||
+					baseline.identity.runId !== String(run.id) ||
+					baseline.identity.repository !== collection.identity.repository ||
+					baseline.errors.length
+				)
+					continue;
+				for (const dataset of collection.datasets) {
+					if (dataset.baseline.coverage || dataset.errors.length) continue;
+					const candidates = baseline.datasets.filter(
+						(item) =>
+							item.source.sha === sha &&
+							item.source.kind === "branch" &&
+							CoverageBaseline.comparable(
+								dataset,
+								item,
+								collection.checks,
+								baseline.checks,
+							),
+					);
+					if (candidates.length !== 1) continue;
+					dataset.baseline = {
+						sha,
+						coverage: candidates[0].assets[0].data.coverage,
+						url: run.html_url,
+					};
+				}
+				// Never overlay separate artifact trees while looking for another measurement.
+				for (const entry of external_node_fs_namespaceObject.readdirSync(directory))
+					external_node_fs_namespaceObject.rmSync(external_node_path_namespaceObject.join(directory, entry), {
+						recursive: true,
+						force: true,
+					});
+				if (
+					collection.datasets.every(
+						(item) => item.baseline.coverage || item.errors.length,
+					)
+				)
+					break;
+			}
+		} catch (error) {
+			for (const dataset of collection.datasets)
+				if (!dataset.baseline.coverage)
+					dataset.baseline = {
+						reason: `Comparison unavailable: ${error.message}`,
+					};
+		} finally {
+			external_node_fs_namespaceObject.rmSync(directory, { recursive: true, force: true });
+		}
+	}
+}
+
 ;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/util.js
 
 
@@ -629,12 +1127,74 @@ const XMLValidator = {
   validate: validate
 }
 
-;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/util.js
+
+
+const util_nameStartChar = ':A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD';
+const util_nameChar = util_nameStartChar + '\\-.\\d\\u00B7\\u0300-\\u036F\\u203F-\\u2040';
+const util_nameRegexp = '[' + util_nameStartChar + '][' + util_nameChar + ']*';
+const util_regexName = new RegExp('^' + util_nameRegexp + '$');
+
+function util_getAllMatches(string, regex) {
+  const matches = [];
+  let match = regex.exec(string);
+  while (match) {
+    const allmatches = [];
+    allmatches.startIndex = regex.lastIndex - match[0].length;
+    const len = match.length;
+    for (let index = 0; index < len; index++) {
+      allmatches.push(match[index]);
+    }
+    matches.push(allmatches);
+    match = regex.exec(string);
+  }
+  return matches;
+}
+
+const util_isName = function (string) {
+  const match = util_regexName.exec(string);
+  return !(match === null || typeof match === 'undefined');
+}
+
+function util_isExist(v) {
+  return typeof v !== 'undefined';
+}
+
+function util_isEmptyObject(obj) {
+  return Object.keys(obj).length === 0;
+}
+
+function util_getValue(v) {
+  if (exports.isExist(v)) {
+    return v;
+  } else {
+    return '';
+  }
+}
+
+/**
+ * Dangerous property names that could lead to prototype pollution or security issues
+ */
+const util_DANGEROUS_PROPERTY_NAMES = [
+  // '__proto__',
+  // 'constructor',
+  // 'prototype',
+  'hasOwnProperty',
+  'toString',
+  'valueOf',
+  '__defineGetter__',
+  '__defineSetter__',
+  '__lookupGetter__',
+  '__lookupSetter__'
+];
+
+const util_criticalProperties = ["__proto__", "constructor", "prototype"];
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js
 
 
 
 const defaultOnDangerousProperty = (name) => {
-  if (DANGEROUS_PROPERTY_NAMES.includes(name)) {
+  if (util_DANGEROUS_PROPERTY_NAMES.includes(name)) {
     return "__" + name;
   }
   return name;
@@ -702,13 +1262,13 @@ function validatePropertyName(propertyName, optionName) {
   }
 
   const normalized = propertyName.toLowerCase();
-  if (DANGEROUS_PROPERTY_NAMES.some(dangerous => normalized === dangerous.toLowerCase())) {
+  if (util_DANGEROUS_PROPERTY_NAMES.some(dangerous => normalized === dangerous.toLowerCase())) {
     throw new Error(
       `[SECURITY] Invalid ${optionName}: "${propertyName}" is a reserved JavaScript keyword that could cause prototype pollution`
     );
   }
 
-  if (criticalProperties.some(dangerous => normalized === dangerous.toLowerCase())) {
+  if (util_criticalProperties.some(dangerous => normalized === dangerous.toLowerCase())) {
     throw new Error(
       `[SECURITY] Invalid ${optionName}: "${propertyName}" is a reserved JavaScript keyword that could cause prototype pollution`
     );
@@ -794,7 +1354,7 @@ const buildOptions = function (options) {
   //console.debug(built.processEntities)
   return built;
 };
-;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/xmlNode.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/xmlparser/xmlNode.js
 
 
 let METADATA_SYMBOL;
@@ -850,7 +1410,7 @@ class XmlNode {
   }
 }
 
-;// CONCATENATED MODULE: ./node_modules/xml-naming/src/index.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/xml-naming/src/index.js
 /**
  * xml-naming
  * Validates XML Name productions as defined in the XML 1.0 and 1.1 specifications.
@@ -1077,7 +1637,7 @@ const nmTokens = (str, { xmlVersion = '1.0', asciiOnly = false } = {}) =>
 //   (e.g. between unrelated parse calls).
 // ---------------------------------------------------------------------------
 
-const PRODUCTIONS = ['name', 'ncName', 'qName', 'nmToken', 'nmTokens'];
+const PRODUCTIONS = (/* unused pure expression or super */ null && (['name', 'ncName', 'qName', 'nmToken', 'nmTokens']));
 
 /**
  * Returns a memoized boolean validator function for a single production,
@@ -1233,7 +1793,7 @@ const sanitize = (str, production = 'name', { replacement = '_', asciiOnly = fal
 
   return result || replacement;
 };
-;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/DocTypeReader.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/xmlparser/DocTypeReader.js
 
 
 class DocTypeReader {
@@ -1660,7 +2220,7 @@ function validateEntityName(name, xmlVersion) {
     else
         throw new Error(`Invalid entity name ${name}`);
 }
-;// CONCATENATED MODULE: ./node_modules/anynum/digitTable.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/anynum/digitTable.js
 /**
  * Flat lookup table: maps Unicode code point → ASCII digit (0-9).
  * Only decimal digit characters (Unicode category Nd) are included.
@@ -1778,7 +2338,7 @@ for (const zero of SCRIPT_ZEROS) {
 
 
 
-;// CONCATENATED MODULE: ./node_modules/anynum/anynum.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/anynum/anynum.js
 
 
 
@@ -1914,7 +2474,7 @@ function anynum(str) {
 
 
 /* harmony default export */ const anynum_anynum = (anynum);
-;// CONCATENATED MODULE: ./node_modules/strnum/strnum.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/strnum/strnum.js
 const hexRegex = /^[-+]?0x[a-fA-F0-9]+$/;
 const binRegex = /^0b[01]+$/;
 const octRegex = /^0o[0-7]+$/;
@@ -2092,7 +2652,7 @@ function handleInfinity(str, num, options) {
     }
 }
 
-;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/ignoreAttributes.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/ignoreAttributes.js
 function getIgnoreAttributesFn(ignoreAttributes) {
     if (typeof ignoreAttributes === 'function') {
         return ignoreAttributes
@@ -2111,7 +2671,7 @@ function getIgnoreAttributesFn(ignoreAttributes) {
     }
     return () => false
 }
-;// CONCATENATED MODULE: ./node_modules/path-expression-matcher/src/Matcher.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/path-expression-matcher/src/Matcher.js
 
 
 /**
@@ -2776,7 +3336,7 @@ class Matcher {
   }
 }
 
-;// CONCATENATED MODULE: ./node_modules/path-expression-matcher/src/Expression.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/path-expression-matcher/src/Expression.js
 /**
  * Expression - Parses and stores a tag pattern expression
  * 
@@ -3009,7 +3569,7 @@ class Expression {
     return this.pattern;
   }
 }
-;// CONCATENATED MODULE: ./node_modules/path-expression-matcher/src/ExpressionSet.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/path-expression-matcher/src/ExpressionSet.js
 /**
  * ExpressionSet - An indexed collection of Expressions for efficient bulk matching
  *
@@ -3236,7 +3796,7 @@ class ExpressionSet {
   }
 }
 
-;// CONCATENATED MODULE: ./node_modules/@nodable/entities/src/entities.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/@nodable/entities/src/entities.js
 // ---------------------------------------------------------------------------
 // Complete HTML5 named entity reference
 // Organized by logical categories for easy maintenance and selective importing
@@ -4376,7 +4936,7 @@ const COMMON_HTML = {
 // Note: NUMERIC_ENTITIES (&#NNN; / &#xHH;) are handled by the scanner directly
 // via String.fromCodePoint() without any map lookup.
 // ---------------------------------------------------------------------------
-;// CONCATENATED MODULE: ./node_modules/@nodable/entities/src/EntityDecoder.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/@nodable/entities/src/EntityDecoder.js
 // ---------------------------------------------------------------------------
 // Built-in named entity map  (name → replacement string)
 // No regex, no {regex,val} objects — just flat key/value pairs.
@@ -5021,7 +5581,7 @@ class EntityDecoder {
     return this._applyNCRAction(effective, token, cp);
   }
 }
-;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/sql.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/sql.js
 /**
  * SQL context patterns — high-precision rules only.
  *
@@ -5118,7 +5678,7 @@ const SQL_PATTERNS = [
 
 /* harmony default export */ const sql = (SQL_PATTERNS);
 
-;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/sql-strict.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/sql-strict.js
 /**
  * SQL-STRICT context patterns.
  *
@@ -5167,7 +5727,7 @@ const SQL_STRICT_PATTERNS = [...sql, ...SQL_STRICT_EXTRA];
 
 /* harmony default export */ const sql_strict = (SQL_STRICT_PATTERNS);
 
-;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/util/decode-entities.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/util/decode-entities.js
 /**
  * Decode the HTML character references that matter for markup-context
  * detection.
@@ -5217,7 +5777,7 @@ function decodeEntities(input) {
   });
 }
 
-;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/html.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/html.js
 /**
  * HTML context patterns.
  *
@@ -5321,7 +5881,7 @@ const HTML_PATTERNS = [
 
 /* harmony default export */ const html = (HTML_PATTERNS);
 
-;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/xml.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/xml.js
 /**
  * XML context patterns.
  *
@@ -5402,7 +5962,7 @@ const XML_PATTERNS = [
 
 /* harmony default export */ const xml = (XML_PATTERNS);
 
-;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/svg.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/svg.js
 /**
  * SVG context patterns.
  *
@@ -5485,7 +6045,7 @@ const SVG_PATTERNS = [
 
 /* harmony default export */ const svg = (SVG_PATTERNS);
 
-;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/shell.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/shell.js
 /**
  * SHELL context patterns.
  *
@@ -5592,7 +6152,7 @@ const SHELL_PATTERNS = [
 
 /* harmony default export */ const shell = (SHELL_PATTERNS);
 
-;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/redos.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/redos.js
 /**
  * REDOS context patterns.
  *
@@ -5654,7 +6214,7 @@ const REDOS_PATTERNS = [
 
 /* harmony default export */ const redos = (REDOS_PATTERNS);
 
-;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/nosql.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/nosql.js
 /**
  * NOSQL context patterns.
  *
@@ -5770,7 +6330,7 @@ const NOSQL_PATTERNS = [
 
 /* harmony default export */ const nosql = (NOSQL_PATTERNS);
 
-;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/log.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/log.js
 /**
  * LOG context patterns.
  *
@@ -5870,7 +6430,7 @@ const LOG_PATTERNS = [
 
 /* harmony default export */ const log = (LOG_PATTERNS);
 
-;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/index.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/index.js
 /**
  * is-unsafe v2
  *
@@ -6164,7 +6724,7 @@ function allUnsafe(value, context) {
 
 /* harmony default export */ const src = ((/* unused pure expression or super */ null && (isUnsafe)));
 
-;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/OrderedObjParser.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/xmlparser/OrderedObjParser.js
 
 ///@ts-check
 
@@ -6378,7 +6938,7 @@ function buildAttributesMap(attrStr, jPath, tagName, force = false) {
     // attrStr = attrStr.replace(/\r?\n/g, ' ');
     //attrStr = attrStr || attrStr.trim();
 
-    const matches = getAllMatches(attrStr, attrsRegx);
+    const matches = util_getAllMatches(attrStr, attrsRegx);
     const len = matches.length; //don't make it inline
     const attrs = {};
 
@@ -7038,7 +7598,7 @@ function parseValue(val, shouldParse, options) {
     else if (newval === 'false') return false;
     else return toNumber(val, options);
   } else {
-    if (isExist(val)) {
+    if (util_isExist(val)) {
       return val;
     } else {
       return '';
@@ -7071,14 +7631,14 @@ function transformTagName(fn, tagName, tagExp, options) {
 
 
 function sanitizeName(name, options) {
-  if (criticalProperties.includes(name)) {
+  if (util_criticalProperties.includes(name)) {
     throw new Error(`[SECURITY] Invalid name: "${name}" is a reserved JavaScript keyword that could cause prototype pollution`);
-  } else if (DANGEROUS_PROPERTY_NAMES.includes(name)) {
+  } else if (util_DANGEROUS_PROPERTY_NAMES.includes(name)) {
     return options.onDangerousProperty(name);
   }
   return name;
 }
-;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/node2json.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/xmlparser/node2json.js
 
 
 
@@ -7256,7 +7816,525 @@ function isLeafTag(obj, options) {
 
   return false;
 }
-;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/XMLParser.js
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/validator.js
+
+
+
+
+const validator_defaultOptions = {
+  allowBooleanAttributes: false, //A tag can have attributes without any value
+  unpairedTags: []
+};
+
+//const tagsPattern = new RegExp("<\\/?([\\w:\\-_\.]+)\\s*\/?>","g");
+function validator_validate(xmlData, options) {
+  options = Object.assign({}, validator_defaultOptions, options);
+
+  //xmlData = xmlData.replace(/(\r\n|\n|\r)/gm,"");//make it single line
+  //xmlData = xmlData.replace(/(^\s*<\?xml.*?\?>)/g,"");//Remove XML starting tag
+  //xmlData = xmlData.replace(/(<!DOCTYPE[\s\w\"\.\/\-\:]+(\[.*\])*\s*>)/g,"");//Remove DOCTYPE
+  const tags = [];
+  let tagFound = false;
+
+  //indicates that the root tag has been closed (aka. depth 0 has been reached)
+  let reachedRoot = false;
+
+  if (xmlData[0] === '\ufeff') {
+    // check for byte order mark (BOM)
+    xmlData = xmlData.substr(1);
+  }
+
+  for (let i = 0; i < xmlData.length; i++) {
+
+    if (xmlData[i] === '<' && xmlData[i + 1] === '?') {
+      i += 2;
+      i = validator_readPI(xmlData, i);
+      if (i.err) return i;
+    } else if (xmlData[i] === '<') {
+      //starting of tag
+      //read until you reach to '>' avoiding any '>' in attribute value
+      let tagStartPos = i;
+      i++;
+
+      if (xmlData[i] === '!') {
+        i = validator_readCommentAndCDATA(xmlData, i);
+        continue;
+      } else {
+        let closingTag = false;
+        if (xmlData[i] === '/') {
+          //closing tag
+          closingTag = true;
+          i++;
+        }
+        //read tagname
+        let tagName = '';
+        for (; i < xmlData.length &&
+          xmlData[i] !== '>' &&
+          xmlData[i] !== ' ' &&
+          xmlData[i] !== '\t' &&
+          xmlData[i] !== '\n' &&
+          xmlData[i] !== '\r'; i++
+        ) {
+          tagName += xmlData[i];
+        }
+        tagName = tagName.trim();
+        //console.log(tagName);
+
+        if (tagName[tagName.length - 1] === '/') {
+          //self closing tag without attributes
+          tagName = tagName.substring(0, tagName.length - 1);
+          //continue;
+          i--;
+        }
+        if (!validator_validateTagName(tagName)) {
+          let msg;
+          if (tagName.trim().length === 0) {
+            msg = "Invalid space after '<'.";
+          } else {
+            msg = "Tag '" + tagName + "' is an invalid name.";
+          }
+          return validator_getErrorObject('InvalidTag', msg, validator_getLineNumberForPosition(xmlData, i));
+        }
+
+        const result = validator_readAttributeStr(xmlData, i);
+        if (result === false) {
+          return validator_getErrorObject('InvalidAttr', "Attributes for '" + tagName + "' have open quote.", validator_getLineNumberForPosition(xmlData, i));
+        }
+        let attrStr = result.value;
+        i = result.index;
+
+        if (attrStr[attrStr.length - 1] === '/') {
+          //self closing tag
+          const attrStrStart = i - attrStr.length;
+          attrStr = attrStr.substring(0, attrStr.length - 1);
+          const isValid = validator_validateAttributeString(attrStr, options);
+          if (isValid === true) {
+            tagFound = true;
+            //continue; //text may presents after self closing tag
+          } else {
+            //the result from the nested function returns the position of the error within the attribute
+            //in order to get the 'true' error line, we need to calculate the position where the attribute begins (i - attrStr.length) and then add the position within the attribute
+            //this gives us the absolute index in the entire xml, which we can use to find the line at last
+            return validator_getErrorObject(isValid.err.code, isValid.err.msg, validator_getLineNumberForPosition(xmlData, attrStrStart + isValid.err.line));
+          }
+        } else if (closingTag) {
+          if (!result.tagClosed) {
+            return validator_getErrorObject('InvalidTag', "Closing tag '" + tagName + "' doesn't have proper closing.", validator_getLineNumberForPosition(xmlData, i));
+          } else if (attrStr.trim().length > 0) {
+            return validator_getErrorObject('InvalidTag', "Closing tag '" + tagName + "' can't have attributes or invalid starting.", validator_getLineNumberForPosition(xmlData, tagStartPos));
+          } else if (tags.length === 0) {
+            return validator_getErrorObject('InvalidTag', "Closing tag '" + tagName + "' has not been opened.", validator_getLineNumberForPosition(xmlData, tagStartPos));
+          } else {
+            const otg = tags.pop();
+            if (tagName !== otg.tagName) {
+              let openPos = validator_getLineNumberForPosition(xmlData, otg.tagStartPos);
+              return validator_getErrorObject('InvalidTag',
+                "Expected closing tag '" + otg.tagName + "' (opened in line " + openPos.line + ", col " + openPos.col + ") instead of closing tag '" + tagName + "'.",
+                validator_getLineNumberForPosition(xmlData, tagStartPos));
+            }
+
+            //when there are no more tags, we reached the root level.
+            if (tags.length == 0) {
+              reachedRoot = true;
+            }
+          }
+        } else {
+          const isValid = validator_validateAttributeString(attrStr, options);
+          if (isValid !== true) {
+            //the result from the nested function returns the position of the error within the attribute
+            //in order to get the 'true' error line, we need to calculate the position where the attribute begins (i - attrStr.length) and then add the position within the attribute
+            //this gives us the absolute index in the entire xml, which we can use to find the line at last
+            return validator_getErrorObject(isValid.err.code, isValid.err.msg, validator_getLineNumberForPosition(xmlData, i - attrStr.length + isValid.err.line));
+          }
+
+          //if the root level has been reached before ...
+          if (reachedRoot === true) {
+            return validator_getErrorObject('InvalidXml', 'Multiple possible root nodes found.', validator_getLineNumberForPosition(xmlData, i));
+          } else if (options.unpairedTags.indexOf(tagName) !== -1) {
+            //don't push into stack
+          } else {
+            tags.push({ tagName, tagStartPos });
+          }
+          tagFound = true;
+        }
+
+        //skip tag text value
+        //It may include comments and CDATA value
+        for (i++; i < xmlData.length; i++) {
+          if (xmlData[i] === '<') {
+            if (xmlData[i + 1] === '!') {
+              //comment or CADATA
+              i++;
+              i = validator_readCommentAndCDATA(xmlData, i);
+              continue;
+            } else if (xmlData[i + 1] === '?') {
+              i = validator_readPI(xmlData, ++i);
+              if (i.err) return i;
+            } else {
+              break;
+            }
+          } else if (xmlData[i] === '&') {
+            const afterAmp = validator_validateAmpersand(xmlData, i);
+            if (afterAmp == -1)
+              return validator_getErrorObject('InvalidChar', "char '&' is not expected.", validator_getLineNumberForPosition(xmlData, i));
+            i = afterAmp;
+          } else {
+            if (reachedRoot === true && !validator_isWhiteSpace(xmlData[i])) {
+              return validator_getErrorObject('InvalidXml', "Extra text at the end", validator_getLineNumberForPosition(xmlData, i));
+            }
+          }
+        } //end of reading tag text value
+        if (xmlData[i] === '<') {
+          i--;
+        }
+      }
+    } else {
+      if (validator_isWhiteSpace(xmlData[i])) {
+        continue;
+      }
+      return validator_getErrorObject('InvalidChar', "char '" + xmlData[i] + "' is not expected.", validator_getLineNumberForPosition(xmlData, i));
+    }
+  }
+
+  if (!tagFound) {
+    return validator_getErrorObject('InvalidXml', 'Start tag expected.', 1);
+  } else if (tags.length == 1) {
+    return validator_getErrorObject('InvalidTag', "Unclosed tag '" + tags[0].tagName + "'.", validator_getLineNumberForPosition(xmlData, tags[0].tagStartPos));
+  } else if (tags.length > 0) {
+    return validator_getErrorObject('InvalidXml', "Invalid '" +
+      JSON.stringify(tags.map(t => t.tagName), null, 4).replace(/\r?\n/g, '') +
+      "' found.", { line: 1, col: 1 });
+  }
+
+  return true;
+};
+
+function validator_isWhiteSpace(char) {
+  return char === ' ' || char === '\t' || char === '\n' || char === '\r';
+}
+/**
+ * Read Processing insstructions and skip
+ * @param {*} xmlData
+ * @param {*} i
+ */
+function validator_readPI(xmlData, i) {
+  const start = i;
+  for (; i < xmlData.length; i++) {
+    if (xmlData[i] == '?' || xmlData[i] == ' ') {
+      //tagname
+      const tagname = xmlData.substr(start, i - start);
+      if (i > 5 && tagname === 'xml') {
+        return validator_getErrorObject('InvalidXml', 'XML declaration allowed only at the start of the document.', validator_getLineNumberForPosition(xmlData, i));
+      } else if (xmlData[i] == '?' && xmlData[i + 1] == '>') {
+        //check if valid attribut string
+        i++;
+        break;
+      } else {
+        continue;
+      }
+    }
+  }
+  return i;
+}
+
+function validator_readCommentAndCDATA(xmlData, i) {
+  if (xmlData.length > i + 5 && xmlData[i + 1] === '-' && xmlData[i + 2] === '-') {
+    //comment
+    for (i += 3; i < xmlData.length; i++) {
+      if (xmlData[i] === '-' && xmlData[i + 1] === '-' && xmlData[i + 2] === '>') {
+        i += 2;
+        break;
+      }
+    }
+  } else if (
+    xmlData.length > i + 8 &&
+    xmlData[i + 1] === 'D' &&
+    xmlData[i + 2] === 'O' &&
+    xmlData[i + 3] === 'C' &&
+    xmlData[i + 4] === 'T' &&
+    xmlData[i + 5] === 'Y' &&
+    xmlData[i + 6] === 'P' &&
+    xmlData[i + 7] === 'E'
+  ) {
+    let angleBracketsCount = 1;
+    for (i += 8; i < xmlData.length; i++) {
+      if (xmlData[i] === '<') {
+        angleBracketsCount++;
+      } else if (xmlData[i] === '>') {
+        angleBracketsCount--;
+        if (angleBracketsCount === 0) {
+          break;
+        }
+      }
+    }
+  } else if (
+    xmlData.length > i + 9 &&
+    xmlData[i + 1] === '[' &&
+    xmlData[i + 2] === 'C' &&
+    xmlData[i + 3] === 'D' &&
+    xmlData[i + 4] === 'A' &&
+    xmlData[i + 5] === 'T' &&
+    xmlData[i + 6] === 'A' &&
+    xmlData[i + 7] === '['
+  ) {
+    for (i += 8; i < xmlData.length; i++) {
+      if (xmlData[i] === ']' && xmlData[i + 1] === ']' && xmlData[i + 2] === '>') {
+        i += 2;
+        break;
+      }
+    }
+  }
+
+  return i;
+}
+
+const validator_doubleQuote = '"';
+const validator_singleQuote = "'";
+
+/**
+ * Keep reading xmlData until '<' is found outside the attribute value.
+ * @param {string} xmlData
+ * @param {number} i
+ */
+function validator_readAttributeStr(xmlData, i) {
+  let attrStr = '';
+  let startChar = '';
+  let tagClosed = false;
+  for (; i < xmlData.length; i++) {
+    if (xmlData[i] === validator_doubleQuote || xmlData[i] === validator_singleQuote) {
+      if (startChar === '') {
+        startChar = xmlData[i];
+      } else if (startChar !== xmlData[i]) {
+        //if vaue is enclosed with double quote then single quotes are allowed inside the value and vice versa
+      } else {
+        startChar = '';
+      }
+    } else if (xmlData[i] === '>') {
+      if (startChar === '') {
+        tagClosed = true;
+        break;
+      }
+    }
+    attrStr += xmlData[i];
+  }
+  if (startChar !== '') {
+    return false;
+  }
+
+  return {
+    value: attrStr,
+    index: i,
+    tagClosed: tagClosed
+  };
+}
+
+/**
+ * Walk `attrStr` once, left to right, splitting it into attribute tokens.
+ *
+ * This replaces a regex that used to do the same job
+ * (`(\s*)([^\s=]+)(\s*=)?(\s*(['"])(([\s\S])*?)\5)?`). That regex led with an
+ * optional whitespace group followed by a required "non-whitespace" group.
+ * On a long run of whitespace that never resolves into an attribute name
+ * (e.g. a tag with thousands of trailing spaces before `>`), the engine
+ * backtracks the whitespace group one character at a time before giving up
+ * and moving to the next starting position — one full backtrack per
+ * position, which is quadratic in the length of the run.
+ *
+ * The scan is forward-only: the cursor never moves backwards, so each
+ * character is visited a constant number of times and the cost is linear
+ * in the length of the string.
+ *
+ * Each returned token mirrors the shape the old regex match array had, so
+ * the validation logic below (which reads token[1]..token[6]) didn't need
+ * to change:
+ *   token.startIndex - where this token begins in attrStr
+ *   token[1]          - leading whitespace before the name
+ *   token[2]          - the attribute name
+ *   token[3]          - whitespace + '=' if present, else undefined
+ *   token[4]          - marker (any defined value) if a quoted value was found
+ *   token[5]          - the quote character used ('"' or "'")
+ *   token[6]          - the value's text, without the surrounding quotes
+ *
+ * A malformed leading character (e.g. a stray '=' with no name before it)
+ * is simply skipped over, one character at a time — the same outcome the
+ * old regex produced by failing to match at that position and retrying at
+ * the next one.
+ */
+function validator_scanAttributeTokens(attrStr) {
+  const tokens = [];
+  const len = attrStr.length;
+  let i = 0;
+
+  while (i < len) {
+    const tokenStart = i;
+
+    // Leading whitespace before the name.
+    while (i < len && validator_isWhiteSpace(attrStr[i])) i++;
+    if (i >= len) break; // trailing whitespace only — nothing left to read
+
+    if (attrStr[i] === '=') {
+      // No name before this '=' — not a valid attribute start. Move past
+      i++;
+      continue;
+    }
+
+    const leadingWs = attrStr.slice(tokenStart, i);
+
+    // Attribute name — everything up to the next whitespace or '='.
+    const nameStart = i;
+    while (i < len && !validator_isWhiteSpace(attrStr[i]) && attrStr[i] !== '=') i++;
+    const name = attrStr.slice(nameStart, i);
+
+    // Optional whitespace + '='.
+    let equalsGroup; // whitespace + '=' text, or undefined if absent
+    let j = i;
+    while (j < len && validator_isWhiteSpace(attrStr[j])) j++;
+    if (j < len && attrStr[j] === '=') {
+      equalsGroup = attrStr.slice(i, j + 1);
+      i = j + 1;
+    }
+
+    // Optional whitespace + quoted value.
+    let quoteChar;
+    let value;
+    let k = i;
+    while (k < len && validator_isWhiteSpace(attrStr[k])) k++;
+    if (k < len && (attrStr[k] === '"' || attrStr[k] === "'")) {
+      const valueStart = k + 1;
+      const closeIdx = attrStr.indexOf(attrStr[k], valueStart);
+      if (closeIdx !== -1) {
+        quoteChar = attrStr[k];
+        value = attrStr.slice(valueStart, closeIdx);
+        i = closeIdx + 1;
+      }
+      // No closing quote found anywhere in the rest of the string — leave
+      // quoteChar/value undefined, same as the old regex's group failing
+      // to match a backreference-less run.
+    }
+
+    const token = { startIndex: tokenStart };
+    token[1] = leadingWs;
+    token[2] = name;
+    token[3] = equalsGroup;
+    token[4] = quoteChar !== undefined ? true : undefined;
+    token[5] = quoteChar;
+    token[6] = value;
+    tokens.push(token);
+  }
+
+  return tokens;
+}
+
+//attr, ="sd", a="amit's", a="sd"b="saf", ab  cd=""
+
+function validator_validateAttributeString(attrStr, options) {
+  //console.log("start:"+attrStr+":end");
+
+  //if(attrStr.trim().length === 0) return true; //empty string
+
+  const matches = validator_scanAttributeTokens(attrStr);
+  const attrNames = {};
+
+  for (let i = 0; i < matches.length; i++) {
+    if (matches[i][1].length === 0) {
+      //nospace before attribute name: a="sd"b="saf"
+      return validator_getErrorObject('InvalidAttr', "Attribute '" + matches[i][2] + "' has no space in starting.", validator_getPositionFromMatch(matches[i]))
+    } else if (matches[i][3] !== undefined && matches[i][4] === undefined) {
+      return validator_getErrorObject('InvalidAttr', "Attribute '" + matches[i][2] + "' is without value.", validator_getPositionFromMatch(matches[i]));
+    } else if (matches[i][3] === undefined && !options.allowBooleanAttributes) {
+      //independent attribute: ab
+      return validator_getErrorObject('InvalidAttr', "boolean attribute '" + matches[i][2] + "' is not allowed.", validator_getPositionFromMatch(matches[i]));
+    }
+    /* else if(matches[i][6] === undefined){//attribute without value: ab=
+                    return { err: { code:"InvalidAttr",msg:"attribute " + matches[i][2] + " has no value assigned."}};
+                } */
+    const attrName = matches[i][2];
+    if (!validator_validateAttrName(attrName)) {
+      return validator_getErrorObject('InvalidAttr', "Attribute '" + attrName + "' is an invalid name.", validator_getPositionFromMatch(matches[i]));
+    }
+    if (!Object.prototype.hasOwnProperty.call(attrNames, attrName)) {
+      //check for duplicate attribute.
+      attrNames[attrName] = 1;
+    } else {
+      return validator_getErrorObject('InvalidAttr', "Attribute '" + attrName + "' is repeated.", validator_getPositionFromMatch(matches[i]));
+    }
+  }
+
+  return true;
+}
+
+function validator_validateNumberAmpersand(xmlData, i) {
+  let re = /\d/;
+  if (xmlData[i] === 'x') {
+    i++;
+    re = /[\da-fA-F]/;
+  }
+  for (; i < xmlData.length; i++) {
+    if (xmlData[i] === ';')
+      return i;
+    if (!xmlData[i].match(re))
+      break;
+  }
+  return -1;
+}
+
+function validator_validateAmpersand(xmlData, i) {
+  // https://www.w3.org/TR/xml/#dt-charref
+  i++;
+  if (xmlData[i] === ';')
+    return -1;
+  if (xmlData[i] === '#') {
+    i++;
+    return validator_validateNumberAmpersand(xmlData, i);
+  }
+  let count = 0;
+  for (; i < xmlData.length; i++, count++) {
+    if (xmlData[i].match(/\w/) && count < 20)
+      continue;
+    if (xmlData[i] === ';')
+      break;
+    return -1;
+  }
+  return i;
+}
+
+function validator_getErrorObject(code, message, lineNumber) {
+  return {
+    err: {
+      code: code,
+      msg: message,
+      line: lineNumber.line || lineNumber,
+      col: lineNumber.col,
+    },
+  };
+}
+
+function validator_validateAttrName(attrName) {
+  return util_isName(attrName);
+}
+
+// const startsWithXML = /^xml/i;
+
+function validator_validateTagName(tagname) {
+  return util_isName(tagname) /* && !tagname.match(startsWithXML) */;
+}
+
+//this function returns the line number for the character at the given index
+function validator_getLineNumberForPosition(xmlData, index) {
+  const lines = xmlData.substring(0, index).split(/\r?\n/);
+  return {
+    line: lines.length,
+
+    // column number is last line's length + 1, because column numbering starts at 1:
+    col: lines[lines.length - 1].length + 1
+  };
+}
+
+//this function returns the position of the first character of match within attrStr
+function validator_getPositionFromMatch(match) {
+  return match.startIndex + match[1].length;
+}
+;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/xmlparser/XMLParser.js
 /* global Uint8Array */
 
 
@@ -7291,7 +8369,7 @@ class XMLParser {
         if (validationOption) {
             if (validationOption === true) validationOption = {}; //validate with default options
 
-            const result = validate(xmlData, validationOption);
+            const result = validator_validate(xmlData, validationOption);
             if (result !== true) {
                 throw Error(`${result.err.msg}:${result.err.line}:${result.err.col}`)
             }
@@ -7332,6 +8410,8327 @@ class XMLParser {
      */
     static getMetaDataSymbol() {
         return XmlNode.getMetaDataSymbol();
+    }
+}
+;// CONCATENATED MODULE: ../parse-ci-reports/src/models/ReportData.js
+/**
+ * Represents a test result
+ */
+class TestResult {
+	constructor({
+		name,
+		status,
+		duration = 0,
+		message = "",
+		errorType = "",
+		stackTrace = "",
+		file = "",
+		suite = "",
+	}) {
+		this.name = name;
+		this.status = status; // 'passed', 'failed', 'skipped', 'error'
+		this.duration = duration;
+		this.message = message;
+		this.errorType = errorType;
+		this.stackTrace = stackTrace;
+		this.file = file;
+		this.suite = suite;
+	}
+
+	isPassed() {
+		return this.status === "passed";
+	}
+
+	isFailed() {
+		return this.status === "failed" || this.status === "error";
+	}
+
+	isSkipped() {
+		return this.status === "skipped";
+	}
+}
+
+/**
+ * Represents a lint/check issue
+ */
+class LintIssue {
+	constructor({ file, line, column, severity, rule, message, source = "" }) {
+		this.file = file;
+		this.line = line;
+		this.column = column;
+		this.severity = severity; // 'error', 'warning', 'info'
+		this.rule = rule;
+		this.message = message;
+		this.source = source;
+	}
+
+	isError() {
+		return this.severity === "error";
+	}
+
+	isWarning() {
+		return this.severity === "warning";
+	}
+}
+
+/**
+ * Represents coverage data
+ */
+class Coverage {
+	constructor({
+		lines = { total: 0, covered: 0, percentage: 0 },
+		branches = { total: 0, covered: 0, percentage: 0 },
+		functions = { total: 0, covered: 0, percentage: 0 },
+		statements = { total: 0, covered: 0, percentage: 0 },
+	}) {
+		this.lines = lines;
+		this.branches = branches;
+		this.functions = functions;
+		this.statements = statements;
+	}
+
+	getOverallPercentage() {
+		// Use line coverage as the primary metric
+		return this.lines.percentage;
+	}
+}
+
+/**
+ * Aggregated report data
+ */
+class ReportData {
+	constructor() {
+		this.tests = [];
+		this.lintIssues = [];
+		this.lintReportCount = 0;
+		this.coverage = null;
+		this.coverageReports = [];
+		this.reportType = "unknown"; // 'test', 'lint', 'coverage', 'mixed'
+	}
+
+	addTest(test) {
+		this.tests.push(test);
+	}
+
+	addLintIssue(issue) {
+		this.lintIssues.push(issue);
+	}
+
+	setCoverage(coverage) {
+		this.coverage = coverage;
+	}
+
+	getPassedTests() {
+		return this.tests.filter((t) => t.isPassed());
+	}
+
+	getFailedTests() {
+		return this.tests.filter((t) => t.isFailed());
+	}
+
+	getSkippedTests() {
+		return this.tests.filter((t) => t.isSkipped());
+	}
+
+	getErrors() {
+		return this.lintIssues.filter((i) => i.isError());
+	}
+
+	getWarnings() {
+		return this.lintIssues.filter((i) => i.isWarning());
+	}
+
+	hasErrors() {
+		return this.getFailedTests().length > 0 || this.getErrors().length > 0;
+	}
+
+	getTotalTests() {
+		return this.tests.length;
+	}
+
+	getPassedCount() {
+		return this.getPassedTests().length;
+	}
+
+	getFailedCount() {
+		return this.getFailedTests().length;
+	}
+
+	getSkippedCount() {
+		return this.getSkippedTests().length;
+	}
+}
+
+;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/BaseParser.js
+/**
+ * Report category constants
+ */
+const ReportCategory = {
+	TEST: "test",
+	COVERAGE: "coverage",
+	LINT: "lint",
+};
+
+/**
+ * Base class for all report parsers
+ * Follows the Strategy pattern for different report formats
+ */
+class BaseParser {
+	constructor() {
+		this._autoPatternRegexCache = null;
+	}
+
+	/**
+	 * Build glob patterns for file basenames matched anywhere in the workspace.
+	 * @param {string[]} baseNames - File basenames to match
+	 * @param {Object} [options] - Pattern options
+	 * @param {boolean} [options.includePrefixed=false] - Also match *-prefixed variants
+	 * @returns {string[]} Array of glob patterns
+	 */
+	buildBasenamePatterns(baseNames, { includePrefixed = false } = {}) {
+		const patterns = [];
+
+		for (const baseName of baseNames) {
+			patterns.push(`**/${baseName}`);
+			if (includePrefixed) {
+				patterns.push(`**/*-${baseName}`);
+			}
+		}
+
+		return patterns;
+	}
+
+	/**
+	 * Build glob patterns for filenames within specific directories.
+	 * @param {string} baseName - File basename to match
+	 * @param {string[]} directories - Directory segments relative to any workspace folder
+	 * @param {Object} [options] - Pattern options
+	 * @param {boolean} [options.includePrefixed=false] - Also match *-prefixed variants
+	 * @returns {string[]} Array of glob patterns
+	 */
+	buildScopedBasenamePatterns(
+		baseName,
+		directories,
+		{ includePrefixed = false } = {},
+	) {
+		const patterns = [];
+
+		for (const directory of directories) {
+			patterns.push(`**/${directory}/${baseName}`);
+			if (includePrefixed) {
+				patterns.push(`**/${directory}/*-${baseName}`);
+			}
+		}
+
+		return patterns;
+	}
+
+	/**
+	 * Build extension-based glob patterns.
+	 * @param {string[]} extensions - Extensions without the leading *.
+	 * @returns {string[]} Array of glob patterns
+	 */
+	buildExtensionPatterns(extensions) {
+		return extensions.map((extension) => `**/*.${extension}`);
+	}
+
+	/**
+	 * Check if a file path matches this parser auto-detection patterns.
+	 * @param {string} filePath - Path to evaluate
+	 * @returns {boolean} True if path matches any auto pattern
+	 */
+	matchesAutoPatterns(filePath) {
+		if (!filePath) {
+			return false;
+		}
+
+		const normalizedPath = this._normalizeFilePath(filePath).toLowerCase();
+		const matchers = this._getAutoPatternRegexes();
+
+		return matchers.some((matcher) => matcher.test(normalizedPath));
+	}
+
+	_getAutoPatternRegexes() {
+		if (this._autoPatternRegexCache) {
+			return this._autoPatternRegexCache;
+		}
+
+		const patterns = this.getAutoPatterns();
+		this._autoPatternRegexCache = patterns.map((pattern) =>
+			this._globToRegex(pattern),
+		);
+
+		return this._autoPatternRegexCache;
+	}
+
+	_normalizeFilePath(filePath) {
+		return String(filePath).replace(/\\/g, "/");
+	}
+
+	_globToRegex(pattern) {
+		const escapedPattern = pattern
+			.toLowerCase()
+			.replace(/[-[\]{}()+?.,\\^$|#\s]/g, "\\$&")
+			.replace(/\*\*\//g, "<<<ANY_DIR_PREFIX>>>")
+			.replace(/\*\*/g, "<<<ANY_DIR>>>")
+			.replace(/\*/g, "[^/]*")
+			.replace(/<<<ANY_DIR_PREFIX>>>/g, "(?:.*/)?")
+			.replace(/<<<ANY_DIR>>>/g, ".*");
+
+		return new RegExp(`^${escapedPattern}$`, "i");
+	}
+
+	/**
+	 * Parse a report file
+	 * @param {string} content - The file content
+	 * @param {string} filePath - The file path for context
+	 * @returns {ReportData} Parsed report data
+	 */
+	// eslint-disable-next-line no-unused-vars
+	parse(_content, _filePath) {
+		throw new Error("parse() must be implemented by subclass");
+	}
+
+	/**
+	 * Check if this parser can handle the given file
+	 * @param {string} filePath - The file path
+	 * @param {string} content - The file content
+	 * @returns {boolean} True if this parser can handle the file
+	 */
+	// eslint-disable-next-line no-unused-vars
+	canParse(_filePath, _content) {
+		throw new Error("canParse() must be implemented by subclass");
+	}
+
+	/**
+	 * Get the priority of this parser (higher = more specific)
+	 * @returns {number} Priority value
+	 */
+	getPriority() {
+		return 0;
+	}
+
+	/**
+	 * Get the category of reports this parser handles
+	 * @returns {string} Report category (test, coverage, or lint)
+	 */
+	getCategory() {
+		throw new Error("getCategory() must be implemented by subclass");
+	}
+
+	/**
+	 * Get the glob patterns for auto-detecting files this parser can handle
+	 * @returns {string[]} Array of glob patterns
+	 */
+	getAutoPatterns() {
+		throw new Error("getAutoPatterns() must be implemented by subclass");
+	}
+}
+
+;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/JUnitParser.js
+
+
+
+
+/**
+ * Parser for JUnit XML format
+ * Supports standard JUnit XML as produced by many testing frameworks
+ */
+class JUnitParser extends BaseParser {
+	constructor() {
+		super();
+		this.xmlParser = new XMLParser({
+			ignoreAttributes: false,
+			attributeNamePrefix: "@_",
+			textNodeName: "#text",
+		});
+	}
+
+	canParse(filePath, content) {
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) ||
+			normalizedPath.includes("junit") ||
+			normalizedPath.endsWith(".xml");
+
+		return (
+			hasSupportedName &&
+			(content.includes("<testsuite") || content.includes("<testsuites"))
+		);
+	}
+
+	getPriority() {
+		return 10;
+	}
+
+	getCategory() {
+		return ReportCategory.TEST;
+	}
+
+	getAutoPatterns() {
+		return [
+			"**/junit*.xml",
+			"**/test-results/**/*.xml",
+			"**/test-reports/**/*.xml",
+			"**/*test*.xml",
+		];
+	}
+
+	parse(content) {
+		const reportData = new ReportData();
+		reportData.reportType = "test";
+
+		try {
+			const parsed = this.xmlParser.parse(content);
+
+			// Handle both <testsuites> and single <testsuite> root elements
+			const testsuites = this._normalizeTestSuites(parsed);
+
+			for (const testsuite of testsuites) {
+				this._parseTestSuite(testsuite, reportData);
+			}
+		} catch (error) {
+			throw new Error(`Failed to parse JUnit XML: ${error.message}`);
+		}
+
+		return reportData;
+	}
+
+	_normalizeTestSuites(parsed) {
+		// Handle different root elements
+		if (parsed.testsuites) {
+			// Node's JUnit reporter can place testcases directly under testsuites.
+			const suites = parsed.testsuites;
+			return Array.isArray(suites) ? suites : [suites];
+		} else if (parsed.testsuite) {
+			return Array.isArray(parsed.testsuite)
+				? parsed.testsuite
+				: [parsed.testsuite];
+		}
+		return [];
+	}
+
+	_parseTestSuite(testsuite, reportData) {
+		if (!testsuite) return;
+
+		const suiteName = testsuite["@_name"] || "Unknown Suite";
+		const testcases = testsuite.testcase || [];
+
+		const cases = Array.isArray(testcases) ? testcases : [testcases];
+
+		for (const testcase of cases) {
+			const test = this._parseTestCase(testcase, suiteName);
+			reportData.addTest(test);
+		}
+
+		for (const nestedSuite of this._normalizeTestSuites(testsuite)) {
+			this._parseTestSuite(nestedSuite, reportData);
+		}
+	}
+
+	_parseTestCase(testcase, suiteName) {
+		const name = testcase["@_name"] || "Unknown Test";
+		const className = testcase["@_classname"] || testcase["@_class"] || "";
+		const time = parseFloat(testcase["@_time"] || 0);
+		const file = testcase["@_file"] || "";
+
+		let status = "passed";
+		let message = "";
+		let errorType = "";
+		let stackTrace = "";
+
+		// Check for failure
+		if (Object.hasOwn(testcase, "failure")) {
+			status = "failed";
+			const failure = testcase.failure;
+			message = failure["@_message"] || failure["#text"] || "Test failed";
+			errorType = failure["@_type"] || "AssertionError";
+			stackTrace = failure["#text"] || "";
+		}
+		// Check for error
+		else if (Object.hasOwn(testcase, "error")) {
+			status = "error";
+			const error = testcase.error;
+			message = error["@_message"] || error["#text"] || "Test error";
+			errorType = error["@_type"] || "Error";
+			stackTrace = error["#text"] || "";
+		}
+		// Check for skipped
+		else if (Object.hasOwn(testcase, "skipped")) {
+			status = "skipped";
+			const skipped = testcase.skipped;
+			message = skipped["@_message"] || skipped["#text"] || "Test skipped";
+		}
+
+		return new TestResult({
+			name,
+			status,
+			duration: time,
+			message,
+			errorType,
+			stackTrace,
+			file: file || className,
+			suite: suiteName,
+		});
+	}
+}
+
+;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/TAPParser.js
+
+
+
+/**
+ * Parser for TAP (Test Anything Protocol) format
+ * Supports TAP versions 12, 13, and 14
+ */
+class TAPParser extends BaseParser {
+	canParse(filePath, content) {
+		const lines = content.split("\n");
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) || normalizedPath.endsWith(".tap");
+
+		if (!hasSupportedName) {
+			return false;
+		}
+
+		// TAP files typically start with TAP version or test plan
+		return lines.some(
+			(line) =>
+				line.trim().match(/^TAP version \d+/) ||
+				line.trim().match(/^\d+\.\.\d+/) ||
+				line.trim().match(/^(ok|not ok) \d+/),
+		);
+	}
+
+	getPriority() {
+		return 8;
+	}
+
+	getCategory() {
+		return ReportCategory.TEST;
+	}
+
+	getAutoPatterns() {
+		return ["**/*.tap"];
+	}
+
+	parse(content, filePath) {
+		const reportData = new ReportData();
+		reportData.reportType = "test";
+
+		const lines = content.split("\n");
+		let testNumber = 0;
+		let currentSuite = filePath;
+
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i].trim();
+
+			// Skip empty lines and comments (except directives)
+			if (
+				!line ||
+				(line.startsWith("#") &&
+					!line.includes("SKIP") &&
+					!line.includes("TODO"))
+			) {
+				continue;
+			}
+
+			// Parse test result line
+			const match = line.match(/^(ok|not ok)\s+(\d+)?\s*-?\s*(.*)/);
+			if (match) {
+				const [, status, number, description] = match;
+				testNumber = number ? parseInt(number, 10) : testNumber + 1;
+
+				const test = this._parseTestLine(
+					status,
+					description,
+					testNumber,
+					currentSuite,
+				);
+				reportData.addTest(test);
+			}
+			// Parse suite name from comments
+			else if (line.startsWith("# Subtest:")) {
+				currentSuite = line.substring("# Subtest:".length).trim();
+			}
+		}
+
+		return reportData;
+	}
+
+	_parseTestLine(status, description, testNumber, suite) {
+		let testStatus = status === "ok" ? "passed" : "failed";
+		let message = "";
+		let name = description || `Test ${testNumber}`;
+
+		// Check for SKIP directive
+		if (description.includes("# SKIP")) {
+			testStatus = "skipped";
+			const parts = description.split("# SKIP");
+			name = parts[0].trim();
+			message = parts[1] ? parts[1].trim() : "Skipped";
+		}
+		// Check for TODO directive
+		else if (description.includes("# TODO")) {
+			testStatus = "skipped";
+			const parts = description.split("# TODO");
+			name = parts[0].trim();
+			message = parts[1] ? `TODO: ${parts[1].trim()}` : "TODO";
+		}
+		// Extract failure message
+		else if (testStatus === "failed") {
+			const parts = description.split("-");
+			if (parts.length > 1) {
+				name = parts[0].trim();
+				message = parts.slice(1).join("-").trim();
+			}
+		}
+
+		return new TestResult({
+			name,
+			status: testStatus,
+			message,
+			suite,
+		});
+	}
+}
+
+;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/CoberturaParser.js
+
+
+
+
+/**
+ * Parser for Cobertura XML coverage format
+ * Commonly used by Java, Python, and other language coverage tools
+ */
+class CoberturaParser extends BaseParser {
+	constructor() {
+		super();
+		this.xmlParser = new XMLParser({
+			ignoreAttributes: false,
+			attributeNamePrefix: "@_",
+		});
+	}
+
+	canParse(filePath, content) {
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) ||
+			normalizedPath.includes("cobertura") ||
+			normalizedPath.includes("coverage");
+
+		return (
+			hasSupportedName &&
+			content.includes("<coverage") &&
+			content.includes("line-rate")
+		);
+	}
+
+	getPriority() {
+		return 9;
+	}
+
+	getCategory() {
+		return ReportCategory.COVERAGE;
+	}
+
+	getAutoPatterns() {
+		return [
+			...this.buildBasenamePatterns(["cobertura.xml"]),
+			...this.buildScopedBasenamePatterns("coverage.xml", ["coverage"], {
+				includePrefixed: true,
+			}),
+			...this.buildScopedBasenamePatterns("cobertura.xml", ["coverage"], {
+				includePrefixed: true,
+			}),
+		];
+	}
+
+	parse(content) {
+		const reportData = new ReportData();
+		reportData.reportType = "coverage";
+
+		try {
+			const parsed = this.xmlParser.parse(content);
+			const coverage = parsed.coverage;
+
+			if (!coverage) {
+				throw new Error("Invalid Cobertura format: missing coverage element");
+			}
+
+			// Calculate totals from packages if available
+			let totalLines = 0;
+			let coveredLines = 0;
+			let totalBranches = 0;
+			let coveredBranches = 0;
+
+			if (coverage.packages?.package) {
+				const packages = Array.isArray(coverage.packages.package)
+					? coverage.packages.package
+					: [coverage.packages.package];
+
+				for (const pkg of packages) {
+					const stats = this._calculatePackageStats(pkg);
+					totalLines += stats.totalLines;
+					coveredLines += stats.coveredLines;
+					totalBranches += stats.totalBranches;
+					coveredBranches += stats.coveredBranches;
+				}
+			}
+
+			// Aggregate attributes are actual counts. A percentage alone must
+			// never manufacture a denominator of 100 lines or branches.
+			const counts = (metric) => {
+				const total = Number(coverage[`@_${metric}-valid`] || 0);
+				const covered = Number(coverage[`@_${metric}-covered`] || 0);
+				if (
+					!Number.isSafeInteger(total) ||
+					!Number.isSafeInteger(covered) ||
+					covered < 0 ||
+					covered > total
+				)
+					throw new Error("Invalid aggregate coverage counts.");
+				return [total, covered];
+			};
+			if (totalLines === 0) [totalLines, coveredLines] = counts("lines");
+			if (totalBranches === 0)
+				[totalBranches, coveredBranches] = counts("branches");
+
+			reportData.setCoverage(
+				new Coverage({
+					lines: {
+						total: totalLines,
+						covered: coveredLines,
+						percentage: totalLines > 0 ? (coveredLines / totalLines) * 100 : 0,
+					},
+					branches: {
+						total: totalBranches,
+						covered: coveredBranches,
+						percentage:
+							totalBranches > 0 ? (coveredBranches / totalBranches) * 100 : 0,
+					},
+				}),
+			);
+		} catch (error) {
+			throw new Error(`Failed to parse Cobertura XML: ${error.message}`);
+		}
+
+		return reportData;
+	}
+
+	_calculatePackageStats(pkg) {
+		let totalLines = 0;
+		let coveredLines = 0;
+		let totalBranches = 0;
+		let coveredBranches = 0;
+
+		if (pkg.classes?.class) {
+			const classes = Array.isArray(pkg.classes.class)
+				? pkg.classes.class
+				: [pkg.classes.class];
+
+			for (const cls of classes) {
+				if (cls.lines?.line) {
+					const lines = Array.isArray(cls.lines.line)
+						? cls.lines.line
+						: [cls.lines.line];
+
+					for (const line of lines) {
+						totalLines++;
+						const hits = parseInt(line["@_hits"] || 0, 10);
+						if (hits > 0) {
+							coveredLines++;
+						}
+
+						// Branch coverage
+						const branch = line["@_branch"] === "true";
+						if (branch) {
+							const conditionCoverage = line["@_condition-coverage"] || "0%";
+							const match = conditionCoverage.match(/(\d+)\/(\d+)/);
+							if (match) {
+								const covered = parseInt(match[1], 10);
+								const total = parseInt(match[2], 10);
+								totalBranches += total;
+								coveredBranches += covered;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return { totalLines, coveredLines, totalBranches, coveredBranches };
+	}
+}
+
+;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/LCOVParser.js
+
+
+
+/**
+ * Parser for LCOV coverage format
+ * Commonly used by JavaScript/Node.js coverage tools
+ */
+class LCOVParser extends BaseParser {
+	canParse(filePath, content) {
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) ||
+			normalizedPath.includes("lcov") ||
+			normalizedPath.endsWith(".info");
+
+		return (
+			hasSupportedName &&
+			content.includes("SF:") &&
+			(content.includes("DA:") ||
+				content.includes("LF:") ||
+				content.includes("end_of_record"))
+		);
+	}
+
+	getPriority() {
+		return 9;
+	}
+
+	getCategory() {
+		return ReportCategory.COVERAGE;
+	}
+
+	getAutoPatterns() {
+		return [
+			...this.buildScopedBasenamePatterns("lcov.info", ["coverage"], {
+				includePrefixed: true,
+			}),
+			...this.buildBasenamePatterns(["lcov.info"], {
+				includePrefixed: true,
+			}),
+		];
+	}
+
+	parse(content) {
+		const reportData = new ReportData();
+		reportData.reportType = "coverage";
+
+		const lines = content.split("\n");
+		let totalLines = 0;
+		let coveredLines = 0;
+		let totalFunctions = 0;
+		let coveredFunctions = 0;
+		let totalBranches = 0;
+		let coveredBranches = 0;
+
+		for (const line of lines) {
+			const trimmed = line.trim();
+
+			// Line coverage: DA:<line number>,<hit count>
+			if (trimmed.startsWith("DA:")) {
+				totalLines++;
+				const parts = trimmed.substring(3).split(",");
+				const hits = parseInt(parts[1] || 0, 10);
+				if (hits > 0) {
+					coveredLines++;
+				}
+			}
+			// Function coverage: FNDA:<hit count>,<function name>
+			else if (trimmed.startsWith("FNDA:")) {
+				totalFunctions++;
+				const parts = trimmed.substring(5).split(",");
+				const hits = parseInt(parts[0] || 0, 10);
+				if (hits > 0) {
+					coveredFunctions++;
+				}
+			}
+			// Branch coverage: BRDA:<line>,<block>,<branch>,<taken>
+			else if (trimmed.startsWith("BRDA:")) {
+				totalBranches++;
+				const parts = trimmed.substring(5).split(",");
+				const taken = parts[3];
+				if (taken !== "-" && parseInt(taken, 10) > 0) {
+					coveredBranches++;
+				}
+			}
+			// Summary lines (LF, LH, FNF, FNH, BRF, BRH)
+			else if (trimmed.startsWith("LF:")) {
+				// Lines found - can be used as a fallback
+			} else if (trimmed.startsWith("LH:")) {
+				// Lines hit - can be used as a fallback
+			}
+		}
+
+		reportData.setCoverage(
+			new Coverage({
+				lines: {
+					total: totalLines,
+					covered: coveredLines,
+					percentage: totalLines > 0 ? (coveredLines / totalLines) * 100 : 0,
+				},
+				functions: {
+					total: totalFunctions,
+					covered: coveredFunctions,
+					percentage:
+						totalFunctions > 0 ? (coveredFunctions / totalFunctions) * 100 : 0,
+				},
+				branches: {
+					total: totalBranches,
+					covered: coveredBranches,
+					percentage:
+						totalBranches > 0 ? (coveredBranches / totalBranches) * 100 : 0,
+				},
+			}),
+		);
+
+		return reportData;
+	}
+}
+
+;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/ESLintParser.js
+
+
+
+/**
+ * Parser for ESLint JSON format
+ * Standard format for ESLint output
+ */
+class ESLintParser extends BaseParser {
+	canParse(filePath, content) {
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) || normalizedPath.endsWith(".json");
+
+		if (!hasSupportedName) {
+			return false;
+		}
+
+		try {
+			const data = JSON.parse(content);
+			// ESLint format is an array of file results
+			return (
+				Array.isArray(data) &&
+				data.length > 0 &&
+				Object.hasOwn(data[0], "filePath") &&
+				Object.hasOwn(data[0], "messages")
+			);
+		} catch {
+			return false;
+		}
+	}
+
+	getPriority() {
+		return 10;
+	}
+
+	getCategory() {
+		return ReportCategory.LINT;
+	}
+
+	getAutoPatterns() {
+		return this.buildBasenamePatterns(["eslint-report.json", "eslint.json"], {
+			includePrefixed: true,
+		});
+	}
+
+	parse(content) {
+		const reportData = new ReportData();
+		reportData.reportType = "lint";
+
+		try {
+			const data = JSON.parse(content);
+
+			for (const fileResult of data) {
+				const file = fileResult.filePath || fileResult.fileName || "unknown";
+
+				if (!fileResult.messages || fileResult.messages.length === 0) {
+					continue;
+				}
+
+				for (const message of fileResult.messages) {
+					const issue = new LintIssue({
+						file,
+						line: message.line || 0,
+						column: message.column || 0,
+						severity: this._mapSeverity(message.severity),
+						rule: message.ruleId || "unknown",
+						message: message.message || "",
+						source: message.source || "",
+					});
+
+					reportData.addLintIssue(issue);
+				}
+			}
+		} catch (error) {
+			throw new Error(`Failed to parse ESLint JSON: ${error.message}`);
+		}
+
+		return reportData;
+	}
+
+	_mapSeverity(severity) {
+		// ESLint severity: 0 = off, 1 = warning, 2 = error
+		if (typeof severity === "number") {
+			if (severity === 2) return "error";
+			if (severity === 1) return "warning";
+			return "info";
+		}
+
+		// Handle string severity
+		const severityStr = String(severity).toLowerCase();
+		if (severityStr === "error" || severityStr === "2") return "error";
+		if (
+			severityStr === "warning" ||
+			severityStr === "warn" ||
+			severityStr === "1"
+		)
+			return "warning";
+		return "info";
+	}
+}
+
+;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/CheckStyleParser.js
+
+
+
+
+/**
+ * Parser for CheckStyle XML format
+ * Used by many linters including CheckStyle (Java), PHP_CodeSniffer, etc.
+ */
+class CheckStyleParser extends BaseParser {
+	constructor() {
+		super();
+		this.xmlParser = new XMLParser({
+			ignoreAttributes: false,
+			attributeNamePrefix: "@_",
+		});
+	}
+
+	canParse(filePath, content) {
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) ||
+			normalizedPath.includes("checkstyle") ||
+			normalizedPath.endsWith(".xml");
+		const hasCheckstyleRoot = /<\s*checkstyle\b/i.test(content);
+
+		return hasSupportedName && hasCheckstyleRoot;
+	}
+
+	getPriority() {
+		return 8;
+	}
+
+	getCategory() {
+		return ReportCategory.LINT;
+	}
+
+	getAutoPatterns() {
+		return this.buildBasenamePatterns(
+			["checkstyle-result.xml", "checkstyle.xml"],
+			{ includePrefixed: true },
+		);
+	}
+
+	parse(content) {
+		const reportData = new ReportData();
+		reportData.reportType = "lint";
+
+		try {
+			const parsed = this.xmlParser.parse(content);
+			const checkstyle = parsed.checkstyle;
+
+			if (!checkstyle?.file) {
+				return reportData;
+			}
+
+			const files = Array.isArray(checkstyle.file)
+				? checkstyle.file
+				: [checkstyle.file];
+
+			for (const file of files) {
+				this._parseFile(file, reportData);
+			}
+		} catch (error) {
+			throw new Error(`Failed to parse CheckStyle XML: ${error.message}`);
+		}
+
+		return reportData;
+	}
+
+	_parseFile(file, reportData) {
+		const fileName = file["@_name"] || "unknown";
+
+		if (!file.error) {
+			return;
+		}
+
+		const errors = Array.isArray(file.error) ? file.error : [file.error];
+
+		for (const error of errors) {
+			const issue = new LintIssue({
+				file: fileName,
+				line: parseInt(error["@_line"] || 0, 10),
+				column: parseInt(error["@_column"] || 0, 10),
+				severity: this._mapSeverity(error["@_severity"]),
+				rule: error["@_source"] || "unknown",
+				message: error["@_message"] || "",
+			});
+
+			reportData.addLintIssue(issue);
+		}
+	}
+
+	_mapSeverity(severity) {
+		if (!severity) return "info";
+
+		const severityStr = String(severity).toLowerCase();
+		if (severityStr === "error") return "error";
+		if (severityStr === "warning" || severityStr === "warn") return "warning";
+		if (severityStr === "info" || severityStr === "information") return "info";
+		return "info";
+	}
+}
+
+;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/PrettierParser.js
+
+
+
+const SUMMARY_PATTERNS = [
+	"code style issues found",
+	"all matched files use prettier",
+	"files were not formatted",
+	"checking formatting",
+];
+
+/**
+ * Parser for Prettier --check CLI output captured in log files
+ */
+class PrettierParser extends BaseParser {
+	canParse(filePath, content) {
+		if (!content) {
+			return false;
+		}
+
+		const normalizedContent = content.toLowerCase();
+		const hasPrettierMarkers = SUMMARY_PATTERNS.some((pattern) =>
+			normalizedContent.includes(pattern),
+		);
+
+		if (hasPrettierMarkers) {
+			return true;
+		}
+
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) || normalizedPath.includes("prettier");
+
+		if (!hasSupportedName) {
+			return false;
+		}
+
+		if (normalizedPath.includes("prettier")) {
+			return /\[(warn|error)\]\s+.+/i.test(content);
+		}
+
+		return false;
+	}
+
+	getPriority() {
+		return 7;
+	}
+
+	getCategory() {
+		return ReportCategory.LINT;
+	}
+
+	getAutoPatterns() {
+		return this.buildBasenamePatterns(
+			[
+				"prettier-check.log",
+				"prettier-check.txt",
+				"prettier-report.log",
+				"prettier-report.txt",
+			],
+			{ includePrefixed: true },
+		);
+	}
+
+	parse(content) {
+		const reportData = new ReportData();
+		reportData.reportType = "lint";
+
+		const lines = content.split(/\r?\n/);
+
+		for (const rawLine of lines) {
+			const line = rawLine.trim();
+			if (!line) {
+				continue;
+			}
+
+			const match = line.match(/^\[(warn|error)\]\s+(.+)$/i);
+			if (!match) {
+				continue;
+			}
+
+			const description = match[2].trim();
+			if (this._isSummaryLine(description)) {
+				continue;
+			}
+
+			const { file, message } = this._extractFileAndMessage(description);
+
+			const issue = new LintIssue({
+				file,
+				line: 0,
+				column: 0,
+				severity: "error",
+				rule: "prettier",
+				message,
+				source: "prettier",
+			});
+
+			reportData.addLintIssue(issue);
+		}
+
+		return reportData;
+	}
+
+	_isSummaryLine(text) {
+		const normalized = text.toLowerCase();
+		return SUMMARY_PATTERNS.some((pattern) => normalized.includes(pattern));
+	}
+
+	_extractFileAndMessage(description) {
+		const separatorIndex = description.indexOf(": ");
+
+		if (separatorIndex === -1) {
+			return {
+				file: description,
+				message: "File is not formatted according to Prettier",
+			};
+		}
+
+		return {
+			file: description.slice(0, separatorIndex).trim(),
+			message: description.slice(separatorIndex + 2).trim(),
+		};
+	}
+}
+
+;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/AstroCheckParser.js
+
+
+
+const LOCATION_PATTERN = /:(\d+):(\d+)\s*(?:-\s+)?(error|warning|hint)\s+/i;
+const ASTRO_HEADER_PATTERNS = [
+	/Getting diagnostics for Astro files/i,
+	/Result \(\d+ files\)/i,
+];
+const ANSI_PATTERN = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+
+/**
+ * Parser for output generated by `astro check`
+ */
+class AstroCheckParser extends BaseParser {
+	canParse(filePath, content) {
+		if (!content) {
+			return false;
+		}
+
+		const sanitized = this.#stripAnsi(content);
+		const hasAstroMarkers =
+			LOCATION_PATTERN.test(sanitized) ||
+			ASTRO_HEADER_PATTERNS.some((pattern) => pattern.test(sanitized));
+
+		if (hasAstroMarkers) {
+			return true;
+		}
+
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) || normalizedPath.includes("astro");
+
+		return hasSupportedName;
+	}
+
+	getPriority() {
+		return 8;
+	}
+
+	getCategory() {
+		return ReportCategory.LINT;
+	}
+
+	getAutoPatterns() {
+		return this.buildBasenamePatterns(
+			[
+				"astro-check.log",
+				"astro-check.txt",
+				"astro-check-report.log",
+				"astro-check-report.txt",
+			],
+			{ includePrefixed: true },
+		);
+	}
+
+	parse(content) {
+		const reportData = new ReportData();
+		reportData.reportType = "lint";
+
+		if (!content) {
+			return reportData;
+		}
+
+		const sanitized = this.#stripAnsi(content);
+		const lines = sanitized.split(/\r?\n/);
+
+		for (const line of lines) {
+			const issue = this.#parseDiagnosticLine(line);
+			if (!issue) {
+				continue;
+			}
+
+			reportData.addLintIssue(
+				new LintIssue({
+					...issue,
+					source: "astro-check",
+				}),
+			);
+		}
+
+		return reportData;
+	}
+
+	#parseDiagnosticLine(line) {
+		if (!line?.trim()) {
+			return null;
+		}
+
+		const locationMatch = line.match(LOCATION_PATTERN);
+		if (!locationMatch || locationMatch.index === undefined) {
+			return null;
+		}
+
+		const filePath = line.slice(0, locationMatch.index).trim();
+		if (!filePath) {
+			return null;
+		}
+
+		const lineNumber = Number(locationMatch[1]) || 0;
+		const columnNumber = Number(locationMatch[2]) || 0;
+		const severity = locationMatch[3].toLowerCase();
+
+		const remainderStart = locationMatch.index + locationMatch[0].length;
+		const remainder = line.slice(remainderStart).trim();
+
+		let rule = "astro-check";
+		let message = remainder;
+
+		const ruleMatch = remainder.match(/^([A-Za-z]+\d+)\s*:\s*(.*)$/);
+		if (ruleMatch) {
+			rule = ruleMatch[1];
+			message = ruleMatch[2].trim();
+		}
+
+		return {
+			file: filePath,
+			line: lineNumber,
+			column: columnNumber,
+			severity,
+			rule,
+			message,
+		};
+	}
+
+	#stripAnsi(text) {
+		return text.replace(ANSI_PATTERN, "");
+	}
+}
+
+;// CONCATENATED MODULE: external "node:url"
+const external_node_url_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:url");
+;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/SarifParser.js
+
+
+
+
+/**
+ * Parser for SARIF 2.1.0 static analysis results
+ */
+class SarifParser extends BaseParser {
+	canParse(filePath, content) {
+		if (!content) {
+			return false;
+		}
+
+		const normalizedPath = filePath.toLowerCase();
+		const hasSupportedName =
+			this.matchesAutoPatterns(filePath) ||
+			normalizedPath.endsWith(".sarif") ||
+			normalizedPath.endsWith(".sarif.json") ||
+			normalizedPath.endsWith(".json");
+
+		if (!hasSupportedName) {
+			return false;
+		}
+
+		try {
+			const sarif = JSON.parse(content);
+			return (
+				typeof sarif.version === "string" &&
+				sarif.version.startsWith("2.") &&
+				Array.isArray(sarif.runs)
+			);
+		} catch {
+			return false;
+		}
+	}
+
+	getPriority() {
+		return 9;
+	}
+
+	getCategory() {
+		return ReportCategory.LINT;
+	}
+
+	getAutoPatterns() {
+		return [
+			...this.buildExtensionPatterns(["sarif", "sarif.json"]),
+			...this.buildBasenamePatterns(["sarif-report.json"], {
+				includePrefixed: true,
+			}),
+		];
+	}
+
+	parse(content) {
+		const reportData = new ReportData();
+		reportData.reportType = "lint";
+
+		try {
+			const sarif = JSON.parse(content);
+			const runs = Array.isArray(sarif.runs) ? sarif.runs : [];
+
+			for (const run of runs) {
+				this._parseRun(run, reportData);
+			}
+		} catch (error) {
+			throw new Error(`Failed to parse SARIF JSON: ${error.message}`);
+		}
+
+		return reportData;
+	}
+
+	_parseRun(run, reportData) {
+		const results = Array.isArray(run?.results) ? run.results : [];
+		if (results.length === 0) {
+			return;
+		}
+
+		const rules = Array.isArray(run?.tool?.driver?.rules)
+			? run.tool.driver.rules
+			: [];
+		const toolName = run?.tool?.driver?.name || "sarif";
+
+		for (const result of results) {
+			const rule = this._resolveRule(result, rules);
+			const issue = this._createIssue(result, rule, toolName);
+
+			if (issue) {
+				reportData.addLintIssue(issue);
+			}
+		}
+	}
+
+	_resolveRule(result, rules) {
+		if (typeof result?.ruleIndex === "number" && rules[result.ruleIndex]) {
+			return rules[result.ruleIndex];
+		}
+
+		if (!result?.ruleId) {
+			return null;
+		}
+
+		return rules.find((rule) => rule?.id === result.ruleId) || null;
+	}
+
+	_createIssue(result, rule, toolName) {
+		const location = result?.locations?.[0]?.physicalLocation;
+		const region = location?.region || {};
+
+		return new LintIssue({
+			file: this._extractFile(location?.artifactLocation?.uri),
+			line: Number.parseInt(region.startLine || 0, 10),
+			column: Number.parseInt(region.startColumn || 0, 10),
+			severity: this._mapSeverity(
+				result?.level || rule?.defaultConfiguration?.level,
+			),
+			rule: result?.ruleId || rule?.id || "unknown",
+			message: this._resolveMessage(result, rule),
+			source: toolName,
+		});
+	}
+
+	_extractFile(uri) {
+		if (!uri) {
+			return "unknown";
+		}
+
+		if (uri.startsWith("file://")) {
+			return (0,external_node_url_namespaceObject.fileURLToPath)(uri);
+		}
+
+		try {
+			return decodeURIComponent(uri);
+		} catch {
+			return uri;
+		}
+	}
+
+	_resolveMessage(result, rule) {
+		return (
+			result?.message?.text ||
+			result?.message?.markdown ||
+			rule?.shortDescription?.text ||
+			"SARIF issue"
+		);
+	}
+
+	_mapSeverity(level) {
+		switch (String(level || "warning").toLowerCase()) {
+			case "error":
+				return "error";
+			case "warning":
+				return "warning";
+			case "note":
+			case "none":
+				return "info";
+			default:
+				return "warning";
+		}
+	}
+}
+
+;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/ParserFactory.js
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * Factory class for creating and managing parsers
+ * Implements the Factory pattern for parser selection
+ */
+class ParserFactory {
+	constructor(fileSystemService) {
+		this.fileSystemService = fileSystemService;
+
+		this.parsers = [
+			new JUnitParser(),
+			new TAPParser(),
+			new CoberturaParser(),
+			new LCOVParser(),
+			new ESLintParser(),
+			new CheckStyleParser(),
+			new PrettierParser(),
+			new AstroCheckParser(),
+			new SarifParser(),
+		];
+
+		// Sort parsers by priority (highest first)
+		this.parsers.sort((a, b) => b.getPriority() - a.getPriority());
+	}
+
+	/**
+	 * Get the appropriate parser for a file
+	 * @param {string} filePath - Path to the file
+	 * @param {string} content - File content
+	 * @returns {BaseParser|null} Parser instance or null if no parser found
+	 */
+	getParser(filePath, content) {
+		for (const parser of this.parsers) {
+			if (parser.canParse(filePath, content)) {
+				return parser;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Parse a file with the appropriate parser
+	 * @param {string} filePath - Path to the file
+	 * @param {string} content - File content
+	 * @returns {ReportData} Parsed report data
+	 */
+	parse(filePath) {
+		const content = this.fileSystemService.readFile(filePath);
+
+		const parser = this.getParser(filePath, content);
+
+		if (!parser) {
+			throw new Error(
+				`No parser found for file: ${filePath}. Ensure pattern and content are supported.`,
+			);
+		}
+
+		return parser.parse(content, filePath);
+	}
+
+	/**
+	 * Get auto-detection patterns for a specific category
+	 * @param {string} category - Report category (test, coverage, or lint)
+	 * @returns {string[]} Array of glob patterns
+	 */
+	getAutoPatternsByCategory(category) {
+		const patterns = [];
+		for (const parser of this.parsers) {
+			if (parser.getCategory() === category) {
+				patterns.push(...parser.getAutoPatterns());
+			}
+		}
+		return patterns;
+	}
+
+	/**
+	 * Get all auto-detection patterns from all parsers
+	 * @returns {string[]} Array of glob patterns
+	 */
+	getAllAutoPatterns() {
+		const patterns = [];
+		for (const parser of this.parsers) {
+			patterns.push(...parser.getAutoPatterns());
+		}
+		return patterns;
+	}
+
+	/**
+	 * Get auto-detection patterns grouped by category
+	 * @returns {Object} Object with category keys and pattern arrays
+	 */
+	getAutoPatternsMap() {
+		return {
+			[ReportCategory.TEST]: this.getAutoPatternsByCategory(
+				ReportCategory.TEST,
+			),
+			[ReportCategory.COVERAGE]: this.getAutoPatternsByCategory(
+				ReportCategory.COVERAGE,
+			),
+			[ReportCategory.LINT]: this.getAutoPatternsByCategory(
+				ReportCategory.LINT,
+			),
+		};
+	}
+}
+
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js
+
+
+
+const OptionsBuilder_defaultOnDangerousProperty = (name) => {
+  if (DANGEROUS_PROPERTY_NAMES.includes(name)) {
+    return "__" + name;
+  }
+  return name;
+};
+
+
+const xmlparser_OptionsBuilder_defaultOptions = {
+  preserveOrder: false,
+  attributeNamePrefix: '@_',
+  attributesGroupName: false,
+  textNodeName: '#text',
+  ignoreAttributes: true,
+  removeNSPrefix: false, // remove NS from tag name or attribute name if true
+  allowBooleanAttributes: false, //a tag can have attributes without any value
+  //ignoreRootElement : false,
+  parseTagValue: true,
+  parseAttributeValue: false,
+  trimValues: true, //Trim string values of tag and attributes
+  cdataPropName: false,
+  numberParseOptions: {
+    hex: true,
+    leadingZeros: true,
+    eNotation: true,
+    unicode: false
+  },
+  tagValueProcessor: function (tagName, val) {
+    return val;
+  },
+  attributeValueProcessor: function (attrName, val) {
+    return val;
+  },
+  stopNodes: [], //nested tags will not be parsed even for errors
+  alwaysCreateTextNode: false,
+  isArray: () => false,
+  commentPropName: false,
+  unpairedTags: [],
+  processEntities: true,
+  htmlEntities: false,
+  entityDecoder: null,
+  ignoreDeclaration: false,
+  ignorePiTags: false,
+  transformTagName: false,
+  transformAttributeName: false,
+  updateTag: function (tagName, jPath, attrs) {
+    return tagName
+  },
+  // skipEmptyListItem: false
+  captureMetaData: false,
+  maxNestedTags: 100,
+  strictReservedNames: true,
+  jPath: true, // if true, pass jPath string to callbacks; if false, pass matcher instance
+  onDangerousProperty: OptionsBuilder_defaultOnDangerousProperty
+};
+
+
+/**
+ * Validates that a property name is safe to use
+ * @param {string} propertyName - The property name to validate
+ * @param {string} optionName - The option field name (for error message)
+ * @throws {Error} If property name is dangerous
+ */
+function OptionsBuilder_validatePropertyName(propertyName, optionName) {
+  if (typeof propertyName !== 'string') {
+    return; // Only validate string property names
+  }
+
+  const normalized = propertyName.toLowerCase();
+  if (DANGEROUS_PROPERTY_NAMES.some(dangerous => normalized === dangerous.toLowerCase())) {
+    throw new Error(
+      `[SECURITY] Invalid ${optionName}: "${propertyName}" is a reserved JavaScript keyword that could cause prototype pollution`
+    );
+  }
+
+  if (criticalProperties.some(dangerous => normalized === dangerous.toLowerCase())) {
+    throw new Error(
+      `[SECURITY] Invalid ${optionName}: "${propertyName}" is a reserved JavaScript keyword that could cause prototype pollution`
+    );
+  }
+}
+
+/**
+ * Normalizes processEntities option for backward compatibility
+ * @param {boolean|object} value 
+ * @returns {object} Always returns normalized object
+ */
+function OptionsBuilder_normalizeProcessEntities(value, htmlEntities) {
+  // Boolean backward compatibility
+  if (typeof value === 'boolean') {
+    return {
+      enabled: value, // true or false
+      maxEntitySize: 10000,
+      maxExpansionDepth: 10000,
+      maxTotalExpansions: Infinity,
+      maxExpandedLength: 100000,
+      maxEntityCount: 1000,
+      allowedTags: null,
+      tagFilter: null,
+      appliesTo: "all",
+    };
+  }
+
+  // Object config - merge with defaults
+  if (typeof value === 'object' && value !== null) {
+    return {
+      enabled: value.enabled !== false,
+      maxEntitySize: Math.max(1, value.maxEntitySize ?? 10000),
+      maxExpansionDepth: Math.max(1, value.maxExpansionDepth ?? 10000),
+      maxTotalExpansions: Math.max(1, value.maxTotalExpansions ?? Infinity),
+      maxExpandedLength: Math.max(1, value.maxExpandedLength ?? 100000),
+      maxEntityCount: Math.max(1, value.maxEntityCount ?? 1000),
+      allowedTags: value.allowedTags ?? null,
+      tagFilter: value.tagFilter ?? null,
+      appliesTo: value.appliesTo ?? "all",
+    };
+  }
+
+  // Default to enabled with limits
+  return OptionsBuilder_normalizeProcessEntities(true);
+}
+
+const OptionsBuilder_buildOptions = function (options) {
+  const built = Object.assign({}, xmlparser_OptionsBuilder_defaultOptions, options);
+
+  // Validate property names to prevent prototype pollution
+  const propertyNameOptions = [
+    { value: built.attributeNamePrefix, name: 'attributeNamePrefix' },
+    { value: built.attributesGroupName, name: 'attributesGroupName' },
+    { value: built.textNodeName, name: 'textNodeName' },
+    { value: built.cdataPropName, name: 'cdataPropName' },
+    { value: built.commentPropName, name: 'commentPropName' }
+  ];
+
+  for (const { value, name } of propertyNameOptions) {
+    if (value) {
+      OptionsBuilder_validatePropertyName(value, name);
+    }
+  }
+
+  if (built.onDangerousProperty === null) {
+    built.onDangerousProperty = OptionsBuilder_defaultOnDangerousProperty;
+  }
+
+  // Always normalize processEntities for backward compatibility and validation
+  built.processEntities = OptionsBuilder_normalizeProcessEntities(built.processEntities, built.htmlEntities);
+  built.unpairedTagsSet = new Set(built.unpairedTags);
+  // Convert old-style stopNodes for backward compatibility
+  if (built.stopNodes && Array.isArray(built.stopNodes)) {
+    built.stopNodes = built.stopNodes.map(node => {
+      if (typeof node === 'string' && node.startsWith('*.')) {
+        // Old syntax: *.tagname meant "tagname anywhere"
+        // Convert to new syntax: ..tagname
+        return '..' + node.substring(2);
+      }
+      return node;
+    });
+  }
+  //console.debug(built.processEntities)
+  return built;
+};
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/xmlNode.js
+
+
+let xmlNode_METADATA_SYMBOL;
+
+if (typeof Symbol !== "function") {
+  xmlNode_METADATA_SYMBOL = "@@xmlMetadata";
+} else {
+  xmlNode_METADATA_SYMBOL = Symbol("XML Node Metadata");
+}
+
+class xmlNode_XmlNode {
+  constructor(tagname) {
+    this.tagname = tagname;
+    this.child = []; //nested tags, text, cdata, comments in order
+    this[":@"] = Object.create(null); //attributes map
+  }
+  add(key, val) {
+    // this.child.push( {name : key, val: val, isCdata: isCdata });
+    if (key === "__proto__") key = "#__proto__";
+    this.child.push({ [key]: val });
+  }
+  addChild(node, startIndex) {
+    if (node.tagname === "__proto__") node.tagname = "#__proto__";
+    if (node[":@"] && Object.keys(node[":@"]).length > 0) {
+      this.child.push({ [node.tagname]: node.child, [":@"]: node[":@"] });
+    } else {
+      this.child.push({ [node.tagname]: node.child });
+    }
+    // if requested, add the startIndex
+    this.addStartIndex(startIndex);
+  }
+
+  addStartIndex(startIndex) {
+    if (startIndex !== undefined) {
+      // Note: for now we just overwrite the metadata. If we had more complex metadata,
+      // we might need to do an object append here:  metadata = { ...metadata, startIndex }
+      this.child[this.child.length - 1][xmlNode_METADATA_SYMBOL] = { startIndex };
+    }
+  }
+
+  addEndIndex(endIndex) {
+    const lastChild = this.child[this.child.length - 1];
+    // endIndex is write-once: when updateTag drops a node, the last child is a
+    // previously completed sibling whose endIndex must not be overwritten
+    if (lastChild !== undefined && lastChild[xmlNode_METADATA_SYMBOL] !== undefined
+      && lastChild[xmlNode_METADATA_SYMBOL].endIndex === undefined) {
+      lastChild[xmlNode_METADATA_SYMBOL].endIndex = endIndex;
+    }
+  }
+  /** symbol used for metadata */
+  static getMetaDataSymbol() {
+    return xmlNode_METADATA_SYMBOL;
+  }
+}
+
+;// CONCATENATED MODULE: ./node_modules/xml-naming/src/index.js
+/**
+ * xml-naming
+ * Validates XML Name productions as defined in the XML 1.0 and 1.1 specifications.
+ * Covers: Name, NCName, QName, NMToken, NMTokens
+ *
+ * XML 1.0 spec: https://www.w3.org/TR/xml/#NT-Name
+ * XML 1.1 spec: https://www.w3.org/TR/xml11/#NT-NameStartChar
+ * XML NS spec:  https://www.w3.org/TR/xml-names/#NT-NCName
+ */
+
+// ---------------------------------------------------------------------------
+// Character class strings — XML 1.0
+//
+// NameStartChar ::= ":" | [A-Z] | "_" | [a-z]
+//   | [#xC0-#xD6]   | [#xD8-#xF6]   | [#xF8-#x2FF]
+//   | [#x370-#x37D] | [#x37F-#x1FFF]    <- split to exclude #x0487
+//   | [#x200C-#x200D]
+//   | [#x2070-#x218F] | [#x2C00-#x2FEF]
+//   | [#x3001-#xD7FF] | [#xF900-#xFDCF] | [#xFDF0-#xFFFD]
+//
+// NameChar ::= NameStartChar | "-" | "." | [0-9]
+//   | #xB7 | [#x0300-#x036F] | [#x203F-#x2040]
+//
+// Note: \u0487 (Combining Cyrillic Millions Sign) was added in Unicode 4.0,
+// after XML 1.0 was defined against Unicode 2.0. It falls inside the range
+// \u037F-\u1FFF but must be excluded. We split that range into
+// \u037F-\u0486 and \u0488-\u1FFF to exclude it explicitly.
+// ---------------------------------------------------------------------------
+
+const src_nameStartChar10 =
+  ':A-Za-z_' +
+  '\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF' +
+  '\u0370-\u037D' +
+  '\u037F-\u0486\u0488-\u1FFF' +  // split to exclude \u0487
+  '\u200C-\u200D' +
+  '\u2070-\u218F' +
+  '\u2C00-\u2FEF' +
+  '\u3001-\uD7FF' +
+  '\uF900-\uFDCF' +
+  '\uFDF0-\uFFFD';
+
+const src_nameChar10 =
+  src_nameStartChar10 +
+  '\\-\\.\\d' +
+  '\u00B7' +
+  '\u0300-\u036F' +
+  '\u203F-\u2040';
+
+// ---------------------------------------------------------------------------
+// Character class strings — XML 1.1
+//
+// Differences from XML 1.0:
+//
+// NameStartChar:
+//   1.0 has split ranges: \u00C0-\u00D6, \u00D8-\u00F6, \u00F8-\u02FF
+//   1.1 merges them into: \u00C0-\u02FF
+//   (\u00D7 x and \u00F7 / are division symbols, excluded in both versions)
+//
+//   1.0 tops out at \uFFFD (BMP only)
+//   1.1 adds \u{10000}-\u{EFFFF} (supplementary planes)
+//   These require the /u flag on the RegExp — see buildRegexes below.
+//
+// NameChar:
+//   1.1 adds \u0487 (Combining Cyrillic Millions Sign, added in Unicode 4.0)
+// ---------------------------------------------------------------------------
+
+const src_nameStartChar11 =
+  ':A-Za-z_' +
+  '\u00C0-\u02FF' +                    // merged — 1.0 had three split ranges here
+  '\u0370-\u037D' +
+  '\u037F-\u0486\u0488-\u1FFF' +       // split to exclude \u0487 (combining mark, never a NameStartChar)
+  '\u200C-\u200D' +
+  '\u2070-\u218F' +
+  '\u2C00-\u2FEF' +
+  '\u3001-\uD7FF' +
+  '\uF900-\uFDCF' +
+  '\uFDF0-\uFFFD' +
+  '\u{10000}-\u{EFFFF}';     // supplementary planes — REQUIRES /u flag on RegExp
+
+const src_nameChar11 =
+  src_nameStartChar11 +
+  '\\-\\.\\d' +
+  '\u00B7' +
+  '\u0300-\u036F' +
+  '\u0487' +                 // Combining Cyrillic Millions Sign — valid in 1.1, not 1.0
+  '\u203F-\u2040';
+
+// ---------------------------------------------------------------------------
+// Regex builders
+//
+// XML 1.0 regexes: no flags — BMP only, standard JS regex behaviour.
+// XML 1.1 regexes: /u flag — required for \u{10000}-\u{EFFFF} to match actual
+//   supplementary code points rather than lone surrogates (which are illegal XML).
+// ---------------------------------------------------------------------------
+
+const src_buildRegexes = (startChar, char, flags = '') => {
+  const ncStart = startChar.replace(':', '');
+  const ncChar = char.replace(':', '');
+  const ncNamePat = `[${ncStart}][${ncChar}]*`;
+
+  return {
+    name: new RegExp(`^[${startChar}][${char}]*$`, flags),
+    ncName: new RegExp(`^${ncNamePat}$`, flags),
+    qName: new RegExp(`^${ncNamePat}(?::${ncNamePat})?$`, flags),
+    nmToken: new RegExp(`^[${char}]+$`, flags),
+    nmTokens: new RegExp(`^[${char}]+(?:\\s+[${char}]+)*$`, flags),
+  };
+};
+
+const src_regexes10 = src_buildRegexes(src_nameStartChar10, src_nameChar10);       // no /u — BMP only
+const src_regexes11 = src_buildRegexes(src_nameStartChar11, src_nameChar11, 'u');  // /u — enables \u{10000}-\u{EFFFF}
+
+// ---------------------------------------------------------------------------
+// ASCII-only fast path (opt-in, off by default)
+//
+// The XML 1.0 vs 1.1 NameStartChar/NameChar productions differ *only* in
+// their non-ASCII ranges (merged vs split Latin-1 ranges, \u0487, and
+// supplementary planes). Restricted to ASCII, both versions collapse to the
+// same character classes, so a single regex pair covers both xmlVersion
+// values — no /u flag needed.
+//
+// Rationale: unicode-aware regexes (the /u flag, required for XML 1.1's
+// supplementary-plane range) are measurably slower in V8 than plain
+// non-unicode regexes on the same input, even when the input is pure ASCII.
+// For the common case — HTML/SVG ids, XML tags — names are ASCII, so callers
+// who know this can opt in to skip the unicode-aware matching path entirely.
+// This is a real but *conditional* win: mainly for XML 1.1 input (avoids /u),
+// or at scale where the larger unicode character classes add engine
+// overhead. It also changes behaviour (rejects legitimate non-ASCII XML
+// 1.0/1.1 names), so it must never be silently enabled — hence off by
+// default.
+// ---------------------------------------------------------------------------
+
+const src_nameStartCharAscii = ':A-Za-z_';
+const src_nameCharAscii = src_nameStartCharAscii + '\\-\\.\\d';
+
+const src_regexesAscii = src_buildRegexes(src_nameStartCharAscii, src_nameCharAscii); // no /u — ASCII only
+
+const src_getRegexes = (xmlVersion = '1.0', asciiOnly = false) => {
+  if (asciiOnly) return src_regexesAscii;
+  return xmlVersion === '1.1' ? src_regexes11 : src_regexes10;
+};
+
+// ---------------------------------------------------------------------------
+// Boolean validators
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true if the string is a valid XML Name.
+ * Colons are allowed anywhere (Name production).
+ * Used for: DOCTYPE entity names, notation names, DTD element declarations.
+ *
+ * @param {{ xmlVersion?: '1.0'|'1.1', asciiOnly?: boolean }} [opts]
+ *   asciiOnly: skip unicode-aware matching, ASCII names only (default false).
+ */
+const xml_naming_src_name = (str, { xmlVersion = '1.0', asciiOnly = false } = {}) =>
+  src_getRegexes(xmlVersion, asciiOnly).name.test(str);
+
+/**
+ * Returns true if the string is a valid NCName (Non-Colonized Name).
+ * Colons are not permitted.
+ * Used for: namespace prefixes, local names, SVG id attributes.
+ *
+ * @param {{ xmlVersion?: '1.0'|'1.1', asciiOnly?: boolean }} [opts]
+ *   asciiOnly: skip unicode-aware matching, ASCII names only (default false).
+ */
+const src_ncName = (str, { xmlVersion = '1.0', asciiOnly = false } = {}) =>
+  src_getRegexes(xmlVersion, asciiOnly).ncName.test(str);
+
+/**
+ * Returns true if the string is a valid QName (Qualified Name).
+ * Allows exactly one colon as a prefix separator: prefix:localName.
+ * Used for: element and attribute names in namespace-aware XML/SVG.
+ *
+ * @param {{ xmlVersion?: '1.0'|'1.1', asciiOnly?: boolean }} [opts]
+ *   asciiOnly: skip unicode-aware matching, ASCII names only (default false).
+ */
+const src_qName = (str, { xmlVersion = '1.0', asciiOnly = false } = {}) =>
+  src_getRegexes(xmlVersion, asciiOnly).qName.test(str);
+
+/**
+ * Returns true if the string is a valid NMToken.
+ * Like Name but no restriction on the first character.
+ * Used for: DTD NMTOKEN attribute values.
+ *
+ * @param {{ xmlVersion?: '1.0'|'1.1', asciiOnly?: boolean }} [opts]
+ *   asciiOnly: skip unicode-aware matching, ASCII names only (default false).
+ */
+const src_nmToken = (str, { xmlVersion = '1.0', asciiOnly = false } = {}) =>
+  src_getRegexes(xmlVersion, asciiOnly).nmToken.test(str);
+
+/**
+ * Returns true if the string is a valid NMTokens value.
+ * A whitespace-separated list of NMToken values.
+ * Used for: DTD NMTOKENS attribute values.
+ *
+ * @param {{ xmlVersion?: '1.0'|'1.1', asciiOnly?: boolean }} [opts]
+ *   asciiOnly: skip unicode-aware matching, ASCII names only (default false).
+ */
+const src_nmTokens = (str, { xmlVersion = '1.0', asciiOnly = false } = {}) =>
+  src_getRegexes(xmlVersion, asciiOnly).nmTokens.test(str);
+
+// ---------------------------------------------------------------------------
+// Memoized validator factory
+//
+// Real documents reuse a small vocabulary of tag/attribute names across many
+// siblings (e.g. `id`, `class`, `href` repeated across hundreds of elements).
+// The plain boolean validators above re-run the regex on every call
+// regardless of repeats. `createValidator` returns a closure with a private
+// string -> boolean cache, so repeated names after the first become O(1)
+// lookups instead of regex tests.
+//
+// - opts (xmlVersion, asciiOnly) are fixed at creation time, so the regex is
+//   resolved once, not on every call.
+// - The cache is private to the returned closure — no shared/global state,
+//   no cross-caller pollution.
+// - `maxCacheSize` bounds memory: once the cache reaches this many entries,
+//   it stops accepting new ones (existing entries keep serving hits; new
+//   misses just fall through to the regex, uncached). This avoids unbounded
+//   growth against adversarial/high-cardinality input (e.g. validating
+//   attacker-supplied names with no repeats) without the cost/complexity of
+//   a full LRU, and without the perf cliff of reset-and-refill thrashing.
+// - Call `.reset()` on the returned function to clear the cache manually
+//   (e.g. between unrelated parse calls).
+// ---------------------------------------------------------------------------
+
+const src_PRODUCTIONS = ['name', 'ncName', 'qName', 'nmToken', 'nmTokens'];
+
+/**
+ * Returns a memoized boolean validator function for a single production,
+ * with opts fixed at creation time.
+ *
+ * @param {'name'|'ncName'|'qName'|'nmToken'|'nmTokens'} production
+ * @param {{ xmlVersion?: '1.0'|'1.1', asciiOnly?: boolean, maxCacheSize?: number }} [opts]
+ *   maxCacheSize: max number of distinct strings to cache (default 2048).
+ *   Once reached, new strings are validated but not cached; existing cached
+ *   entries keep being served.
+ * @returns {((str: string) => boolean) & { reset: () => void }}
+ */
+const src_createValidator = (production, { xmlVersion = '1.0', asciiOnly = false, maxCacheSize = 2048 } = {}) => {
+  if (!src_PRODUCTIONS.includes(production)) {
+    throw new TypeError(
+      `Unknown production "${production}". Must be one of: ${src_PRODUCTIONS.join(', ')}`
+    );
+  }
+
+  const regex = src_getRegexes(xmlVersion, asciiOnly)[production];
+  let cache = new Map();
+
+  const validator = (str) => {
+    const cached = cache.get(str);
+    if (cached !== undefined) return cached;
+
+    const result = regex.test(str);
+    if (cache.size < maxCacheSize) cache.set(str, result);
+    return result;
+  };
+
+  validator.reset = () => { cache = new Map(); };
+
+  return validator;
+};
+
+// ---------------------------------------------------------------------------
+// Diagnostic validator
+// ---------------------------------------------------------------------------
+
+/**
+ * Validates a string against a named production and returns a detailed result.
+ *
+ * @param {string} str
+ * @param {'name'|'ncName'|'qName'|'nmToken'|'nmTokens'} production
+ * @param {{ xmlVersion?: '1.0'|'1.1', asciiOnly?: boolean }} [opts]
+ * @returns {{ valid: boolean, production: string, input: string, reason?: string, position?: number }}
+ */
+const xml_naming_src_validate = (str, production, { xmlVersion = '1.0', asciiOnly = false } = {}) => {
+  if (!src_PRODUCTIONS.includes(production)) {
+    throw new TypeError(
+      `Unknown production "${production}". Must be one of: ${src_PRODUCTIONS.join(', ')}`
+    );
+  }
+
+  const validators = { name: xml_naming_src_name, ncName: src_ncName, qName: src_qName, nmToken: src_nmToken, nmTokens: src_nmTokens };
+  const isValid = validators[production](str, { xmlVersion, asciiOnly });
+
+  if (isValid) return { valid: true, production, input: str };
+
+  let reason = 'Does not match the production rules';
+  let position;
+
+  // Diagnostic fallback char checks must mirror the same character set the
+  // boolean validator above used, or the reported reason/position could
+  // contradict the `valid: false` result (e.g. flagging a char as illegal
+  // that the unicode-aware check would have accepted).
+  const startCharPattern = asciiOnly ? /^[:A-Za-z_]/ : /^[:A-Za-z_\u00C0-\uFFFD]/;
+  const namePattern = asciiOnly ? /[\w\-\\.:]/ : /[\w\-\\.:\u00B7\u00C0-\uFFFD]/;
+
+  if (str.length === 0) {
+    reason = 'Input is empty';
+  } else if (production === 'ncName' && str.includes(':')) {
+    position = str.indexOf(':');
+    reason = 'Colon is not allowed in NCName';
+  } else if (production === 'qName' && str.startsWith(':')) {
+    reason = 'QName cannot start with a colon';
+    position = 0;
+  } else if (production === 'qName' && str.endsWith(':')) {
+    reason = 'QName cannot end with a colon';
+    position = str.length - 1;
+  } else if (production === 'qName' && (str.match(/:/g) || []).length > 1) {
+    reason = 'QName can have at most one colon';
+    position = str.lastIndexOf(':');
+  } else if (
+    ['name', 'ncName', 'qName'].includes(production) &&
+    !startCharPattern.test(str[0])
+  ) {
+    reason = `First character "${str[0]}" is not a valid NameStartChar`;
+    position = 0;
+  } else {
+    for (let i = 0; i < str.length; i++) {
+      if (!namePattern.test(str[i])) {
+        reason = `Character "${str[i]}" at position ${i} is not a valid NameChar`;
+        position = i;
+        break;
+      }
+    }
+  }
+
+  return { valid: false, production, input: str, reason, position };
+};
+
+// ---------------------------------------------------------------------------
+// Batch validator
+// ---------------------------------------------------------------------------
+
+/**
+ * Validates an array of strings against a named production.
+ *
+ * @param {string[]} strings
+ * @param {'name'|'ncName'|'qName'|'nmToken'|'nmTokens'} production
+ * @param {{ xmlVersion?: '1.0'|'1.1', asciiOnly?: boolean }} [opts]
+ * @returns {Array<{ valid: boolean, production: string, input: string, reason?: string, position?: number }>}
+ */
+const src_validateAll = (strings, production, opts = {}) =>
+  strings.map(str => xml_naming_src_validate(str, production, opts));
+
+// ---------------------------------------------------------------------------
+// Sanitizer
+// ---------------------------------------------------------------------------
+
+/**
+ * Transforms an invalid string into the nearest valid XML name for the given production.
+ *
+ * @param {string} str
+ * @param {'name'|'ncName'|'qName'|'nmToken'|'nmTokens'} production
+ * @param {{ replacement?: string, asciiOnly?: boolean }} [opts]
+ *   asciiOnly: also replace any non-ASCII character, not just XML-illegal
+ *   ones (default false).
+ * @returns {string}
+ */
+const src_sanitize = (str, production = 'name', { replacement = '_', asciiOnly = false } = {}) => {
+  if (!str) return replacement;
+
+  let result = str;
+
+  // Strip colons for NCName
+  if (production === 'ncName') {
+    result = result.replace(/:/g, '');
+  }
+
+  // Replace illegal characters
+  const allowedCharPattern = asciiOnly ? /[^\w\-\.:]/g : /[^\w\-\.:\u00B7\u00C0-\uFFFD]/g;
+  result = result.replace(allowedCharPattern, replacement);
+
+  // Fix invalid start character for Name / NCName / QName
+  if (production !== 'nmToken' && production !== 'nmTokens') {
+    if (/^[\-\.\d]/.test(result)) {
+      result = replacement + result;
+    }
+  }
+
+  return result || replacement;
+};
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/DocTypeReader.js
+
+
+class DocTypeReader_DocTypeReader {
+    constructor(options, xmlVersion) {
+        this.suppressValidationErr = !options;
+        this.options = options;
+        this.xmlVersion = xmlVersion || 1.0;
+    }
+
+    setXmlVersion(xmlVersion = 1.0) {
+        this.xmlVersion = xmlVersion;
+    }
+    readDocType(xmlData, i) {
+        const entities = Object.create(null);
+        let entityCount = 0;
+
+        if (xmlData[i + 3] === 'O' &&
+            xmlData[i + 4] === 'C' &&
+            xmlData[i + 5] === 'T' &&
+            xmlData[i + 6] === 'Y' &&
+            xmlData[i + 7] === 'P' &&
+            xmlData[i + 8] === 'E') {
+            i = i + 9;
+            let angleBracketsCount = 1;
+            let hasBody = false, comment = false;
+            let quoteChar = null; // tracks an open SYSTEM/PUBLIC literal before the '[' body
+            let exp = "";
+            for (; i < xmlData.length; i++) {
+                // Inside a quoted external-identifier literal — XML allows '<'
+                // and '>' as plain data here, so they must not be interpreted
+                // as DOCTYPE structure until the matching quote closes.
+                if (quoteChar !== null) {
+                    if (xmlData[i] === quoteChar) quoteChar = null;
+                    exp += xmlData[i];
+                    continue;
+                }
+                if (!hasBody && !comment && (xmlData[i] === '"' || xmlData[i] === "'")) {
+                    quoteChar = xmlData[i];
+                    exp += xmlData[i];
+                    continue;
+                }
+
+                if (xmlData[i] === '<' && !comment) { //Determine the tag type
+                    if (hasBody && DocTypeReader_hasSeq(xmlData, "!ENTITY", i)) {
+                        i += 7;
+                        let entityName, val;
+                        [entityName, val, i] = this.readEntityExp(xmlData, i + 1, this.suppressValidationErr);
+                        if (val.indexOf("&") === -1) { //Parameter entities are not supported
+                            if (this.options.enabled !== false &&
+                                this.options.maxEntityCount != null &&
+                                entityCount >= this.options.maxEntityCount) {
+                                throw new Error(
+                                    `Entity count (${entityCount + 1}) exceeds maximum allowed (${this.options.maxEntityCount})`
+                                );
+                            }
+                            //const escaped = entityName.replace(/[.\-+*:]/g, '\\.');
+                            //const escaped = entityName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            entities[entityName] = val;
+                            entityCount++;
+                        }
+                    }
+                    else if (hasBody && DocTypeReader_hasSeq(xmlData, "!ELEMENT", i)) {
+                        i += 8;//Not supported
+                        const { index } = this.readElementExp(xmlData, i + 1);
+                        i = index;
+                    } else if (hasBody && DocTypeReader_hasSeq(xmlData, "!ATTLIST", i)) {
+                        i += 8;//Not supported
+                        // const {index} = this.readAttlistExp(xmlData,i+1);
+                        // i = index;
+                    } else if (hasBody && DocTypeReader_hasSeq(xmlData, "!NOTATION", i)) {
+                        i += 9;//Not supported
+                        const { index } = this.readNotationExp(xmlData, i + 1, this.suppressValidationErr);
+                        i = index;
+                    } else if (DocTypeReader_hasSeq(xmlData, "!--", i)) comment = true;
+                    else throw new Error(`Invalid DOCTYPE`);
+
+                    angleBracketsCount++;
+                    exp = "";
+                } else if (xmlData[i] === '>') { //Read tag content
+                    if (comment) {
+                        if (xmlData[i - 1] === "-" && xmlData[i - 2] === "-") {
+                            comment = false;
+                            angleBracketsCount--;
+                        }
+                    } else {
+                        angleBracketsCount--;
+                    }
+                    if (angleBracketsCount === 0) {
+                        break;
+                    }
+                } else if (xmlData[i] === '[') {
+                    hasBody = true;
+                } else {
+                    exp += xmlData[i];
+                }
+            }
+            if (quoteChar !== null || angleBracketsCount !== 0) {
+                throw new Error(`Unclosed DOCTYPE`);
+            }
+        } else {
+            throw new Error(`Invalid Tag instead of DOCTYPE`);
+        }
+        return { entities, i };
+    }
+    readEntityExp(xmlData, i) {
+        //External entities are not supported
+        //    <!ENTITY ext SYSTEM "http://normal-website.com" >
+
+        //Parameter entities are not supported
+        //    <!ENTITY entityname "&anotherElement;">
+
+        //Internal entities are supported
+        //    <!ENTITY entityname "replacement text">
+
+        // Skip leading whitespace after <!ENTITY
+        i = DocTypeReader_skipWhitespace(xmlData, i);
+
+        // Read entity name
+        const startIndex = i;
+        while (i < xmlData.length && !/\s/.test(xmlData[i]) && xmlData[i] !== '"' && xmlData[i] !== "'") {
+            i++;
+        }
+        let entityName = xmlData.substring(startIndex, i);
+
+        DocTypeReader_validateEntityName(entityName, { xmlVersion: this.xmlVersion });
+
+        // Skip whitespace after entity name
+        i = DocTypeReader_skipWhitespace(xmlData, i);
+
+        // Check for unsupported constructs (external entities or parameter entities)
+        if (!this.suppressValidationErr) {
+            if (xmlData.substring(i, i + 6).toUpperCase() === "SYSTEM") {
+                throw new Error("External entities are not supported");
+            } else if (xmlData[i] === "%") {
+                throw new Error("Parameter entities are not supported");
+            }
+        }
+
+        // Read entity value (internal entity)
+        let entityValue = "";
+        [i, entityValue] = this.readIdentifierVal(xmlData, i, "entity");
+
+        // Validate entity size
+        if (this.options.enabled !== false &&
+            this.options.maxEntitySize != null &&
+            entityValue.length > this.options.maxEntitySize) {
+            throw new Error(
+                `Entity "${entityName}" size (${entityValue.length}) exceeds maximum allowed size (${this.options.maxEntitySize})`
+            );
+        }
+
+        i--;
+        return [entityName, entityValue, i];
+    }
+
+    readNotationExp(xmlData, i) {
+        // Skip leading whitespace after <!NOTATION
+        i = DocTypeReader_skipWhitespace(xmlData, i);
+
+        // Read notation name
+
+        const startIndex = i;
+        while (i < xmlData.length && !/\s/.test(xmlData[i])) {
+            i++;
+        }
+        let notationName = xmlData.substring(startIndex, i);
+
+        !this.suppressValidationErr && DocTypeReader_validateEntityName(notationName, { xmlVersion: this.xmlVersion });
+
+        // Skip whitespace after notation name
+        i = DocTypeReader_skipWhitespace(xmlData, i);
+
+        // Check identifier type (SYSTEM or PUBLIC)
+        const identifierType = xmlData.substring(i, i + 6).toUpperCase();
+        if (!this.suppressValidationErr && identifierType !== "SYSTEM" && identifierType !== "PUBLIC") {
+            throw new Error(`Expected SYSTEM or PUBLIC, found "${identifierType}"`);
+        }
+        i += identifierType.length;
+
+        // Skip whitespace after identifier type
+        i = DocTypeReader_skipWhitespace(xmlData, i);
+
+        // Read public identifier (if PUBLIC)
+        let publicIdentifier = null;
+        let systemIdentifier = null;
+
+        if (identifierType === "PUBLIC") {
+            [i, publicIdentifier] = this.readIdentifierVal(xmlData, i, "publicIdentifier");
+
+            // Skip whitespace after public identifier
+            i = DocTypeReader_skipWhitespace(xmlData, i);
+
+            // Optionally read system identifier
+            if (xmlData[i] === '"' || xmlData[i] === "'") {
+                [i, systemIdentifier] = this.readIdentifierVal(xmlData, i, "systemIdentifier");
+            }
+        } else if (identifierType === "SYSTEM") {
+            // Read system identifier (mandatory for SYSTEM)
+            [i, systemIdentifier] = this.readIdentifierVal(xmlData, i, "systemIdentifier");
+
+            if (!this.suppressValidationErr && !systemIdentifier) {
+                throw new Error("Missing mandatory system identifier for SYSTEM notation");
+            }
+        }
+
+        return { notationName, publicIdentifier, systemIdentifier, index: --i };
+    }
+
+    readIdentifierVal(xmlData, i, type) {
+        let identifierVal = "";
+        const startChar = xmlData[i];
+        if (startChar !== '"' && startChar !== "'") {
+            throw new Error(`Expected quoted string, found "${startChar}"`);
+        }
+        i++;
+
+        const startIndex = i;
+        while (i < xmlData.length && xmlData[i] !== startChar) {
+            i++;
+        }
+        identifierVal = xmlData.substring(startIndex, i);
+
+        if (xmlData[i] !== startChar) {
+            throw new Error(`Unterminated ${type} value`);
+        }
+        i++;
+        return [i, identifierVal];
+    }
+
+    readElementExp(xmlData, i) {
+        // <!ELEMENT br EMPTY>
+        // <!ELEMENT div ANY>
+        // <!ELEMENT title (#PCDATA)>
+        // <!ELEMENT book (title, author+)>
+        // <!ELEMENT name (content-model)>
+
+        // Skip leading whitespace after <!ELEMENT
+        i = DocTypeReader_skipWhitespace(xmlData, i);
+
+        // Read element name
+        const startIndex = i;
+        while (i < xmlData.length && !/\s/.test(xmlData[i])) {
+            i++;
+        }
+        let elementName = xmlData.substring(startIndex, i);
+
+        // Validate element name
+        if (!this.suppressValidationErr && !src_qName(elementName, { xmlVersion: this.xmlVersion })) {
+            throw new Error(`Invalid element name: "${elementName}"`);
+        }
+
+        // Skip whitespace after element name
+        i = DocTypeReader_skipWhitespace(xmlData, i);
+        let contentModel = "";
+        // Expect '(' to start content model
+        if (xmlData[i] === "E" && DocTypeReader_hasSeq(xmlData, "MPTY", i)) i += 4;
+        else if (xmlData[i] === "A" && DocTypeReader_hasSeq(xmlData, "NY", i)) i += 2;
+        else if (xmlData[i] === "(") {
+            i++; // Move past '('
+
+            // Read content model
+            const startIndex = i;
+            while (i < xmlData.length && xmlData[i] !== ")") {
+                i++;
+            }
+            contentModel = xmlData.substring(startIndex, i);
+
+            if (xmlData[i] !== ")") {
+                throw new Error("Unterminated content model");
+            }
+
+        } else if (!this.suppressValidationErr) {
+            throw new Error(`Invalid Element Expression, found "${xmlData[i]}"`);
+        }
+
+        return {
+            elementName,
+            contentModel: contentModel.trim(),
+            index: i
+        };
+    }
+
+    readAttlistExp(xmlData, i) {
+        // Skip leading whitespace after <!ATTLIST
+        i = DocTypeReader_skipWhitespace(xmlData, i);
+
+        // Read element name
+        let startIndex = i;
+        while (i < xmlData.length && !/\s/.test(xmlData[i])) {
+            i++;
+        }
+        let elementName = xmlData.substring(startIndex, i);
+
+        // Validate element name
+        DocTypeReader_validateEntityName(elementName, { xmlVersion: this.xmlVersion })
+
+        // Skip whitespace after element name
+        i = DocTypeReader_skipWhitespace(xmlData, i);
+
+        // Read attribute name
+        startIndex = i;
+        while (i < xmlData.length && !/\s/.test(xmlData[i])) {
+            i++;
+        }
+        let attributeName = xmlData.substring(startIndex, i);
+
+        // Validate attribute name
+        if (!DocTypeReader_validateEntityName(attributeName, { xmlVersion: this.xmlVersion })) {
+            throw new Error(`Invalid attribute name: "${attributeName}"`);
+        }
+
+        // Skip whitespace after attribute name
+        i = DocTypeReader_skipWhitespace(xmlData, i);
+
+        // Read attribute type
+        let attributeType = "";
+        if (xmlData.substring(i, i + 8).toUpperCase() === "NOTATION") {
+            attributeType = "NOTATION";
+            i += 8; // Move past "NOTATION"
+
+            // Skip whitespace after "NOTATION"
+            i = DocTypeReader_skipWhitespace(xmlData, i);
+
+            // Expect '(' to start the list of notations
+            if (xmlData[i] !== "(") {
+                throw new Error(`Expected '(', found "${xmlData[i]}"`);
+            }
+            i++; // Move past '('
+
+            // Read the list of allowed notations
+            let allowedNotations = [];
+            while (i < xmlData.length && xmlData[i] !== ")") {
+
+
+                const startIndex = i;
+                while (i < xmlData.length && xmlData[i] !== "|" && xmlData[i] !== ")") {
+                    i++;
+                }
+                let notation = xmlData.substring(startIndex, i);
+
+                // Validate notation name
+                notation = notation.trim();
+                if (!DocTypeReader_validateEntityName(notation, { xmlVersion: this.xmlVersion })) {
+                    throw new Error(`Invalid notation name: "${notation}"`);
+                }
+
+                allowedNotations.push(notation);
+
+                // Skip '|' separator or exit loop
+                if (xmlData[i] === "|") {
+                    i++; // Move past '|'
+                    i = DocTypeReader_skipWhitespace(xmlData, i); // Skip optional whitespace after '|'
+                }
+            }
+
+            if (xmlData[i] !== ")") {
+                throw new Error("Unterminated list of notations");
+            }
+            i++; // Move past ')'
+
+            // Store the allowed notations as part of the attribute type
+            attributeType += " (" + allowedNotations.join("|") + ")";
+        } else {
+            // Handle simple types (e.g., CDATA, ID, IDREF, etc.)
+            const startIndex = i;
+            while (i < xmlData.length && !/\s/.test(xmlData[i])) {
+                i++;
+            }
+            attributeType += xmlData.substring(startIndex, i);
+
+            // Validate simple attribute type
+            const validTypes = ["CDATA", "ID", "IDREF", "IDREFS", "ENTITY", "ENTITIES", "NMTOKEN", "NMTOKENS"];
+            if (!this.suppressValidationErr && !validTypes.includes(attributeType.toUpperCase())) {
+                throw new Error(`Invalid attribute type: "${attributeType}"`);
+            }
+        }
+
+        // Skip whitespace after attribute type
+        i = DocTypeReader_skipWhitespace(xmlData, i);
+
+        // Read default value
+        let defaultValue = "";
+        if (xmlData.substring(i, i + 8).toUpperCase() === "#REQUIRED") {
+            defaultValue = "#REQUIRED";
+            i += 8;
+        } else if (xmlData.substring(i, i + 7).toUpperCase() === "#IMPLIED") {
+            defaultValue = "#IMPLIED";
+            i += 7;
+        } else {
+            [i, defaultValue] = this.readIdentifierVal(xmlData, i, "ATTLIST");
+        }
+
+        return {
+            elementName,
+            attributeName,
+            attributeType,
+            defaultValue,
+            index: i
+        }
+    }
+}
+
+
+
+const DocTypeReader_skipWhitespace = (data, index) => {
+    while (index < data.length && /\s/.test(data[index])) {
+        index++;
+    }
+    return index;
+};
+
+
+
+function DocTypeReader_hasSeq(data, seq, i) {
+    for (let j = 0; j < seq.length; j++) {
+        if (seq[j] !== data[i + j + 1]) return false;
+    }
+    return true;
+}
+
+function DocTypeReader_validateEntityName(name, xmlVersion) {
+    if (src_qName(name, { xmlVersion: xmlVersion }))
+        return name;
+    else
+        throw new Error(`Invalid entity name ${name}`);
+}
+;// CONCATENATED MODULE: ./node_modules/anynum/digitTable.js
+/**
+ * Flat lookup table: maps Unicode code point → ASCII digit (0-9).
+ * Only decimal digit characters (Unicode category Nd) are included.
+ *
+ * Strategy: Int32Array of size (maxCodePoint - minCodePoint + 1).
+ * Value 0xFF means "not a digit". Value 0-9 is the ASCII digit value.
+ * This gives O(1) lookup with no branching, no bisect, no loop.
+ *
+ * Memory: range is 0x0660 to 0x1FBF0 → ~129,936 entries × 1 byte = ~127 KB.
+ * Acceptable for a one-time init; lookup is a single array index.
+ */
+
+// All known Unicode Nd (decimal digit) script zero code points.
+// Each script has exactly 10 consecutive digits: zero+0 .. zero+9.
+const digitTable_SCRIPT_ZEROS = [
+  // Basic Latin (ASCII) — included for completeness / pass-through
+  0x0030, // 0-9
+
+  // Arabic scripts
+  0x0660, // Arabic-Indic ٠١٢٣٤٥٦٧٨٩
+  0x06F0, // Extended Arabic-Indic (Urdu/Persian/Sindhi) ۰۱۲۳
+
+  // Indic scripts
+  0x0966, // Devanagari ०१२३४५६७८९
+  0x09E6, // Bengali ০১২৩৪৫৬৭৮৯
+  0x0A66, // Gurmukhi ੦੧੨੩੪੫੬੭੮੯
+  0x0AE6, // Gujarati ૦૧૨૩૪૫૬૭૮૯
+  0x0B66, // Odia ୦୧୨୩୪୫୬୭୮୯
+  0x0BE6, // Tamil ௦௧௨௩௪௫௬௭௮௯
+  0x0C66, // Telugu ౦౧౨౩౪౫౬౭౮౯
+  0x0CE6, // Kannada ೦೧೨೩೪೫೬೭೮೯
+  0x0D66, // Malayalam ൦൧൨൩൪൫൬൭൮൯
+  0x0DE6, // Sinhala Archaic ෦෧෨෩෪෫෬෭෮෯
+
+  // Southeast Asian scripts
+  0x0E50, // Thai ๐๑๒๓๔๕๖๗๘๙
+  0x0ED0, // Lao ໐໑໒໓໔໕໖໗໘໙
+  0x0F20, // Tibetan ༠༡༢༣༤༥༦༧༨༩
+  0x1040, // Myanmar ၀၁၂၃၄၅၆၇၈၉
+  0x1090, // Myanmar Shan ႐႑႒႓႔႕႖႗႘႙
+  0x17E0, // Khmer ០១២៣៤៥៦៧៨៩
+  0x1810, // Mongolian ᠐᠑᠒᠓᠔᠕᠖᠗᠘᠙
+  0x1946, // Limbu ᥆᥇᥈᥉᥊᥋᥌᥍᥎᥏
+  0x19D0, // New Tai Lue ᧐᧑᧒᧓᧔᧕᧖᧗᧘᧙
+  0x1A80, // Tai Tham Hora ᪀᪁᪂᪃᪄᪅᪆᪇᪈᪉
+  0x1A90, // Tai Tham Tham ᪐᪑᪒᪓᪔᪕᪖᪗᪘᪙
+  0x1B50, // Balinese ᭐᭑᭒᭓᭔᭕᭖᭗᭘᭙
+  0x1BB0, // Sundanese ᮰᮱᮲᮳᮴᮵᮶᮷᮸᮹
+  0x1C40, // Lepcha ᱀᱁᱂᱃᱄᱅᱆᱇᱈᱉
+  0x1C50, // Ol Chiki ᱐᱑᱒᱓᱔᱕᱖᱗᱘᱙
+
+  // Fullwidth (CJK context)
+  0xFF10, // Fullwidth ０１２３４５６７８９
+
+  // Mathematical digit variants (Unicode math block)
+  0x1D7CE, // Mathematical Bold
+  0x1D7D8, // Mathematical Double-Struck
+  0x1D7E2, // Mathematical Sans-Serif
+  0x1D7EC, // Mathematical Sans-Serif Bold
+  0x1D7F6, // Mathematical Monospace
+
+  // Other scripts
+  0x104A0, // Osmanya 𐒠𐒡𐒢𐒣𐒤𐒥𐒦𐒧𐒨𐒩
+  0x10D30, // Hanifi Rohingya 𐴰𐴱𐴲𐴳𐴴𐴵𐴶𐴷𐴸𐴹
+  0x11066, // Brahmi 𑁦𑁧𑁨𑁩𑁪𑁫𑁬𑁭𑁮𑁯
+  0x110F0, // Sora Sompeng 𑃰𑃱𑃲𑃳𑃴𑃵𑃶𑃷𑃸𑃹
+  0x11136, // Chakma 𑄶𑄷𑄸𑄹𑄺𑄻𑄼𑄽𑄾𑄿
+  0x111D0, // Sharada 𑇐𑇑𑇒𑇓𑇔𑇕𑇖𑇗𑇘𑇙
+  0x112F0, // Khudawadi 𑋰𑋱𑋲𑋳𑋴𑋵𑋶𑋷𑋸𑋹
+  0x11450, // Newa 𑑐𑑑𑑒𑑓𑑔𑑕𑑖𑑗𑑘𑑙
+  0x114D0, // Tirhuta 𑓐𑓑𑓒𑓓𑓔𑓕𑓖𑓗𑓘𑓙
+  0x11650, // Modi 𑙐𑙑𑙒𑙓𑙔𑙕𑙖𑙗𑙘𑙙
+  0x116C0, // Takri 𑛀𑛁𑛂𑛃𑛄𑛅𑛆𑛇𑛈𑛉
+  0x11730, // Ahom 𑜰𑜱𑜲𑜳𑜴𑜵𑜶𑜷𑜸𑜹
+  0x118E0, // Warang Citi 𑣠𑣡𑣢𑣣𑣤𑣥𑣦𑣧𑣨𑣩
+  0x11950, // Dives Akuru 𑥐𑥑𑥒𑥓𑥔𑥕𑥖𑥗𑥘𑥙
+  0x11BF0, // Khitan Small Script 𑯰𑯱𑯲𑯳𑯴𑯵𑯶𑯷𑯸𑯹
+  0x11C50, // Bhaiksuki 𑱐𑱑𑱒𑱓𑱔𑱕𑱖𑱗𑱘𑱙
+  0x11D50, // Masaram Gondi 𑵐𑵑𑵒𑵓𑵔𑵕𑵖𑵗𑵘𑵙
+  0x11DA0, // Gunjala Gondi 𑶠𑶡𑶢𑶣𑶤𑶥𑶦𑶧𑶨𑶩
+  0x11F50, // Kawi 𑽐𑽑𑽒𑽓𑽔𑽕𑽖𑽗𑽘𑽙
+  0x16A60, // Mro 𖩠𖩡𖩢𖩣𖩤𖩥𖩦𖩧𖩨𖩩
+  0x16AC0, // Tangsa 𖫀𖫁𖫂𖫃𖫄𖫅𖫆𖫇𖫈𖫉
+  0x16B50, // Pahawh Hmong 𖭐𖭑𖭒𖭓𖭔𖭕𖭖𖭗𖭘𖭙
+  0x1E140, // Nyiakeng Puachue Hmong 𞅀𞅁𞅂𞅃𞅄𞅅𞅆𞅇𞅈𞅉
+  0x1E2F0, // Wancho 𞋰𞋱𞋲𞋳𞋴𞋵𞋶𞋷𞋸𞋹
+  0x1E4F0, // Nag Mundari 𞓰𞓱𞓲𞓳𞓴𞓵𞓶𞓷𞓸𞓹
+  0x1E950, // Adlam 𞥐𞥑𞥒𞥓𞥔𞥕𞥖𞥗𞥘𞥙
+  0x1FBF0, // Segmented digit symbols 🯰🯱🯲🯳🯴🯵🯶🯷🯸🯹
+];
+
+// Build a sparse Map for scripts above 0xFFFF (surrogate-pair range).
+// These can't go into a flat Uint8Array indexed by code point efficiently.
+const digitTable_NOT_DIGIT = 0xFF;
+const digitTable_HIGH_MAP = new Map(); // codePoint → digit value (0-9)
+
+const digitTable_LOW_MAX = 0xFFFF;
+const digitTable_LOW_MIN = 0x0660; // first non-ASCII digit script
+
+// Flat Uint8Array covering 0x0660 .. 0xFFFF
+const digitTable_TABLE_OFFSET = digitTable_LOW_MIN;
+const digitTable_TABLE_SIZE = digitTable_LOW_MAX - digitTable_LOW_MIN + 1;
+const digitTable_TABLE = new Uint8Array(digitTable_TABLE_SIZE).fill(digitTable_NOT_DIGIT);
+
+for (const zero of digitTable_SCRIPT_ZEROS) {
+  for (let d = 0; d < 10; d++) {
+    const cp = zero + d;
+    if (cp <= digitTable_LOW_MAX) {
+      digitTable_TABLE[cp - digitTable_TABLE_OFFSET] = d;
+    } else {
+      digitTable_HIGH_MAP.set(cp, d);
+    }
+  }
+}
+
+
+
+;// CONCATENATED MODULE: ./node_modules/anynum/anynum.js
+
+
+
+
+const anynum_CHAR_0 = 48; // '0'.charCodeAt(0)
+const anynum_CHAR_9 = 57; // '9'.charCodeAt(0)
+const anynum_CHAR_MINUS = 45; // '-'.charCodeAt(0)
+
+// Unicode minus/hyphen variants worth normalizing to ASCII '-' in numeric context:
+//   U+2212  MINUS SIGN       − (mathematically correct minus)
+//   U+FF0D  FULLWIDTH HYPHEN-MINUS  － (Japanese fullwidth context)
+//   U+FE63  SMALL HYPHEN-MINUS     ﹣ (small form variant)
+//
+// NOT normalized (deliberate):
+//   U+2013  EN DASH  –  (punctuation, not a numeric sign)
+//   U+2014  EM DASH  —  (punctuation)
+//   U+2010  HYPHEN   ‐  (typographic hyphen)
+//
+// Rationale: only characters a human or locale formatter would plausibly use
+// as a numeric minus sign are normalized. Dashes used for punctuation are left
+// alone to avoid mangling non-numeric strings.
+const anynum_MINUS_SET = new Set([0x2212, 0xFF0D, 0xFE63]);
+
+/**
+ * Normalize all Unicode decimal digit characters in a string to ASCII (0-9),
+ * and normalize Unicode minus variants to ASCII '-' (U+002D).
+ *
+ * Non-digit, non-minus characters are passed through unchanged.
+ *
+ * Performance design:
+ * - Fast path: if the string has no convertible characters, return it unchanged
+ *   (zero allocation).
+ * - BMP digits (0x0660..0xFFFF excl. surrogates): flat Uint8Array lookup (O(1)).
+ * - Supplementary plane digits (> 0xFFFF, encoded as surrogate pairs): Map lookup.
+ * - Minus variants: checked inline with a small fixed Set.
+ *
+ * @param {string} str
+ * @returns {string}
+ */
+function anynum_anynum_anynum(str) {
+  if (typeof str !== 'string') return str;
+
+  const len = str.length;
+  if (len === 0) return str;
+
+  // Scan for first character needing conversion.
+  // If none found, return original string (zero allocation).
+  let firstHit = -1;
+
+  for (let i = 0; i < len; i++) {
+    const cc = str.charCodeAt(i);
+
+    // ASCII digit or ASCII minus — already normalized, skip fast
+    if ((cc >= anynum_CHAR_0 && cc <= anynum_CHAR_9) || cc === anynum_CHAR_MINUS) continue;
+
+    // Below first unicode digit script — check minus variants only
+    if (cc < digitTable_TABLE_OFFSET) {
+      if (anynum_MINUS_SET.has(cc)) { firstHit = i; break; }
+      continue;
+    }
+
+    // Surrogate pairs live in BMP range 0xD800-0xDFFF — check before TABLE
+    if (cc >= 0xD800 && cc <= 0xDBFF) {
+      if (i + 1 < len) {
+        const low = str.charCodeAt(i + 1);
+        if (low >= 0xDC00 && low <= 0xDFFF) {
+          const cp = 0x10000 + ((cc - 0xD800) << 10) + (low - 0xDC00);
+          if (digitTable_HIGH_MAP.has(cp)) { firstHit = i; break; }
+        }
+      }
+      continue;
+    }
+
+    // BMP non-surrogate: flat table lookup; also check minus variants in this range
+    if (digitTable_TABLE[cc - digitTable_TABLE_OFFSET] !== digitTable_NOT_DIGIT || anynum_MINUS_SET.has(cc)) {
+      firstHit = i;
+      break;
+    }
+  }
+
+  // Nothing to replace — return original, zero allocation
+  if (firstHit === -1) return str;
+
+  // Build result: copy unchanged prefix, then convert from firstHit onward
+  const chars = [];
+
+  if (firstHit > 0) chars.push(str.slice(0, firstHit));
+
+  for (let i = firstHit; i < len; i++) {
+    const cc = str.charCodeAt(i);
+
+    // ASCII digit or ASCII minus — pass through
+    if ((cc >= anynum_CHAR_0 && cc <= anynum_CHAR_9) || cc === anynum_CHAR_MINUS) {
+      chars.push(str[i]);
+      continue;
+    }
+
+    // Below TABLE_OFFSET — check minus variants, else pass through
+    if (cc < digitTable_TABLE_OFFSET) {
+      chars.push(anynum_MINUS_SET.has(cc) ? '-' : str[i]);
+      continue;
+    }
+
+    // Surrogate pairs
+    if (cc >= 0xD800 && cc <= 0xDBFF) {
+      if (i + 1 < len) {
+        const low = str.charCodeAt(i + 1);
+        if (low >= 0xDC00 && low <= 0xDFFF) {
+          const cp = 0x10000 + ((cc - 0xD800) << 10) + (low - 0xDC00);
+          const d = digitTable_HIGH_MAP.get(cp);
+          if (d !== undefined) {
+            chars.push(String.fromCharCode(d + 48));
+            i++; // consume low surrogate
+            continue;
+          }
+        }
+      }
+      chars.push(str[i]);
+      continue;
+    }
+
+    // BMP non-surrogate: flat table lookup + minus variants
+    if (anynum_MINUS_SET.has(cc)) {
+      chars.push('-');
+      continue;
+    }
+    const d = digitTable_TABLE[cc - digitTable_TABLE_OFFSET];
+    chars.push(d !== digitTable_NOT_DIGIT ? String.fromCharCode(d + 48) : str[i]);
+  }
+
+  return chars.join('');
+}
+
+
+/* harmony default export */ const node_modules_anynum_anynum = (anynum_anynum_anynum);
+;// CONCATENATED MODULE: ./node_modules/strnum/strnum.js
+const strnum_hexRegex = /^[-+]?0x[a-fA-F0-9]+$/;
+const strnum_binRegex = /^0b[01]+$/;
+const strnum_octRegex = /^0o[0-7]+$/;
+const strnum_numRegex = /^([\-\+])?(0*)([0-9]*(\.[0-9]*)?)$/;
+
+
+
+const strnum_consider = {
+    hex: true,
+    binary: false,
+    octal: false,
+    leadingZeros: true,
+    decimalPoint: "\.",
+    eNotation: true,
+    //skipLike: /regex/,
+    infinity: "original", // "null", "infinity" (Infinity type), "string" ("Infinity" (the string literal))
+    unicode: false,
+};
+
+function strnum_toNumber(str, options = {}) {
+    options = Object.assign({}, strnum_consider, options);
+    if (!str || typeof str !== "string") return str;
+
+    let trimmedStr = str.trim();
+
+    if (trimmedStr.length === 0) return str;
+    else if (options.skipLike !== undefined && options.skipLike.test(trimmedStr)) return str;
+    else if (trimmedStr === "0") return 0;
+
+    if (options.unicode) {
+        trimmedStr = node_modules_anynum_anynum(trimmedStr);
+        if (trimmedStr === "0") return 0; // re-check after normalization
+    }
+    if (options.hex && strnum_hexRegex.test(trimmedStr)) {
+        return strnum_parse_int(trimmedStr, 16);
+    } else if (options.binary && strnum_binRegex.test(trimmedStr)) {
+        return strnum_parse_int(trimmedStr, 2);
+    } else if (options.octal && strnum_octRegex.test(trimmedStr)) {
+        return strnum_parse_int(trimmedStr, 8);
+    } else if (!isFinite(trimmedStr)) { //Infinity or not a number
+        const num = Number(trimmedStr);
+        if (Number.isNaN(num)) return str; //not a number: always the original string
+        return strnum_handleInfinity(str, num, options); //only +/-Infinity reaches here
+    } else if (trimmedStr.includes('e') || trimmedStr.includes('E')) { //eNotation
+        return strnum_resolveEnotation(str, trimmedStr, options);
+    } else {
+        //separate negative sign, leading zeros, and rest number
+        const match = strnum_numRegex.exec(trimmedStr);
+        // +00.123 => [ , '+', '00', '.123', ..
+        if (match) {
+            const sign = match[1] || "";
+            const leadingZeros = match[2];
+            let numTrimmedByZeros = strnum_trimZeros(match[3]); //complete num without leading zeros
+            const decimalAdjacentToLeadingZeros = sign ? // 0., -00., 000.
+                trimmedStr[leadingZeros.length + 1] === "."
+                : trimmedStr[leadingZeros.length] === ".";
+
+            //trim ending zeros for floating number
+            if (!options.leadingZeros //leading zeros are not allowed
+                && (leadingZeros.length > 1
+                    || (leadingZeros.length === 1 && !decimalAdjacentToLeadingZeros))) {
+                // 00, 00.3, +03.24, 03, 03.24
+                return str;
+            }
+            else {//no leading zeros or leading zeros are allowed
+                const num = Number(trimmedStr);
+                const parsedStr = String(num);
+
+                if (num === 0) return num;
+                if (parsedStr.search(/[eE]/) !== -1) { //given number is long and parsed to eNotation
+                    if (options.eNotation) return num;
+                    else return str;
+                } else if (trimmedStr.indexOf(".") !== -1) { //floating number
+                    if (parsedStr === "0") return num; //0.0
+                    else if (parsedStr === numTrimmedByZeros) return num; //0.456. 0.79000
+                    else if (parsedStr === `${sign}${numTrimmedByZeros}`) return num;
+                    else return str;
+                }
+
+                let n = leadingZeros ? numTrimmedByZeros : trimmedStr;
+                if (leadingZeros) {
+                    // -009 => -9
+                    return (n === parsedStr) || (sign + n === parsedStr) ? num : str
+                } else {
+                    // +9
+                    return (n === parsedStr) || (n === sign + parsedStr) ? num : str
+                }
+            }
+        } else { //non-numeric string
+            return str;
+        }
+    }
+}
+
+const strnum_eNotationRegx = /^([-+])?(0*)(\d*(\.\d*)?[eE][-\+]?\d+)$/;
+function strnum_resolveEnotation(str, trimmedStr, options) {
+    if (!options.eNotation) return str;
+    const notation = trimmedStr.match(strnum_eNotationRegx);
+    if (notation) {
+        let sign = notation[1] || "";
+        const eChar = notation[3].indexOf("e") === -1 ? "E" : "e";
+        const leadingZeros = notation[2];
+        const eAdjacentToLeadingZeros = sign ? // 0E.
+            trimmedStr[leadingZeros.length + 1] === eChar
+            : trimmedStr[leadingZeros.length] === eChar;
+
+        if (leadingZeros.length > 1 && eAdjacentToLeadingZeros) return str;
+        else if (leadingZeros.length === 1
+            && (notation[3].startsWith(`.${eChar}`) || notation[3][0] === eChar)) {
+            return Number(trimmedStr);
+        } else if (leadingZeros.length > 0) {
+            // Has leading zeros — only accept if leadingZeros option allows it
+            if (options.leadingZeros && !eAdjacentToLeadingZeros) {
+                return Number(trimmedStr); // Number() accepts leading zeros; stripping can leave a mantissa-less ".e0"
+            } else return str;
+        } else {
+            // No leading zeros — always valid e-notation, parse it
+            return Number(trimmedStr);
+        }
+    } else {
+        return str;
+    }
+}
+
+/**
+ * 
+ * @param {string} numStr without leading zeros
+ * @returns 
+ */
+function strnum_trimZeros(numStr) {
+    if (numStr && numStr.indexOf(".") !== -1) {//float
+        //remove ending zeros without the O(n^2) backtracking that /0+$/ hits
+        //when the string doesn't end in 0 but has a long internal zero-run
+        let end = numStr.length;
+        while (end > 0 && numStr.charCodeAt(end - 1) === 48 /* '0' */) end--;
+        numStr = numStr.slice(0, end);
+        if (numStr === ".") numStr = "0";
+        else if (numStr[0] === ".") numStr = "0" + numStr;
+        else if (numStr[numStr.length - 1] === ".") numStr = numStr.substring(0, numStr.length - 1);
+        return numStr;
+    }
+    return numStr;
+}
+
+function strnum_parse_int(numStr, base) {
+    const str = numStr.trim();
+    if (base === 2 || base === 8) numStr = str.substring(2);
+
+    if (parseInt) return parseInt(numStr, base);
+    else if (Number.parseInt) return Number.parseInt(numStr, base);
+    else if (window && window.parseInt) return window.parseInt(numStr, base);
+    else throw new Error("parseInt, Number.parseInt, window.parseInt are not supported");
+}
+
+/**
+ * Handle infinite values based on user option
+ * @param {string} str - original input string
+ * @param {number} num - parsed number (Infinity or -Infinity)
+ * @param {object} options - user options
+ * @returns {string|number|null} based on infinity option
+ */
+function strnum_handleInfinity(str, num, options) {
+    const isPositive = num === Infinity;
+
+    switch (options.infinity.toLowerCase()) {
+        case "null":
+            return null;
+        case "infinity":
+            return num; // Return Infinity or -Infinity
+        case "string":
+            return isPositive ? "Infinity" : "-Infinity";
+        case "original":
+        default:
+            return str; // Return original string like "1e1000"
+    }
+}
+
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/ignoreAttributes.js
+function ignoreAttributes_getIgnoreAttributesFn(ignoreAttributes) {
+    if (typeof ignoreAttributes === 'function') {
+        return ignoreAttributes
+    }
+    if (Array.isArray(ignoreAttributes)) {
+        return (attrName) => {
+            for (const pattern of ignoreAttributes) {
+                if (typeof pattern === 'string' && attrName === pattern) {
+                    return true
+                }
+                if (pattern instanceof RegExp && pattern.test(attrName)) {
+                    return true
+                }
+            }
+        }
+    }
+    return () => false
+}
+;// CONCATENATED MODULE: ./node_modules/path-expression-matcher/src/Matcher.js
+
+
+/**
+ * MatcherView - A lightweight read-only view over a Matcher's internal state.
+ *
+ * Created once by Matcher and reused across all callbacks. Holds a direct
+ * reference to the parent Matcher so it always reflects current parser state
+ * with zero copying or freezing overhead.
+ *
+ * Users receive this via {@link Matcher#readOnly} or directly from parser
+ * callbacks. It exposes all query and matching methods but has no mutation
+ * methods — misuse is caught at the TypeScript level rather than at runtime.
+ *
+ * @example
+ * const matcher = new Matcher();
+ * const view = matcher.readOnly();
+ *
+ * matcher.push("root", {});
+ * view.getCurrentTag(); // "root"
+ * view.getDepth();      // 1
+ */
+class Matcher_MatcherView {
+  /**
+   * @param {Matcher} matcher - The parent Matcher instance to read from.
+   */
+  constructor(matcher) {
+    this._matcher = matcher;
+  }
+
+  /**
+   * Get the path separator used by the parent matcher.
+   * @returns {string}
+   */
+  get separator() {
+    return this._matcher.separator;
+  }
+
+  /**
+   * Get current tag name.
+   * @returns {string|undefined}
+   */
+  getCurrentTag() {
+    const path = this._matcher.path;
+    return path.length > 0 ? path[path.length - 1].tag : undefined;
+  }
+
+  /**
+   * Get current namespace.
+   * @returns {string|undefined}
+   */
+  getCurrentNamespace() {
+    const path = this._matcher.path;
+    return path.length > 0 ? path[path.length - 1].namespace : undefined;
+  }
+
+  /**
+   * Get current node's attribute value.
+   * @param {string} attrName
+   * @returns {*}
+   */
+  getAttrValue(attrName) {
+    const path = this._matcher.path;
+    if (path.length === 0) return undefined;
+    return path[path.length - 1].values?.[attrName];
+  }
+
+  /**
+   * Check if current node has an attribute.
+   * @param {string} attrName
+   * @returns {boolean}
+   */
+  hasAttr(attrName) {
+    const path = this._matcher.path;
+    if (path.length === 0) return false;
+    const current = path[path.length - 1];
+    return current.values !== undefined && attrName in current.values;
+  }
+
+  /**
+   * Get the value of a "kept" attribute from the nearest ancestor (or
+   * current node) that declared it via `push(tag, attrs, ns, { keep: [...] })`.
+   * @param {string} attrName
+   * @returns {*}
+   */
+  getAnyParentAttr(attrName) {
+    return this._matcher.getAnyParentAttr(attrName);
+  }
+
+  /**
+   * Check whether any ancestor (or the current node) kept the given
+   * attribute via `push(tag, attrs, ns, { keep: [...] })`.
+   * @param {string} attrName
+   * @returns {boolean}
+   */
+  hasAnyParentAttr(attrName) {
+    return this._matcher.hasAnyParentAttr(attrName);
+  }
+
+  /**
+   * Get current node's sibling position (child index in parent).
+   * @returns {number}
+   */
+  getPosition() {
+    const path = this._matcher.path;
+    if (path.length === 0) return -1;
+    return path[path.length - 1].position ?? 0;
+  }
+
+  /**
+   * Get current node's repeat counter (occurrence count of this tag name).
+   * @returns {number}
+   */
+  getCounter() {
+    const path = this._matcher.path;
+    if (path.length === 0) return -1;
+    return path[path.length - 1].counter ?? 0;
+  }
+
+  /**
+   * Get current node's sibling index (alias for getPosition).
+   * @returns {number}
+   * @deprecated Use getPosition() or getCounter() instead
+   */
+  getIndex() {
+    return this.getPosition();
+  }
+
+  /**
+   * Get current path depth.
+   * @returns {number}
+   */
+  getDepth() {
+    return this._matcher.path.length;
+  }
+
+  /**
+   * Get path as string.
+   * @param {string} [separator] - Optional separator (uses default if not provided)
+   * @param {boolean} [includeNamespace=true]
+   * @returns {string}
+   */
+  toString(separator, includeNamespace = true) {
+    return this._matcher.toString(separator, includeNamespace);
+  }
+
+  /**
+   * Get path as array of tag names.
+   * @returns {string[]}
+   */
+  toArray() {
+    return this._matcher.path.map(n => n.tag);
+  }
+
+  /**
+   * Match current path against an Expression.
+   * @param {Expression} expression
+   * @returns {boolean}
+   */
+  matches(expression) {
+    return this._matcher.matches(expression);
+  }
+
+  /**
+   * Match any expression in the given set against the current path.
+   * @param {ExpressionSet} exprSet
+   * @returns {boolean}
+   */
+  matchesAny(exprSet) {
+    return exprSet.matchesAny(this._matcher);
+  }
+}
+
+/**
+ * Matcher - Tracks current path in XML/JSON tree and matches against Expressions.
+ *
+ * The matcher maintains a stack of nodes representing the current path from root to
+ * current tag. It only stores attribute values for the current (top) node to minimize
+ * memory usage. Sibling tracking is used to auto-calculate position and counter.
+ *
+ * Use {@link Matcher#readOnly} to obtain a {@link MatcherView} safe to pass to
+ * user callbacks — it always reflects current state with no Proxy overhead.
+ *
+ * @example
+ * const matcher = new Matcher();
+ * matcher.push("root", {});
+ * matcher.push("users", {});
+ * matcher.push("user", { id: "123", type: "admin" });
+ *
+ * const expr = new Expression("root.users.user");
+ * matcher.matches(expr); // true
+ */
+class Matcher_Matcher {
+  /**
+   * Create a new Matcher.
+   * @param {Object} [options={}]
+   * @param {string} [options.separator='.'] - Default path separator
+   */
+  constructor(options = {}) {
+    this.separator = options.separator || '.';
+    this.path = [];
+    this.siblingStacks = [];
+    // Each path node: { tag, values, position, counter, namespace? }
+    // values only present for current (last) node
+    // Each siblingStacks entry: Map<tagName, count> tracking occurrences at each level
+    this._pathStringCache = null;
+    this._view = new Matcher_MatcherView(this);
+
+    // Kept-attribute stack: only populated when push() is called with options.keep.
+    this._keptAttrs = [];
+  }
+
+  /**
+   * Push a new tag onto the path.
+   * @param {string} tagName
+   * @param {Object|null} [attrValues=null]
+   * @param {string|null} [namespace=null]
+   * @param {Object|null} [options=null]
+   * @param {string[]} [options.keep] - Names of attributes (from attrValues)
+   */
+  push(tagName, attrValues = null, namespace = null, options = null) {
+    this._pathStringCache = null;
+
+    // Remove values from previous current node (now becoming ancestor)
+    if (this.path.length > 0) {
+      this.path[this.path.length - 1].values = undefined;
+    }
+
+    // Get or create sibling tracking for current level
+    const currentLevel = this.path.length;
+    let level = this.siblingStacks[currentLevel];
+    if (!level) {
+      // `counts` tells same-name siblings apart (the "counter" — nth <item>
+      // among other <item>s). `total` is every child seen at this level so
+      // far, kept as a running number instead of re-added from `counts` on
+      // every push — a parent with many differently-named children would
+      // otherwise cost more per child the more distinct names it has.
+      level = { counts: new Map(), total: 0 };
+      this.siblingStacks[currentLevel] = level;
+    }
+
+    // Create a unique key for sibling tracking that includes namespace
+    const siblingKey = namespace ? `${namespace}:${tagName}` : tagName;
+
+    // Calculate counter (how many times this tag appeared at this level)
+    const counter = level.counts.get(siblingKey) || 0;
+
+    // Position = total children at this level seen before this one.
+    const position = level.total;
+
+    // Update sibling count for this tag, and the level's running total.
+    level.counts.set(siblingKey, counter + 1);
+    level.total++;
+
+    // Create new node
+    const node = {
+      tag: tagName,
+      position: position,
+      counter: counter
+    };
+
+    if (namespace !== null && namespace !== undefined) {
+      node.namespace = namespace;
+    }
+
+    if (attrValues !== null && attrValues !== undefined) {
+      node.values = attrValues;
+    }
+
+    this.path.push(node);
+
+    // Depth of the node we just pushed (1-based, matches this.path.length)
+    const depth = this.path.length;
+
+    // Copy only the requested attributes into the kept-attrs stack. This is
+    // the one part of push() whose cost scales with input (O(keep.length))
+    // rather than being O(1) — by design, since the caller is explicitly
+    // opting in for specific attribute names. No options/keep => zero added
+    // cost beyond the two property reads below.
+    const keep = options !== null ? options.keep : null;
+    if (keep !== null && keep !== undefined && keep.length > 0 && attrValues) {
+      for (let i = 0; i < keep.length; i++) {
+        const name = keep[i];
+        if (attrValues[name] !== undefined) {
+          this._keptAttrs.push({ depth, name, value: attrValues[name] });
+        }
+      }
+    }
+  }
+
+  /**
+   * Pop the last tag from the path.
+   * @returns {Object|undefined} The popped node
+   */
+  pop() {
+    if (this.path.length === 0) return undefined;
+    this._pathStringCache = null;
+
+    const node = this.path.pop();
+
+    if (this.siblingStacks.length > this.path.length + 1) {
+      this.siblingStacks.length = this.path.length + 1;
+    }
+
+    // Drop any kept attributes that belonged to the popped node (or deeper).
+    // _keptAttrs is depth-ordered (push only ever appends increasing depths),
+    // so this is a backward scan that stops at the first surviving entry —
+    // typically O(1) since kept attrs are rare by design.
+    const poppedDepth = this.path.length + 1;
+    while (
+      this._keptAttrs.length > 0 &&
+      this._keptAttrs[this._keptAttrs.length - 1].depth >= poppedDepth
+    ) {
+      this._keptAttrs.pop();
+    }
+
+    return node;
+  }
+
+  /**
+   * Update current node's attribute values.
+   * Useful when attributes are parsed after push.
+   * @param {Object} attrValues
+   */
+  updateCurrent(attrValues) {
+    if (this.path.length > 0) {
+      const current = this.path[this.path.length - 1];
+      if (attrValues !== null && attrValues !== undefined) {
+        current.values = attrValues;
+      }
+    }
+  }
+
+  /**
+   * Get current tag name.
+   * @returns {string|undefined}
+   */
+  getCurrentTag() {
+    return this.path.length > 0 ? this.path[this.path.length - 1].tag : undefined;
+  }
+
+  /**
+   * Get current namespace.
+   * @returns {string|undefined}
+   */
+  getCurrentNamespace() {
+    return this.path.length > 0 ? this.path[this.path.length - 1].namespace : undefined;
+  }
+
+  /**
+   * Get current node's attribute value.
+   * @param {string} attrName
+   * @returns {*}
+   */
+  getAttrValue(attrName) {
+    if (this.path.length === 0) return undefined;
+    return this.path[this.path.length - 1].values?.[attrName];
+  }
+
+  /**
+   * Check if current node has an attribute.
+   * @param {string} attrName
+   * @returns {boolean}
+   */
+  hasAttr(attrName) {
+    if (this.path.length === 0) return false;
+    const current = this.path[this.path.length - 1];
+    return current.values !== undefined && attrName in current.values;
+  }
+
+  /**
+   * Get the value of a "kept" attribute from the nearest ancestor (or
+   * current node) that declared it via `push(tag, attrs, ns, { keep: [...] })`.
+   * Unlike getAttrValue(), this works regardless of how deep the path has
+   * gone since the attribute was pushed — but only for attribute names that
+   * were explicitly marked with `keep` at push time. Cost is proportional to
+   * the number of currently-kept attributes (typically 0-3), not path depth.
+   * @param {string} attrName
+   * @returns {*} the value, or undefined if no ancestor kept this attribute
+   */
+  getAnyParentAttr(attrName) {
+    const kept = this._keptAttrs;
+    for (let i = kept.length - 1; i >= 0; i--) {
+      if (kept[i].name === attrName) return kept[i].value;
+    }
+    return undefined;
+  }
+
+  /**
+   * Check whether any ancestor (or the current node) kept the given
+   * attribute via `push(tag, attrs, ns, { keep: [...] })`.
+   * @param {string} attrName
+   * @returns {boolean}
+   */
+  hasAnyParentAttr(attrName) {
+    const kept = this._keptAttrs;
+    for (let i = kept.length - 1; i >= 0; i--) {
+      if (kept[i].name === attrName) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get current node's sibling position (child index in parent).
+   * @returns {number}
+   */
+  getPosition() {
+    if (this.path.length === 0) return -1;
+    return this.path[this.path.length - 1].position ?? 0;
+  }
+
+  /**
+   * Get current node's repeat counter (occurrence count of this tag name).
+   * @returns {number}
+   */
+  getCounter() {
+    if (this.path.length === 0) return -1;
+    return this.path[this.path.length - 1].counter ?? 0;
+  }
+
+  /**
+   * Get current node's sibling index (alias for getPosition).
+   * @returns {number}
+   * @deprecated Use getPosition() or getCounter() instead
+   */
+  getIndex() {
+    return this.getPosition();
+  }
+
+  /**
+   * Get current path depth.
+   * @returns {number}
+   */
+  getDepth() {
+    return this.path.length;
+  }
+
+  /**
+   * Get path as string.
+   * @param {string} [separator] - Optional separator (uses default if not provided)
+   * @param {boolean} [includeNamespace=true]
+   * @returns {string}
+   */
+  toString(separator, includeNamespace = true) {
+    const sep = separator || this.separator;
+    const isDefault = (sep === this.separator && includeNamespace === true);
+
+    if (isDefault) {
+      if (this._pathStringCache !== null) {
+        return this._pathStringCache;
+      }
+      const result = this.path.map(n =>
+        (n.namespace) ? `${n.namespace}:${n.tag}` : n.tag
+      ).join(sep);
+      this._pathStringCache = result;
+      return result;
+    }
+
+    return this.path.map(n =>
+      (includeNamespace && n.namespace) ? `${n.namespace}:${n.tag}` : n.tag
+    ).join(sep);
+  }
+
+  /**
+   * Get path as array of tag names.
+   * @returns {string[]}
+   */
+  toArray() {
+    return this.path.map(n => n.tag);
+  }
+
+  /**
+   * Reset the path to empty.
+   */
+  reset() {
+    this._pathStringCache = null;
+    this.path = [];
+    this.siblingStacks = [];
+    this._keptAttrs = [];
+  }
+
+  /**
+   * Match current path against an Expression.
+   * @param {Expression} expression
+   * @returns {boolean}
+   */
+  matches(expression) {
+    const segments = expression.segments;
+
+    if (segments.length === 0) {
+      return false;
+    }
+
+    if (expression.hasDeepWildcard()) {
+      return this._matchWithDeepWildcard(segments);
+    }
+
+    return this._matchSimple(segments);
+  }
+
+  /**
+   * @private
+   */
+  _matchSimple(segments) {
+    if (this.path.length !== segments.length) {
+      return false;
+    }
+
+    for (let i = 0; i < segments.length; i++) {
+      if (!this._matchSegment(segments[i], this.path[i], i === this.path.length - 1)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * @private
+   */
+  _matchWithDeepWildcard(segments) {
+    let pathIdx = this.path.length - 1;
+    let segIdx = segments.length - 1;
+
+    while (segIdx >= 0 && pathIdx >= 0) {
+      const segment = segments[segIdx];
+
+      if (segment.type === 'deep-wildcard') {
+        segIdx--;
+
+        if (segIdx < 0) {
+          return true;
+        }
+
+        const nextSeg = segments[segIdx];
+        let found = false;
+
+        for (let i = pathIdx; i >= 0; i--) {
+          if (this._matchSegment(nextSeg, this.path[i], i === this.path.length - 1)) {
+            pathIdx = i - 1;
+            segIdx--;
+            found = true;
+            break;
+          }
+        }
+
+        if (!found) {
+          return false;
+        }
+      } else {
+        if (!this._matchSegment(segment, this.path[pathIdx], pathIdx === this.path.length - 1)) {
+          return false;
+        }
+        pathIdx--;
+        segIdx--;
+      }
+    }
+
+    return segIdx < 0;
+  }
+
+  /**
+   * @private
+   */
+  _matchSegment(segment, node, isCurrentNode) {
+    if (segment.tag !== '*' && segment.tag !== node.tag) {
+      return false;
+    }
+
+    if (segment.namespace !== undefined) {
+      if (segment.namespace !== '*' && segment.namespace !== node.namespace) {
+        return false;
+      }
+    }
+
+    if (segment.attrName !== undefined) {
+      if (!isCurrentNode) {
+        return false;
+      }
+
+      if (!node.values || !(segment.attrName in node.values)) {
+        return false;
+      }
+
+      if (segment.attrValue !== undefined) {
+        if (String(node.values[segment.attrName]) !== String(segment.attrValue)) {
+          return false;
+        }
+      }
+    }
+
+    if (segment.position !== undefined) {
+      if (!isCurrentNode) {
+        return false;
+      }
+
+      const counter = node.counter ?? 0;
+
+      if (segment.position === 'first' && counter !== 0) {
+        return false;
+      } else if (segment.position === 'odd' && counter % 2 !== 1) {
+        return false;
+      } else if (segment.position === 'even' && counter % 2 !== 0) {
+        return false;
+      } else if (segment.position === 'nth' && counter !== segment.positionValue) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Match any expression in the given set against the current path.
+   * @param {ExpressionSet} exprSet
+   * @returns {boolean}
+   */
+  matchesAny(exprSet) {
+    return exprSet.matchesAny(this);
+  }
+
+  /**
+   * Create a snapshot of current state.
+   * @returns {Object}
+   */
+  snapshot() {
+    return {
+      path: this.path.map(node => ({ ...node })),
+      siblingStacks: this.siblingStacks.map(level => level ? { counts: new Map(level.counts), total: level.total } : level),
+      keptAttrs: this._keptAttrs.map(entry => ({ ...entry }))
+    };
+  }
+
+  /**
+   * Restore state from snapshot.
+   * @param {Object} snapshot
+   */
+  restore(snapshot) {
+    this._pathStringCache = null;
+    this.path = snapshot.path.map(node => ({ ...node }));
+    this.siblingStacks = snapshot.siblingStacks.map(level => level ? { counts: new Map(level.counts), total: level.total } : level);
+    this._keptAttrs = (snapshot.keptAttrs || []).map(entry => ({ ...entry }));
+  }
+
+  /**
+   * Return the read-only {@link MatcherView} for this matcher.
+   *
+   * The same instance is returned on every call — no allocation occurs.
+   * It always reflects the current parser state and is safe to pass to
+   * user callbacks without risk of accidental mutation.
+   *
+   * @returns {MatcherView}
+   *
+   * @example
+   * const view = matcher.readOnly();
+   * // pass view to callbacks — it stays in sync automatically
+   * view.matches(expr);       // ✓
+   * view.getCurrentTag();     // ✓
+   * // view.push(...)         // ✗ method does not exist — caught by TypeScript
+   */
+  readOnly() {
+    return this._view;
+  }
+}
+
+;// CONCATENATED MODULE: ./node_modules/path-expression-matcher/src/Expression.js
+/**
+ * Expression - Parses and stores a tag pattern expression
+ * 
+ * Patterns are parsed once and stored in an optimized structure for fast matching.
+ * 
+ * @example
+ * const expr = new Expression("root.users.user");
+ * const expr2 = new Expression("..user[id]:first");
+ * const expr3 = new Expression("root/users/user", { separator: '/' });
+ */
+class Expression_Expression {
+  /**
+   * Create a new Expression
+   * @param {string} pattern - Pattern string (e.g., "root.users.user", "..user[id]")
+   * @param {Object} options - Configuration options
+   * @param {string} options.separator - Path separator (default: '.')
+   */
+  constructor(pattern, options = {}, data) {
+    this.pattern = pattern;
+    this.separator = options.separator || '.';
+    this.segments = this._parse(pattern);
+    this.data = data;
+    // Cache expensive checks for performance (O(1) instead of O(n))
+    this._hasDeepWildcard = this.segments.some(seg => seg.type === 'deep-wildcard');
+    this._hasAttributeCondition = this.segments.some(seg => seg.attrName !== undefined);
+    this._hasPositionSelector = this.segments.some(seg => seg.position !== undefined);
+  }
+
+  /**
+   * Parse pattern string into segments
+   * @private
+   * @param {string} pattern - Pattern to parse
+   * @returns {Array} Array of segment objects
+   */
+  _parse(pattern) {
+    const segments = [];
+
+    // Split by separator but handle ".." specially
+    let i = 0;
+    let currentPart = '';
+
+    while (i < pattern.length) {
+      if (pattern[i] === this.separator) {
+        // Check if next char is also separator (deep wildcard)
+        if (i + 1 < pattern.length && pattern[i + 1] === this.separator) {
+          // Flush current part if any
+          if (currentPart.trim()) {
+            segments.push(this._parseSegment(currentPart.trim()));
+            currentPart = '';
+          }
+          // Add deep wildcard
+          segments.push({ type: 'deep-wildcard' });
+          i += 2; // Skip both separators
+        } else {
+          // Regular separator
+          if (currentPart.trim()) {
+            segments.push(this._parseSegment(currentPart.trim()));
+          }
+          currentPart = '';
+          i++;
+        }
+      } else {
+        currentPart += pattern[i];
+        i++;
+      }
+    }
+
+    // Flush remaining part
+    if (currentPart.trim()) {
+      segments.push(this._parseSegment(currentPart.trim()));
+    }
+
+    return segments;
+  }
+
+  /**
+   * Parse a single segment
+   * @private
+   * @param {string} part - Segment string (e.g., "user", "ns::user", "user[id]", "ns::user:first")
+   * @returns {Object} Segment object
+   */
+  _parseSegment(part) {
+    const segment = { type: 'tag' };
+
+    // NEW NAMESPACE SYNTAX (v2.0):
+    // ============================
+    // Namespace uses DOUBLE colon (::)
+    // Position uses SINGLE colon (:)
+    // 
+    // Examples:
+    //   "user"              → tag
+    //   "user:first"        → tag + position
+    //   "user[id]"          → tag + attribute
+    //   "user[id]:first"    → tag + attribute + position
+    //   "ns::user"          → namespace + tag
+    //   "ns::user:first"    → namespace + tag + position
+    //   "ns::user[id]"      → namespace + tag + attribute
+    //   "ns::user[id]:first" → namespace + tag + attribute + position
+    //   "ns::first"         → namespace + tag named "first" (NO ambiguity!)
+    //
+    // This eliminates all ambiguity:
+    //   :: = namespace separator
+    //   :  = position selector
+    //   [] = attributes
+
+    // Step 1: Extract brackets [attr] or [attr=value]
+    let bracketContent = null;
+    let withoutBrackets = part;
+
+    const bracketMatch = part.match(/^([^\[]+)(\[[^\]]*\])(.*)$/);
+    if (bracketMatch) {
+      withoutBrackets = bracketMatch[1] + bracketMatch[3];
+      if (bracketMatch[2]) {
+        const content = bracketMatch[2].slice(1, -1);
+        if (content) {
+          bracketContent = content;
+        }
+      }
+    }
+
+    // Step 2: Check for namespace (double colon ::)
+    let namespace = undefined;
+    let tagAndPosition = withoutBrackets;
+
+    if (withoutBrackets.includes('::')) {
+      const nsIndex = withoutBrackets.indexOf('::');
+      namespace = withoutBrackets.substring(0, nsIndex).trim();
+      tagAndPosition = withoutBrackets.substring(nsIndex + 2).trim(); // Skip ::
+
+      if (!namespace) {
+        throw new Error(`Invalid namespace in pattern: ${part}`);
+      }
+    }
+
+    // Step 3: Parse tag and position (single colon :)
+    let tag = undefined;
+    let positionMatch = null;
+
+    if (tagAndPosition.includes(':')) {
+      const colonIndex = tagAndPosition.lastIndexOf(':'); // Use last colon for position
+      const tagPart = tagAndPosition.substring(0, colonIndex).trim();
+      const posPart = tagAndPosition.substring(colonIndex + 1).trim();
+
+      // Verify position is a valid keyword
+      const isPositionKeyword = ['first', 'last', 'odd', 'even'].includes(posPart) ||
+        /^nth\(\d+\)$/.test(posPart);
+
+      if (isPositionKeyword) {
+        tag = tagPart;
+        positionMatch = posPart;
+      } else {
+        // Not a valid position keyword, treat whole thing as tag
+        tag = tagAndPosition;
+      }
+    } else {
+      tag = tagAndPosition;
+    }
+
+    if (!tag) {
+      throw new Error(`Invalid segment pattern: ${part}`);
+    }
+
+    segment.tag = tag;
+    if (namespace) {
+      segment.namespace = namespace;
+    }
+
+    // Step 4: Parse attributes
+    if (bracketContent) {
+      if (bracketContent.includes('=')) {
+        const eqIndex = bracketContent.indexOf('=');
+        segment.attrName = bracketContent.substring(0, eqIndex).trim();
+        segment.attrValue = bracketContent.substring(eqIndex + 1).trim();
+      } else {
+        segment.attrName = bracketContent.trim();
+      }
+    }
+
+    // Step 5: Parse position selector
+    if (positionMatch) {
+      const nthMatch = positionMatch.match(/^nth\((\d+)\)$/);
+      if (nthMatch) {
+        segment.position = 'nth';
+        segment.positionValue = parseInt(nthMatch[1], 10);
+      } else {
+        segment.position = positionMatch;
+      }
+    }
+
+    return segment;
+  }
+
+  /**
+   * Get the number of segments
+   * @returns {number}
+   */
+  get length() {
+    return this.segments.length;
+  }
+
+  /**
+   * Check if expression contains deep wildcard
+   * @returns {boolean}
+   */
+  hasDeepWildcard() {
+    return this._hasDeepWildcard;
+  }
+
+  /**
+   * Check if expression has attribute conditions
+   * @returns {boolean}
+   */
+  hasAttributeCondition() {
+    return this._hasAttributeCondition;
+  }
+
+  /**
+   * Check if expression has position selectors
+   * @returns {boolean}
+   */
+  hasPositionSelector() {
+    return this._hasPositionSelector;
+  }
+
+  /**
+   * Get string representation
+   * @returns {string}
+   */
+  toString() {
+    return this.pattern;
+  }
+}
+;// CONCATENATED MODULE: ./node_modules/path-expression-matcher/src/ExpressionSet.js
+/**
+ * ExpressionSet - An indexed collection of Expressions for efficient bulk matching
+ *
+ * Instead of iterating all expressions on every tag, ExpressionSet pre-indexes
+ * them at insertion time by depth and terminal tag name. At match time, only
+ * the relevant bucket is evaluated — typically reducing checks from O(E) to O(1)
+ * lookup plus O(small bucket) matches.
+ *
+ * Three buckets are maintained:
+ *  - `_byDepthAndTag`  — exact depth + exact tag name  (tightest, used first)
+ *  - `_wildcardByDepth` — exact depth + wildcard tag `*` (depth-matched only)
+ *  - `_deepWildcards`  — expressions containing `..`  (cannot be depth-indexed)
+ *
+ * @example
+ * import { Expression, ExpressionSet } from 'fast-xml-tagger';
+ *
+ * // Build once at config time
+ * const stopNodes = new ExpressionSet();
+ * stopNodes.add(new Expression('root.users.user'));
+ * stopNodes.add(new Expression('root.config.setting'));
+ * stopNodes.add(new Expression('..script'));
+ *
+ * // Query on every tag — hot path
+ * if (stopNodes.matchesAny(matcher)) { ... }
+ */
+class ExpressionSet_ExpressionSet {
+  constructor() {
+    /** @type {Map<string, import('./Expression.js').default[]>} depth:tag → expressions */
+    this._byDepthAndTag = new Map();
+
+    /** @type {Map<number, import('./Expression.js').default[]>} depth → wildcard-tag expressions */
+    this._wildcardByDepth = new Map();
+
+    /** @type {import('./Expression.js').default[]} expressions containing deep wildcard (..) */
+    this._deepWildcards = [];
+
+    /** @type {Map<string, import('./Expression.js').default[]>} terminalTag → deep wildcard expressions */
+    this._deepByTerminalTag = new Map();
+
+    /** @type {Set<string>} pattern strings already added — used for deduplication */
+    this._patterns = new Set();
+
+    /** @type {boolean} whether the set is sealed against further additions */
+    this._sealed = false;
+  }
+
+  /**
+   * Add an Expression to the set.
+   * Duplicate patterns (same pattern string) are silently ignored.
+   *
+   * @param {import('./Expression.js').default} expression - A pre-constructed Expression instance
+   * @returns {this} for chaining
+   * @throws {TypeError} if called after seal()
+   *
+   * @example
+   * set.add(new Expression('root.users.user'));
+   * set.add(new Expression('..script'));
+   */
+  add(expression) {
+    if (this._sealed) {
+      throw new TypeError(
+        'ExpressionSet is sealed. Create a new ExpressionSet to add more expressions.'
+      );
+    }
+
+    // Deduplicate by pattern string
+    if (this._patterns.has(expression.pattern)) return this;
+    this._patterns.add(expression.pattern);
+
+    if (expression.hasDeepWildcard()) {
+      const lastSeg = expression.segments[expression.segments.length - 1];
+      if (lastSeg && lastSeg.type !== 'deep-wildcard' && lastSeg.tag !== '*') {
+        const tag = lastSeg.tag;
+        if (!this._deepByTerminalTag.has(tag)) this._deepByTerminalTag.set(tag, []);
+        this._deepByTerminalTag.get(tag).push(expression);
+      } else {
+        this._deepWildcards.push(expression);
+      }
+      return this;
+    }
+
+    const depth = expression.length;
+    const lastSeg = expression.segments[expression.segments.length - 1];
+    const tag = lastSeg?.tag;
+
+    if (!tag || tag === '*') {
+      // Can index by depth but not by tag
+      if (!this._wildcardByDepth.has(depth)) this._wildcardByDepth.set(depth, []);
+      this._wildcardByDepth.get(depth).push(expression);
+    } else {
+      // Tightest bucket: depth + tag
+      const key = `${depth}:${tag}`;
+      if (!this._byDepthAndTag.has(key)) this._byDepthAndTag.set(key, []);
+      this._byDepthAndTag.get(key).push(expression);
+    }
+
+    return this;
+  }
+
+  /**
+   * Add multiple expressions at once.
+   *
+   * @param {import('./Expression.js').default[]} expressions - Array of Expression instances
+   * @returns {this} for chaining
+   *
+   * @example
+   * set.addAll([
+   *   new Expression('root.users.user'),
+   *   new Expression('root.config.setting'),
+   * ]);
+   */
+  addAll(expressions) {
+    for (const expr of expressions) this.add(expr);
+    return this;
+  }
+
+  /**
+   * Check whether a pattern string is already present in the set.
+   *
+   * @param {import('./Expression.js').default} expression
+   * @returns {boolean}
+   */
+  has(expression) {
+    return this._patterns.has(expression.pattern);
+  }
+
+  /**
+   * Number of expressions in the set.
+   * @type {number}
+   */
+  get size() {
+    return this._patterns.size;
+  }
+
+  /**
+   * Seal the set against further modifications.
+   * Useful to prevent accidental mutations after config is built.
+   * Calling add() or addAll() on a sealed set throws a TypeError.
+   *
+   * @returns {this}
+   */
+  seal() {
+    this._sealed = true;
+    return this;
+  }
+
+  /**
+   * Whether the set has been sealed.
+   * @type {boolean}
+   */
+  get isSealed() {
+    return this._sealed;
+  }
+
+  /**
+   * Test whether the matcher's current path matches any expression in the set.
+   *
+   * Evaluation order (cheapest → most expensive):
+   *  1. Exact depth + tag bucket  — O(1) lookup, typically 0–2 expressions
+   *  2. Depth-only wildcard bucket — O(1) lookup, rare
+   *  3. Deep-wildcard list         — always checked, but usually small
+   *
+   * @param {import('./Matcher.js').default} matcher - Matcher instance (or readOnly view)
+   * @returns {boolean} true if any expression matches the current path
+   *
+   * @example
+   * if (stopNodes.matchesAny(matcher)) {
+   *   // handle stop node
+   * }
+   */
+  matchesAny(matcher) {
+    return this.findMatch(matcher) !== null;
+  }
+  /**
+ * Find and return the first Expression that matches the matcher's current path.
+ *
+ * Uses the same evaluation order as matchesAny (cheapest → most expensive):
+ *  1. Exact depth + tag bucket
+ *  2. Depth-only wildcard bucket
+ *  3. Deep-wildcard list
+ *
+ * @param {import('./Matcher.js').default} matcher - Matcher instance (or readOnly view)
+ * @returns {import('./Expression.js').default | null} the first matching Expression, or null
+ *
+ * @example
+ * const expr = stopNodes.findMatch(matcher);
+ * if (expr) {
+ *   // access expr.config, expr.pattern, etc.
+ * }
+ */
+  findMatch(matcher) {
+    const depth = matcher.getDepth();
+    const tag = matcher.getCurrentTag();
+
+    // 1. Tightest bucket — most expressions live here
+    const exactKey = `${depth}:${tag}`;
+    const exactBucket = this._byDepthAndTag.get(exactKey);
+    if (exactBucket) {
+      for (let i = 0; i < exactBucket.length; i++) {
+        if (matcher.matches(exactBucket[i])) return exactBucket[i];
+      }
+    }
+
+    // 2. Depth-matched wildcard-tag expressions
+    const wildcardBucket = this._wildcardByDepth.get(depth);
+    if (wildcardBucket) {
+      for (let i = 0; i < wildcardBucket.length; i++) {
+        if (matcher.matches(wildcardBucket[i])) return wildcardBucket[i];
+      }
+    }
+
+    // 3. Deep wildcards — indexed by terminal tag, then unindexed fallback
+    const deepBucket = this._deepByTerminalTag.get(tag);
+    if (deepBucket) {
+      for (let i = 0; i < deepBucket.length; i++) {
+        if (matcher.matches(deepBucket[i])) return deepBucket[i];
+      }
+    }
+    for (let i = 0; i < this._deepWildcards.length; i++) {
+      if (matcher.matches(this._deepWildcards[i])) return this._deepWildcards[i];
+    }
+
+    return null;
+  }
+}
+
+;// CONCATENATED MODULE: ./node_modules/@nodable/entities/src/entities.js
+// ---------------------------------------------------------------------------
+// Complete HTML5 named entity reference
+// Organized by logical categories for easy maintenance and selective importing
+// ---------------------------------------------------------------------------
+
+/**
+ * Basic Latin & Special Characters
+ * @type {Record<string, string>}
+ */
+const entities_BASIC_LATIN = {
+  amp: '&',
+  AMP: '&',
+  lt: '<',
+  LT: '<',
+  gt: '>',
+  GT: '>',
+  quot: '"',
+  QUOT: '"',
+  apos: "'",
+  lsquo: '‘',
+  rsquo: '’',
+  ldquo: '“',
+  rdquo: '”',
+  lsquor: '‚',
+  rsquor: '’',
+  ldquor: '„',
+  bdquo: '„',
+  comma: ',',
+  period: '.',
+  colon: ':',
+  semi: ';',
+  excl: '!',
+  quest: '?',
+  num: '#',
+  dollar: '$',
+  percent: '%',
+  ast: '*',
+  commat: '@',
+  lowbar: '_',
+  verbar: '|',
+  vert: '|',
+  sol: '/',
+  bsol: '\\',
+  lbrace: '{',
+  rbrace: '}',
+  lbrack: '[',
+  rbrack: ']',
+  lpar: '(',
+  rpar: ')',
+  nbsp: '\u00a0',
+  iexcl: '¡',
+  cent: '¢',
+  pound: '£',
+  curren: '¤',
+  yen: '¥',
+  brvbar: '¦',
+  sect: '§',
+  uml: '¨',
+  copy: '©',
+  COPY: '©',
+  ordf: 'ª',
+  laquo: '«',
+  not: '¬',
+  shy: '\u00ad',
+  reg: '®',
+  REG: '®',
+  macr: '¯',
+  deg: '°',
+  plusmn: '±',
+  sup2: '²',
+  sup3: '³',
+  acute: '´',
+  micro: 'µ',
+  para: '¶',
+  middot: '·',
+  cedil: '¸',
+  sup1: '¹',
+  ordm: 'º',
+  raquo: '»',
+  frac14: '¼',
+  frac12: '½',
+  half: '½',
+  frac34: '¾',
+  iquest: '¿',
+  times: '×',
+  div: '÷',
+  divide: '÷',
+};
+
+/**
+ * Latin Extended & Accented Letters (A-Z)
+ * @type {Record<string, string>}
+ */
+const entities_LATIN_ACCENTS = {
+  Agrave: 'À',
+  agrave: 'à',
+  Aacute: 'Á',
+  aacute: 'á',
+  Acirc: 'Â',
+  acirc: 'â',
+  Atilde: 'Ã',
+  atilde: 'ã',
+  Auml: 'Ä',
+  auml: 'ä',
+  Aring: 'Å',
+  aring: 'å',
+  AElig: 'Æ',
+  aelig: 'æ',
+  Ccedil: 'Ç',
+  ccedil: 'ç',
+  Egrave: 'È',
+  egrave: 'è',
+  Eacute: 'É',
+  eacute: 'é',
+  Ecirc: 'Ê',
+  ecirc: 'ê',
+  Euml: 'Ë',
+  euml: 'ë',
+  Igrave: 'Ì',
+  igrave: 'ì',
+  Iacute: 'Í',
+  iacute: 'í',
+  Icirc: 'Î',
+  icirc: 'î',
+  Iuml: 'Ï',
+  iuml: 'ï',
+  ETH: 'Ð',
+  eth: 'ð',
+  Ntilde: 'Ñ',
+  ntilde: 'ñ',
+  Ograve: 'Ò',
+  ograve: 'ò',
+  Oacute: 'Ó',
+  oacute: 'ó',
+  Ocirc: 'Ô',
+  ocirc: 'ô',
+  Otilde: 'Õ',
+  otilde: 'õ',
+  Ouml: 'Ö',
+  ouml: 'ö',
+  Oslash: 'Ø',
+  oslash: 'ø',
+  Ugrave: 'Ù',
+  ugrave: 'ù',
+  Uacute: 'Ú',
+  uacute: 'ú',
+  Ucirc: 'Û',
+  ucirc: 'û',
+  Uuml: 'Ü',
+  uuml: 'ü',
+  Yacute: 'Ý',
+  yacute: 'ý',
+  THORN: 'Þ',
+  thorn: 'þ',
+  szlig: 'ß',
+  yuml: 'ÿ',
+  Yuml: 'Ÿ',
+};
+
+/**
+ * Latin Extended (Letters with diacritics)
+ * @type {Record<string, string>}
+ */
+const entities_LATIN_EXTENDED = {
+  Amacr: 'Ā',
+  amacr: 'ā',
+  Abreve: 'Ă',
+  abreve: 'ă',
+  Aogon: 'Ą',
+  aogon: 'ą',
+  Cacute: 'Ć',
+  cacute: 'ć',
+  Ccirc: 'Ĉ',
+  ccirc: 'ĉ',
+  Cdot: 'Ċ',
+  cdot: 'ċ',
+  Ccaron: 'Č',
+  ccaron: 'č',
+  Dcaron: 'Ď',
+  dcaron: 'ď',
+  Dstrok: 'Đ',
+  dstrok: 'đ',
+  Emacr: 'Ē',
+  emacr: 'ē',
+  Ecaron: 'Ě',
+  ecaron: 'ě',
+  Edot: 'Ė',
+  edot: 'ė',
+  Eogon: 'Ę',
+  eogon: 'ę',
+  Gcirc: 'Ĝ',
+  gcirc: 'ĝ',
+  Gbreve: 'Ğ',
+  gbreve: 'ğ',
+  Gdot: 'Ġ',
+  gdot: 'ġ',
+  Gcedil: 'Ģ',
+  Hcirc: 'Ĥ',
+  hcirc: 'ĥ',
+  Hstrok: 'Ħ',
+  hstrok: 'ħ',
+  Itilde: 'Ĩ',
+  itilde: 'ĩ',
+  Imacr: 'Ī',
+  imacr: 'ī',
+  Iogon: 'Į',
+  iogon: 'į',
+  Idot: 'İ',
+  IJlig: 'Ĳ',
+  ijlig: 'ĳ',
+  Jcirc: 'Ĵ',
+  jcirc: 'ĵ',
+  Kcedil: 'Ķ',
+  kcedil: 'ķ',
+  kgreen: 'ĸ',
+  Lacute: 'Ĺ',
+  lacute: 'ĺ',
+  Lcedil: 'Ļ',
+  lcedil: 'ļ',
+  Lcaron: 'Ľ',
+  lcaron: 'ľ',
+  Lmidot: 'Ŀ',
+  lmidot: 'ŀ',
+  Lstrok: 'Ł',
+  lstrok: 'ł',
+  Nacute: 'Ń',
+  nacute: 'ń',
+  Ncaron: 'Ň',
+  ncaron: 'ň',
+  Ncedil: 'Ņ',
+  ncedil: 'ņ',
+  ENG: 'Ŋ',
+  eng: 'ŋ',
+  Omacr: 'Ō',
+  omacr: 'ō',
+  Odblac: 'Ő',
+  odblac: 'ő',
+  OElig: 'Œ',
+  oelig: 'œ',
+  Racute: 'Ŕ',
+  racute: 'ŕ',
+  Rcaron: 'Ř',
+  rcaron: 'ř',
+  Rcedil: 'Ŗ',
+  rcedil: 'ŗ',
+  Sacute: 'Ś',
+  sacute: 'ś',
+  Scirc: 'Ŝ',
+  scirc: 'ŝ',
+  Scedil: 'Ş',
+  scedil: 'ş',
+  Scaron: 'Š',
+  scaron: 'š',
+  Tcedil: 'Ţ',
+  tcedil: 'ţ',
+  Tcaron: 'Ť',
+  tcaron: 'ť',
+  Tstrok: 'Ŧ',
+  tstrok: 'ŧ',
+  Utilde: 'Ũ',
+  utilde: 'ũ',
+  Umacr: 'Ū',
+  umacr: 'ū',
+  Ubreve: 'Ŭ',
+  ubreve: 'ŭ',
+  Uring: 'Ů',
+  uring: 'ů',
+  Udblac: 'Ű',
+  udblac: 'ű',
+  Uogon: 'Ų',
+  uogon: 'ų',
+  Wcirc: 'Ŵ',
+  wcirc: 'ŵ',
+  Ycirc: 'Ŷ',
+  ycirc: 'ŷ',
+  Zacute: 'Ź',
+  zacute: 'ź',
+  Zdot: 'Ż',
+  zdot: 'ż',
+  Zcaron: 'Ž',
+  zcaron: 'ž',
+};
+
+/**
+ * Greek Letters
+ * @type {Record<string, string>}
+ */
+const entities_GREEK = {
+  Alpha: 'Α',
+  alpha: 'α',
+  Beta: 'Β',
+  beta: 'β',
+  Gamma: 'Γ',
+  gamma: 'γ',
+  Delta: 'Δ',
+  delta: 'δ',
+  Epsilon: 'Ε',
+  epsilon: 'ε',
+  epsiv: 'ϵ',
+  varepsilon: 'ϵ',
+  Zeta: 'Ζ',
+  zeta: 'ζ',
+  Eta: 'Η',
+  eta: 'η',
+  Theta: 'Θ',
+  theta: 'θ',
+  thetasym: 'ϑ',
+  vartheta: 'ϑ',
+  Iota: 'Ι',
+  iota: 'ι',
+  Kappa: 'Κ',
+  kappa: 'κ',
+  kappav: 'ϰ',
+  varkappa: 'ϰ',
+  Lambda: 'Λ',
+  lambda: 'λ',
+  Mu: 'Μ',
+  mu: 'μ',
+  Nu: 'Ν',
+  nu: 'ν',
+  Xi: 'Ξ',
+  xi: 'ξ',
+  Omicron: 'Ο',
+  omicron: 'ο',
+  Pi: 'Π',
+  pi: 'π',
+  piv: 'ϖ',
+  varpi: 'ϖ',
+  Rho: 'Ρ',
+  rho: 'ρ',
+  rhov: 'ϱ',
+  varrho: 'ϱ',
+  Sigma: 'Σ',
+  sigma: 'σ',
+  sigmaf: 'ς',
+  sigmav: 'ς',
+  varsigma: 'ς',
+  Tau: 'Τ',
+  tau: 'τ',
+  Upsilon: 'Υ',
+  upsilon: 'υ',
+  upsi: 'υ',
+  Upsi: 'ϒ',
+  upsih: 'ϒ',
+  Phi: 'Φ',
+  phi: 'φ',
+  phiv: 'ϕ',
+  varphi: 'ϕ',
+  Chi: 'Χ',
+  chi: 'χ',
+  Psi: 'Ψ',
+  psi: 'ψ',
+  Omega: 'Ω',
+  omega: 'ω',
+  ohm: 'Ω',
+  Gammad: 'Ϝ',
+  gammad: 'ϝ',
+  digamma: 'ϝ',
+};
+
+/**
+ * Cyrillic Letters
+ * @type {Record<string, string>}
+ */
+const entities_CYRILLIC = {
+  Afr: '𝔄',
+  afr: '𝔞',
+  Acy: 'А',
+  acy: 'а',
+  Bcy: 'Б',
+  bcy: 'б',
+  Vcy: 'В',
+  vcy: 'в',
+  Gcy: 'Г',
+  gcy: 'г',
+  Dcy: 'Д',
+  dcy: 'д',
+  IEcy: 'Е',
+  iecy: 'е',
+  IOcy: 'Ё',
+  iocy: 'ё',
+  ZHcy: 'Ж',
+  zhcy: 'ж',
+  Zcy: 'З',
+  zcy: 'з',
+  Icy: 'И',
+  icy: 'и',
+  Jcy: 'Й',
+  jcy: 'й',
+  Kcy: 'К',
+  kcy: 'к',
+  Lcy: 'Л',
+  lcy: 'л',
+  Mcy: 'М',
+  mcy: 'м',
+  Ncy: 'Н',
+  ncy: 'н',
+  Ocy: 'О',
+  ocy: 'о',
+  Pcy: 'П',
+  pcy: 'п',
+  Rcy: 'Р',
+  rcy: 'р',
+  Scy: 'С',
+  scy: 'с',
+  Tcy: 'Т',
+  tcy: 'т',
+  Ucy: 'У',
+  ucy: 'у',
+  Fcy: 'Ф',
+  fcy: 'ф',
+  KHcy: 'Х',
+  khcy: 'х',
+  TScy: 'Ц',
+  tscy: 'ц',
+  CHcy: 'Ч',
+  chcy: 'ч',
+  SHcy: 'Ш',
+  shcy: 'ш',
+  SHCHcy: 'Щ',
+  shchcy: 'щ',
+  HARDcy: 'Ъ',
+  hardcy: 'ъ',
+  Ycy: 'Ы',
+  ycy: 'ы',
+  SOFTcy: 'Ь',
+  softcy: 'ь',
+  Ecy: 'Э',
+  ecy: 'э',
+  YUcy: 'Ю',
+  yucy: 'ю',
+  YAcy: 'Я',
+  yacy: 'я',
+  DJcy: 'Ђ',
+  djcy: 'ђ',
+  GJcy: 'Ѓ',
+  gjcy: 'ѓ',
+  Jukcy: 'Є',
+  jukcy: 'є',
+  DScy: 'Ѕ',
+  dscy: 'ѕ',
+  Iukcy: 'І',
+  iukcy: 'і',
+  YIcy: 'Ї',
+  yicy: 'ї',
+  Jsercy: 'Ј',
+  jsercy: 'ј',
+  LJcy: 'Љ',
+  ljcy: 'љ',
+  NJcy: 'Њ',
+  njcy: 'њ',
+  TSHcy: 'Ћ',
+  tshcy: 'ћ',
+  KJcy: 'Ќ',
+  kjcy: 'ќ',
+  Ubrcy: 'Ў',
+  ubrcy: 'ў',
+  DZcy: 'Џ',
+  dzcy: 'џ',
+};
+
+/**
+ * Mathematical Operators & Relations
+ * @type {Record<string, string>}
+ */
+const entities_MATH = {
+  plus: '+',
+  pm: '±',
+  times: '×',
+  div: '÷',
+  divide: '÷',
+  sdot: '⋅',
+  star: '☆',
+  starf: '★',
+  bigstar: '★',
+  lowast: '∗',
+  ast: '*',
+  midast: '*',
+  compfn: '∘',
+  smallcircle: '∘',
+  bullet: '•',
+  bull: '•',
+  nbsp: '\u00a0',
+  hellip: '…',
+  mldr: '…',
+  prime: '′',
+  Prime: '″',
+  tprime: '‴',
+  bprime: '‵',
+  backprime: '‵',
+  minus: '−',
+  minusd: '∸',
+  dotminus: '∸',
+  plusdo: '∔',
+  dotplus: '∔',
+  plusmn: '±',
+  minusplus: '∓',
+  mnplus: '∓',
+  mp: '∓',
+  setminus: '∖',
+  smallsetminus: '∖',
+  Backslash: '∖',
+  setmn: '∖',
+  ssetmn: '∖',
+  lowbar: '_',
+  verbar: '|',
+  vert: '|',
+  VerticalLine: '|',
+  colon: ':',
+  Colon: '∷',
+  Proportion: '∷',
+  ratio: '∶',
+  equals: '=',
+  ne: '≠',
+  nequiv: '≢',
+  equiv: '≡',
+  Congruent: '≡',
+  sim: '∼',
+  thicksim: '∼',
+  thksim: '∼',
+  sime: '≃',
+  simeq: '≃',
+  TildeEqual: '≃',
+  asymp: '≈',
+  approx: '≈',
+  thickapprox: '≈',
+  thkap: '≈',
+  TildeTilde: '≈',
+  ncong: '≇',
+  cong: '≅',
+  TildeFullEqual: '≅',
+  asympeq: '≍',
+  CupCap: '≍',
+  bump: '≎',
+  Bumpeq: '≎',
+  HumpDownHump: '≎',
+  bumpe: '≏',
+  bumpeq: '≏',
+  HumpEqual: '≏',
+  le: '≤',
+  LessEqual: '≤',
+  ge: '≥',
+  GreaterEqual: '≥',
+  lesseqgtr: '⋚',
+  lesseqqgtr: '⪋',
+  greater: '>',
+  less: '<',
+};
+
+/**
+ * Mathematical Operators (Advanced)
+ * @type {Record<string, string>}
+ */
+const entities_MATH_ADVANCED = {
+  alefsym: 'ℵ',
+  aleph: 'ℵ',
+  beth: 'ℶ',
+  gimel: 'ℷ',
+  daleth: 'ℸ',
+  forall: '∀',
+  ForAll: '∀',
+  part: '∂',
+  PartialD: '∂',
+  exist: '∃',
+  Exists: '∃',
+  nexist: '∄',
+  nexists: '∄',
+  empty: '∅',
+  emptyset: '∅',
+  emptyv: '∅',
+  varnothing: '∅',
+  nabla: '∇',
+  Del: '∇',
+  isin: '∈',
+  isinv: '∈',
+  in: '∈',
+  Element: '∈',
+  notin: '∉',
+  notinva: '∉',
+  ni: '∋',
+  niv: '∋',
+  SuchThat: '∋',
+  ReverseElement: '∋',
+  notni: '∌',
+  notniva: '∌',
+  prod: '∏',
+  Product: '∏',
+  coprod: '∐',
+  Coproduct: '∐',
+  sum: '∑',
+  Sum: '∑',
+  minus: '−',
+  mp: '∓',
+  plusdo: '∔',
+  dotplus: '∔',
+  setminus: '∖',
+  lowast: '∗',
+  radic: '√',
+  Sqrt: '√',
+  prop: '∝',
+  propto: '∝',
+  Proportional: '∝',
+  varpropto: '∝',
+  infin: '∞',
+  infintie: '⧝',
+  ang: '∠',
+  angle: '∠',
+  angmsd: '∡',
+  measuredangle: '∡',
+  angsph: '∢',
+  mid: '∣',
+  VerticalBar: '∣',
+  nmid: '∤',
+  nsmid: '∤',
+  npar: '∦',
+  parallel: '∥',
+  spar: '∥',
+  nparallel: '∦',
+  nspar: '∦',
+  and: '∧',
+  wedge: '∧',
+  or: '∨',
+  vee: '∨',
+  cap: '∩',
+  cup: '∪',
+  int: '∫',
+  Integral: '∫',
+  conint: '∮',
+  ContourIntegral: '∮',
+  Conint: '∯',
+  DoubleContourIntegral: '∯',
+  Cconint: '∰',
+  there4: '∴',
+  therefore: '∴',
+  Therefore: '∴',
+  becaus: '∵',
+  because: '∵',
+  Because: '∵',
+  ratio: '∶',
+  Proportion: '∷',
+  minusd: '∸',
+  dotminus: '∸',
+  mDDot: '∺',
+  homtht: '∻',
+  sim: '∼',
+  bsimg: '∽',
+  backsim: '∽',
+  ac: '∾',
+  mstpos: '∾',
+  acd: '∿',
+  VerticalTilde: '≀',
+  wr: '≀',
+  wreath: '≀',
+  nsime: '≄',
+  nsimeq: '≄',
+  ncong: '≇',
+  simne: '≆',
+  ncongdot: '⩭̸',
+  ngsim: '≵',
+  nsim: '≁',
+  napprox: '≉',
+  nap: '≉',
+  ngeq: '≱',
+  nge: '≱',
+  nleq: '≰',
+  nle: '≰',
+  ngtr: '≯',
+  ngt: '≯',
+  nless: '≮',
+  nlt: '≮',
+  nprec: '⊀',
+  npr: '⊀',
+  nsucc: '⊁',
+  nsc: '⊁',
+};
+
+/**
+ * Arrows
+ * @type {Record<string, string>}
+ */
+const entities_ARROWS = {
+  larr: '←',
+  leftarrow: '←',
+  LeftArrow: '←',
+  uarr: '↑',
+  uparrow: '↑',
+  UpArrow: '↑',
+  rarr: '→',
+  rightarrow: '→',
+  RightArrow: '→',
+  darr: '↓',
+  downarrow: '↓',
+  DownArrow: '↓',
+  harr: '↔',
+  leftrightarrow: '↔',
+  LeftRightArrow: '↔',
+  varr: '↕',
+  updownarrow: '↕',
+  UpDownArrow: '↕',
+  nwarr: '↖',
+  nwarrow: '↖',
+  UpperLeftArrow: '↖',
+  nearr: '↗',
+  nearrow: '↗',
+  UpperRightArrow: '↗',
+  searr: '↘',
+  searrow: '↘',
+  LowerRightArrow: '↘',
+  swarr: '↙',
+  swarrow: '↙',
+  LowerLeftArrow: '↙',
+  lArr: '⇐',
+  Leftarrow: '⇐',
+  uArr: '⇑',
+  Uparrow: '⇑',
+  rArr: '⇒',
+  Rightarrow: '⇒',
+  dArr: '⇓',
+  Downarrow: '⇓',
+  hArr: '⇔',
+  Leftrightarrow: '⇔',
+  iff: '⇔',
+  vArr: '⇕',
+  Updownarrow: '⇕',
+  lAarr: '⇚',
+  Lleftarrow: '⇚',
+  rAarr: '⇛',
+  Rrightarrow: '⇛',
+  lrarr: '⇆',
+  leftrightarrows: '⇆',
+  rlarr: '⇄',
+  rightleftarrows: '⇄',
+  lrhar: '⇋',
+  leftrightharpoons: '⇋',
+  ReverseEquilibrium: '⇋',
+  rlhar: '⇌',
+  rightleftharpoons: '⇌',
+  Equilibrium: '⇌',
+  udarr: '⇅',
+  UpArrowDownArrow: '⇅',
+  duarr: '⇵',
+  DownArrowUpArrow: '⇵',
+  llarr: '⇇',
+  leftleftarrows: '⇇',
+  rrarr: '⇉',
+  rightrightarrows: '⇉',
+  ddarr: '⇊',
+  downdownarrows: '⇊',
+  har: '↽',
+  lhard: '↽',
+  leftharpoondown: '↽',
+  lharu: '↼',
+  leftharpoonup: '↼',
+  rhard: '⇁',
+  rightharpoondown: '⇁',
+  rharu: '⇀',
+  rightharpoonup: '⇀',
+  lsh: '↰',
+  Lsh: '↰',
+  rsh: '↱',
+  Rsh: '↱',
+  ldsh: '↲',
+  rdsh: '↳',
+  hookleftarrow: '↩',
+  hookrightarrow: '↪',
+  mapstoleft: '↤',
+  mapstoup: '↥',
+  map: '↦',
+  mapsto: '↦',
+  mapstodown: '↧',
+  crarr: '↵',
+  nleftarrow: '↚',
+  nleftrightarrow: '↮',
+  nrightarrow: '↛',
+  nrarr: '↛',
+  larrtl: '↢',
+  rarrtl: '↣',
+  leftarrowtail: '↢',
+  rightarrowtail: '↣',
+  twoheadleftarrow: '↞',
+  twoheadrightarrow: '↠',
+  Larr: '↞',
+  Rarr: '↠',
+  larrhk: '↩',
+  rarrhk: '↪',
+  larrlp: '↫',
+  looparrowleft: '↫',
+  rarrlp: '↬',
+  looparrowright: '↬',
+  harrw: '↭',
+  leftrightsquigarrow: '↭',
+  nrarrw: '↝̸',
+  rarrw: '↝',
+  rightsquigarrow: '↝',
+  larrbfs: '⤟',
+  rarrbfs: '⤠',
+  nvHarr: '⤄',
+  nvlArr: '⤂',
+  nvrArr: '⤃',
+  larrfs: '⤝',
+  rarrfs: '⤞',
+  Map: '⤅',
+  larrsim: '⥳',
+  rarrsim: '⥴',
+  harrcir: '⥈',
+  Uarrocir: '⥉',
+  lurdshar: '⥊',
+  ldrdhar: '⥧',
+  ldrushar: '⥋',
+  rdldhar: '⥩',
+  lrhard: '⥭',
+  uharr: '↾',
+  uharl: '↿',
+  dharr: '⇂',
+  dharl: '⇃',
+  Uarr: '↟',
+  Darr: '↡',
+  zigrarr: '⇝',
+  nwArr: '⇖',
+  neArr: '⇗',
+  seArr: '⇘',
+  swArr: '⇙',
+  nharr: '↮',
+  nhArr: '⇎',
+  nlarr: '↚',
+  nlArr: '⇍',
+  nrArr: '⇏',
+  larrb: '⇤',
+  LeftArrowBar: '⇤',
+  rarrb: '⇥',
+  RightArrowBar: '⇥',
+};
+
+/**
+ * Geometric Shapes
+ * @type {Record<string, string>}
+ */
+const entities_SHAPES = {
+  square: '□',
+  Square: '□',
+  squ: '□',
+  squf: '▪',
+  squarf: '▪',
+  blacksquar: '▪',
+  blacksquare: '▪',
+  FilledVerySmallSquare: '▪',
+  blk34: '▓',
+  blk12: '▒',
+  blk14: '░',
+  block: '█',
+  srect: '▭',
+  rect: '▭',
+  sdot: '⋅',
+  sdotb: '⊡',
+  dotsquare: '⊡',
+  triangle: '▵',
+  tri: '▵',
+  trine: '▵',
+  utri: '▵',
+  triangledown: '▿',
+  dtri: '▿',
+  tridown: '▿',
+  triangleleft: '◃',
+  ltri: '◃',
+  triangleright: '▹',
+  rtri: '▹',
+  blacktriangle: '▴',
+  utrif: '▴',
+  blacktriangledown: '▾',
+  dtrif: '▾',
+  blacktriangleleft: '◂',
+  ltrif: '◂',
+  blacktriangleright: '▸',
+  rtrif: '▸',
+  loz: '◊',
+  lozenge: '◊',
+  blacklozenge: '⧫',
+  lozf: '⧫',
+  bigcirc: '◯',
+  xcirc: '◯',
+  circ: 'ˆ',
+  Circle: '○',
+  cir: '○',
+  o: '○',
+  bullet: '•',
+  bull: '•',
+  hellip: '…',
+  mldr: '…',
+  nldr: '‥',
+  boxh: '─',
+  HorizontalLine: '─',
+  boxv: '│',
+  boxdr: '┌',
+  boxdl: '┐',
+  boxur: '└',
+  boxul: '┘',
+  boxvr: '├',
+  boxvl: '┤',
+  boxhd: '┬',
+  boxhu: '┴',
+  boxvh: '┼',
+  boxH: '═',
+  boxV: '║',
+  boxdR: '╒',
+  boxDr: '╓',
+  boxDR: '╔',
+  boxDl: '╕',
+  boxdL: '╖',
+  boxDL: '╗',
+  boxuR: '╘',
+  boxUr: '╙',
+  boxUR: '╚',
+  boxUl: '╜',
+  boxuL: '╛',
+  boxUL: '╝',
+  boxvR: '╞',
+  boxVr: '╟',
+  boxVR: '╠',
+  boxVl: '╢',
+  boxvL: '╡',
+  boxVL: '╣',
+  boxHd: '╤',
+  boxhD: '╥',
+  boxHD: '╦',
+  boxHu: '╧',
+  boxhU: '╨',
+  boxHU: '╩',
+  boxvH: '╪',
+  boxVh: '╫',
+  boxVH: '╬',
+};
+
+/**
+ * Punctuation & Diacritics
+ * @type {Record<string, string>}
+ */
+const entities_PUNCTUATION = {
+  excl: '!',
+  iexcl: '¡',
+  brvbar: '¦',
+  sect: '§',
+  uml: '¨',
+  copy: '©',
+  ordf: 'ª',
+  laquo: '«',
+  not: '¬',
+  shy: '\u00ad',
+  reg: '®',
+  macr: '¯',
+  deg: '°',
+  plusmn: '±',
+  sup2: '²',
+  sup3: '³',
+  acute: '´',
+  micro: 'µ',
+  para: '¶',
+  middot: '·',
+  cedil: '¸',
+  sup1: '¹',
+  ordm: 'º',
+  raquo: '»',
+  frac14: '¼',
+  frac12: '½',
+  frac34: '¾',
+  iquest: '¿',
+  nbsp: '\u00a0',
+  comma: ',',
+  period: '.',
+  colon: ':',
+  semi: ';',
+  vert: '|',
+  Verbar: '‖',
+  verbar: '|',
+  dblac: '˝',
+  circ: 'ˆ',
+  caron: 'ˇ',
+  breve: '˘',
+  dot: '˙',
+  ring: '˚',
+  ogon: '˛',
+  tilde: '˜',
+  DiacriticalGrave: '`',
+  DiacriticalAcute: '´',
+  DiacriticalTilde: '˜',
+  DiacriticalDot: '˙',
+  DiacriticalDoubleAcute: '˝',
+  grave: '`',
+};
+
+/**
+ * Currency Symbols
+ * @type {Record<string, string>}
+ */
+const entities_CURRENCY = {
+  cent: '¢',
+  pound: '£',
+  curren: '¤',
+  yen: '¥',
+  euro: '€',
+  dollar: '$',
+  fnof: 'ƒ',
+  inr: '₹',
+  af: '؋',
+  birr: 'ብር',
+  peso: '₱',
+  rub: '₽',
+  won: '₩',
+  yuan: '¥',
+  cedil: '¸',
+};
+
+/**
+ * Fractions
+ * @type {Record<string, string>}
+ */
+const entities_FRACTIONS = {
+  frac12: '½',
+  half: '½',
+  frac13: '⅓',
+  frac14: '¼',
+  frac15: '⅕',
+  frac16: '⅙',
+  frac18: '⅛',
+  frac23: '⅔',
+  frac25: '⅖',
+  frac34: '¾',
+  frac35: '⅗',
+  frac38: '⅜',
+  frac45: '⅘',
+  frac56: '⅚',
+  frac58: '⅝',
+  frac78: '⅞',
+  frasl: '⁄',
+};
+
+/**
+ * Miscellaneous Symbols
+ * @type {Record<string, string>}
+ */
+const entities_MISC_SYMBOLS = {
+  trade: '™',
+  TRADE: '™',
+  telrec: '⌕',
+  target: '⌖',
+  ulcorn: '⌜',
+  ulcorner: '⌜',
+  urcorn: '⌝',
+  urcorner: '⌝',
+  dlcorn: '⌞',
+  llcorner: '⌞',
+  drcorn: '⌟',
+  lrcorner: '⌟',
+  intercal: '⊺',
+  intcal: '⊺',
+  oplus: '⊕',
+  CirclePlus: '⊕',
+  ominus: '⊖',
+  CircleMinus: '⊖',
+  otimes: '⊗',
+  CircleTimes: '⊗',
+  osol: '⊘',
+  odot: '⊙',
+  CircleDot: '⊙',
+  oast: '⊛',
+  circledast: '⊛',
+  odash: '⊝',
+  circleddash: '⊝',
+  ocirc: '⊚',
+  circledcirc: '⊚',
+  boxplus: '⊞',
+  plusb: '⊞',
+  boxminus: '⊟',
+  minusb: '⊟',
+  boxtimes: '⊠',
+  timesb: '⊠',
+  boxdot: '⊡',
+  sdotb: '⊡',
+  veebar: '⊻',
+  vee: '∨',
+  barvee: '⊽',
+  and: '∧',
+  wedge: '∧',
+  Cap: '⋒',
+  Cup: '⋓',
+  Fork: '⋔',
+  pitchfork: '⋔',
+  epar: '⋕',
+  ltlarr: '⥶',
+  nvap: '≍⃒',
+  nvsim: '∼⃒',
+  nvge: '≥⃒',
+  nvle: '≤⃒',
+  nvlt: '<⃒',
+  nvgt: '>⃒',
+  nvltrie: '⊴⃒',
+  nvrtrie: '⊵⃒',
+  Vdash: '⊩',
+  dashv: '⊣',
+  vDash: '⊨',
+  Vvdash: '⊪',
+  nvdash: '⊬',
+  nvDash: '⊭',
+  nVdash: '⊮',
+  nVDash: '⊯',
+};
+
+const entities_XML = {
+  amp: "&",
+  apos: "'",
+  gt: ">",
+  lt: "<",
+  quot: "\""
+}
+const entities_COMMON_HTML = {
+  nbsp: '\u00a0',
+  copy: '\u00a9',
+  reg: '\u00ae',
+  trade: '\u2122',
+  mdash: '\u2014',
+  ndash: '\u2013',
+  hellip: '\u2026',
+  laquo: '\u00ab',
+  raquo: '\u00bb',
+  lsquo: '\u2018',
+  rsquo: '\u2019',
+  ldquo: '\u201c',
+  rdquo: '\u201d',
+  bull: '\u2022',
+  para: '\u00b6',
+  sect: '\u00a7',
+  deg: '\u00b0',
+  frac12: '\u00bd',
+  frac14: '\u00bc',
+  frac34: '\u00be',
+}
+// ---------------------------------------------------------------------------
+// Note: NUMERIC_ENTITIES (&#NNN; / &#xHH;) are handled by the scanner directly
+// via String.fromCodePoint() without any map lookup.
+// ---------------------------------------------------------------------------
+;// CONCATENATED MODULE: ./node_modules/@nodable/entities/src/EntityDecoder.js
+// ---------------------------------------------------------------------------
+// Built-in named entity map  (name → replacement string)
+// No regex, no {regex,val} objects — just flat key/value pairs.
+// ---------------------------------------------------------------------------
+
+
+
+// ---------------------------------------------------------------------------
+// Entity hook action constants
+// ---------------------------------------------------------------------------
+
+/**
+ * Action constants for `onExternalEntity` and `onInputEntity` hooks.
+ *
+ * Use these instead of raw strings to avoid typos:
+ *
+ * @example
+ * import EntityDecoder, { ENTITY_ACTION } from './EntityDecoder.js';
+ * const dec = new EntityDecoder({
+ *   onInputEntity: (name, value) => ENTITY_ACTION.BLOCK,
+ * });
+ */
+const EntityDecoder_ENTITY_ACTION = Object.freeze({
+  /** Resolve and expand the entity normally. */
+  ALLOW: 'allow',
+  /** Silently skip this entity — it will not be registered. */
+  BLOCK: 'block',
+  /** Throw an error, aborting entity registration entirely. */
+  THROW: 'throw',
+});
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const EntityDecoder_SPECIAL_CHARS = new Set('!?\\\\/[]$%{}^&*()<>|+');
+
+/**
+ * Validate that an entity name contains no dangerous characters.
+ * @param {string} name
+ * @returns {string} the name, unchanged
+ * @throws {Error} on invalid characters
+ */
+function src_EntityDecoder_validateEntityName(name) {
+  if (name[0] === '#') {
+    throw new Error(`[EntityReplacer] Invalid character '#' in entity name: "${name}"`);
+  }
+  for (const ch of name) {
+    if (EntityDecoder_SPECIAL_CHARS.has(ch)) {
+      throw new Error(`[EntityReplacer] Invalid character '${ch}' in entity name: "${name}"`);
+    }
+  }
+  return name;
+}
+
+/**
+ * Merge one or more entity maps into a flat name→string map.
+ * Accepts either:
+ *   - plain string values:             { amp: '&' }
+ *   - legacy {regex,val} / {regx,val}: { lt: { regex: /.../, val: '<' } }
+ *
+ * Values containing '&' are skipped (recursive expansion risk).
+ *
+ * @param {...object} maps
+ * @returns {Record<string, string>}
+ */
+function EntityDecoder_mergeEntityMaps(...maps) {
+  const out = Object.create(null);
+  for (const map of maps) {
+    if (!map) continue;
+    for (const key of Object.keys(map)) {
+      const raw = map[key];
+      if (typeof raw === 'string') {
+        out[key] = raw;
+      } else if (raw && typeof raw === 'object' && raw.val !== undefined) {
+        // Legacy {regex,val} or {regx,val} — extract the string val only
+        const val = raw.val;
+        if (typeof val === 'string') {
+          out[key] = val;
+        }
+        // function vals are not supported in the scanner — skip
+      }
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// applyLimitsTo helpers
+// ---------------------------------------------------------------------------
+
+const EntityDecoder_LIMIT_TIER_EXTERNAL = 'external'; // input/runtime + persistent external maps
+const EntityDecoder_LIMIT_TIER_BASE = 'base';     // DEFAULT_XML_ENTITIES + namedEntities (system) maps
+const EntityDecoder_LIMIT_TIER_ALL = 'all';      // every entity regardless of tier
+
+/**
+ * Resolve `applyLimitsTo` option into a normalised Set of tier strings.
+ * Accepted values: 'external' | 'base' | 'all' | string[]
+ * Default: 'external' (only untrusted injected entities are counted).
+ * @param {string|string[]|undefined} raw
+ * @returns {Set<string>}
+ */
+function EntityDecoder_parseLimitTiers(raw) {
+  if (!raw || raw === EntityDecoder_LIMIT_TIER_EXTERNAL) return new Set([EntityDecoder_LIMIT_TIER_EXTERNAL]);
+  if (raw === EntityDecoder_LIMIT_TIER_ALL) return new Set([EntityDecoder_LIMIT_TIER_ALL]);
+  if (raw === EntityDecoder_LIMIT_TIER_BASE) return new Set([EntityDecoder_LIMIT_TIER_BASE]);
+  if (Array.isArray(raw)) return new Set(raw);
+  return new Set([EntityDecoder_LIMIT_TIER_EXTERNAL]); // safe default for unrecognised values
+}
+
+// ---------------------------------------------------------------------------
+// NCR (Numeric Character Reference) classification
+// ---------------------------------------------------------------------------
+
+// Severity order — higher number = stricter action.
+// Used to enforce minimum action levels for specific codepoint ranges.
+const EntityDecoder_NCR_LEVEL = Object.freeze({ allow: 0, leave: 1, remove: 2, throw: 3 });
+
+// XML 1.0 §2.2: allowed chars are #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
+// Restricted C0: U+0001–U+001F excluding U+0009, U+000A, U+000D
+const EntityDecoder_XML10_ALLOWED_C0 = new Set([0x09, 0x0A, 0x0D]);
+
+/**
+ * Parse the `ncr` constructor option into flat, hot-path-friendly fields.
+ * @param {object|undefined} ncr
+ * @returns {{ xmlVersion: number, onLevel: number, nullLevel: number }}
+ */
+function EntityDecoder_parseNCRConfig(ncr) {
+  if (!ncr) {
+    return { xmlVersion: 1.0, onLevel: EntityDecoder_NCR_LEVEL.allow, nullLevel: EntityDecoder_NCR_LEVEL.remove };
+  }
+  const xmlVersion = ncr.xmlVersion === 1.1 ? 1.1 : 1.0;
+  const onLevel = EntityDecoder_NCR_LEVEL[ncr.onNCR] ?? EntityDecoder_NCR_LEVEL.allow;
+  const nullLevel = EntityDecoder_NCR_LEVEL[ncr.nullNCR] ?? EntityDecoder_NCR_LEVEL.remove;
+  // 'allow' is not meaningful for null — clamp to at least 'remove'
+  const clampedNull = Math.max(nullLevel, EntityDecoder_NCR_LEVEL.remove);
+  return { xmlVersion, onLevel, nullLevel: clampedNull };
+}
+
+// ---------------------------------------------------------------------------
+// EntityReplacer
+// ---------------------------------------------------------------------------
+
+/**
+ * Single-pass, zero-regex entity replacer for XML/HTML content.
+ *
+ * Algorithm: scan the string once for '&', read to ';', resolve via map
+ * or direct codepoint conversion, build output chunks, join once at the end.
+ *
+ * Entity lookup priority (highest → lowest):
+ *   1. input / runtime  (DOCTYPE entities for current document)
+ *   2. persistent external (survive across documents)
+ *   3. base named map   (DEFAULT_XML_ENTITIES + user-supplied namedEntities)
+ *
+ * Both input and external resolve as the 'external' tier for limit purposes.
+ * Base map entities resolve as the 'base' tier.
+ *
+ * Numeric / hex references (&#NNN; / &#xHH;) are resolved directly via
+ * String.fromCodePoint() — no map needed. They count as 'base' tier.
+ *
+ * @example
+ * const replacer = new EntityReplacer({ namedEntities: COMMON_HTML });
+ * replacer.setExternalEntities({ brand: 'Acme' });
+ *
+ * const instance = replacer.reset();
+ * instance.addInputEntities({ version: '1.0' });
+ * instance.encode('&brand; v&version; &lt;'); // 'Acme v1.0 <'
+ */
+class EntityDecoder_EntityDecoder {
+  /**
+   * @param {object} [options]
+   * @param {object|null}  [options.namedEntities]        — extra named entities merged into base map
+   * @param {object}  [options.limit]                 — security limits
+   * @param {number}       [options.limit.maxTotalExpansions=0]  — 0 = unlimited
+   * @param {number}       [options.limit.maxExpandedLength=0]   — 0 = unlimited
+   * @param {'external'|'base'|'all'|string[]} [options.limit.applyLimitsTo='external']
+   *   Which entity tiers count against the security limits:
+   *   - 'external' (default) — only input/runtime + persistent external entities
+   *   - 'base'               — only DEFAULT_XML_ENTITIES + namedEntities
+   *   - 'all'                — every entity regardless of tier
+   *   - string[]             — explicit combination, e.g. ['external', 'base']
+   * @param {((resolved: string, original: string) => string)|null} [options.postCheck=null]
+   * @param {string[]} [options.remove=[]] — entity names (e.g. ['nbsp', '#13']) to delete (replace with empty string)
+   * @param {string[]} [options.leave=[]]  — entity names to keep as literal (unchanged in output)
+   * @param {object}   [options.ncr]       — Numeric Character Reference controls
+   * @param {1.0|1.1}  [options.ncr.xmlVersion=1.0]
+   *   XML version governing which codepoint ranges are restricted:
+   *   - 1.0 — C0 controls U+0001–U+001F (except U+0009/000A/000D) are prohibited
+   *   - 1.1 — C0 controls are allowed when written as NCRs; C1 (U+007F–U+009F) decoded as-is
+   * @param {'allow'|'leave'|'remove'|'throw'} [options.ncr.onNCR='allow']
+   *   Base action for numeric references. Severity order: allow < leave < remove < throw.
+   *   For codepoint ranges that carry a minimum level (surrogates → remove, XML 1.0 C0 → remove),
+   *   the effective action is max(onNCR, rangeMinimum).
+   * @param {'remove'|'throw'} [options.ncr.nullNCR='remove']
+   *   Action for U+0000 (null). 'allow' and 'leave' are clamped to 'remove' since null is never safe.
+   * @param {((name: string, value: string) => 'allow'|'block'|'throw')|null} [options.onExternalEntity=null]
+   *   Hook called when an external entity is registered via `setExternalEntities()` or
+   *   `addExternalEntity()`. Return `ENTITY_ACTION.ALLOW` to accept the entity,
+   *   `ENTITY_ACTION.BLOCK` to silently skip it, or `ENTITY_ACTION.THROW` to abort with an error.
+   * @param {((name: string, value: string) => 'allow'|'block'|'throw')|null} [options.onInputEntity=null]
+   *   Hook called when an input entity is registered via `addInputEntities()`. Return
+   *   `ENTITY_ACTION.ALLOW` to accept, `ENTITY_ACTION.BLOCK` to silently skip, or
+   *   `ENTITY_ACTION.THROW` to abort with an error.
+   */
+  constructor(options = {}) {
+    this._limit = options.limit || {};
+    this._maxTotalExpansions = this._limit.maxTotalExpansions || 0;
+    this._maxExpandedLength = this._limit.maxExpandedLength || 0;
+    this._postCheck = typeof options.postCheck === 'function' ? options.postCheck : r => r;
+    this._limitTiers = EntityDecoder_parseLimitTiers(this._limit.applyLimitsTo ?? EntityDecoder_LIMIT_TIER_EXTERNAL);
+    this._numericAllowed = options.numericAllowed ?? true;
+    // Base map: DEFAULT_XML_ENTITIES + user-supplied extras. Immutable after construction.
+    this._baseMap = EntityDecoder_mergeEntityMaps(entities_XML, options.namedEntities || null);
+
+    // Persistent external entities — survive across documents.
+    // Stored as a separate map so reset() never touches them.
+    /** @type {Record<string, string>} */
+    this._externalMap = Object.create(null);
+
+    // Input / runtime entities — current document only, wiped on reset().
+    /** @type {Record<string, string>} */
+    this._inputMap = Object.create(null);
+
+    // Per-document counters
+    this._totalExpansions = 0;
+    this._expandedLength = 0;
+
+    // --- New: remove / leave sets ---
+    /** @type {Set<string>} */
+    this._removeSet = new Set(options.remove && Array.isArray(options.remove) ? options.remove : []);
+    /** @type {Set<string>} */
+    this._leaveSet = new Set(options.leave && Array.isArray(options.leave) ? options.leave : []);
+
+    // --- NCR config (parsed into flat fields for hot-path speed) ---
+    const ncrCfg = EntityDecoder_parseNCRConfig(options.ncr);
+    this._ncrXmlVersion = ncrCfg.xmlVersion;
+    this._ncrOnLevel = ncrCfg.onLevel;
+    this._ncrNullLevel = ncrCfg.nullLevel;
+
+    // --- Registration hooks ---
+    /** @type {((name: string, value: string) => 'allow'|'block'|'throw')|null} */
+    this._onExternalEntity = typeof options.onExternalEntity === 'function'
+      ? options.onExternalEntity
+      : null;
+    /** @type {((name: string, value: string) => 'allow'|'block'|'throw')|null} */
+    this._onInputEntity = typeof options.onInputEntity === 'function'
+      ? options.onInputEntity
+      : null;
+  }
+
+  // -------------------------------------------------------------------------
+  // Private: registration hook dispatch
+  // -------------------------------------------------------------------------
+
+  /**
+   * Invoke a registration hook for a single entity name/value pair.
+   * Returns true when the entity should be accepted, false when it should be
+   * silently skipped (BLOCK), and throws when the hook returns THROW.
+   *
+   * @param {((name: string, value: string) => 'allow'|'block'|'throw')|null} hook
+   * @param {string} name
+   * @param {string} value
+   * @param {string} context  — used in error messages ('external' | 'input')
+   * @returns {boolean}  true = accept, false = skip
+   */
+  _applyRegistrationHook(hook, name, value, context) {
+    if (!hook) return true; // no hook → always accept
+    const action = hook(name, value);
+    if (action === EntityDecoder_ENTITY_ACTION.BLOCK) return false;
+    if (action === EntityDecoder_ENTITY_ACTION.THROW) {
+      throw new Error(
+        `[EntityDecoder] Registration of ${context} entity "&${name};" was rejected by hook`
+      );
+    }
+    return true; // ALLOW or any unknown return value → accept
+  }
+
+  // -------------------------------------------------------------------------
+  // Persistent external entity registration
+  // -------------------------------------------------------------------------
+
+  /**
+   * Replace the full set of persistent external entities.
+   * All keys are validated — throws on invalid characters.
+   * If `onExternalEntity` is set, it is called once per entry; entries that
+   * return `ENTITY_ACTION.BLOCK` are silently omitted, `ENTITY_ACTION.THROW`
+   * aborts the whole call.
+   * @param {Record<string, string | { regex?: RegExp, val: string }>} map
+   */
+  setExternalEntities(map) {
+    if (map) {
+      for (const key of Object.keys(map)) {
+        src_EntityDecoder_validateEntityName(key);
+      }
+    }
+    if (!this._onExternalEntity) {
+      this._externalMap = EntityDecoder_mergeEntityMaps(map);
+      return;
+    }
+    // Hook present — resolve values first, then filter
+    const flat = EntityDecoder_mergeEntityMaps(map);
+    const filtered = Object.create(null);
+    for (const [name, value] of Object.entries(flat)) {
+      if (this._applyRegistrationHook(this._onExternalEntity, name, value, 'external')) {
+        filtered[name] = value;
+      }
+    }
+    this._externalMap = filtered;
+  }
+
+  /**
+   * Add a single persistent external entity.
+   * If `onExternalEntity` is set it is called before the entity is stored;
+   * `ENTITY_ACTION.BLOCK` silently skips storage, `ENTITY_ACTION.THROW` raises.
+   * @param {string} key
+   * @param {string} value
+   */
+  addExternalEntity(key, value) {
+    src_EntityDecoder_validateEntityName(key);
+    if (typeof value === 'string' && value.indexOf('&') === -1) {
+      if (this._applyRegistrationHook(this._onExternalEntity, key, value, 'external')) {
+        this._externalMap[key] = value;
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Input / runtime entity registration (per document)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Inject DOCTYPE entities for the current document.
+   * Also resets per-document expansion counters.
+   * If `onInputEntity` is set it is called once per entry; entries returning
+   * `ENTITY_ACTION.BLOCK` are silently omitted, `ENTITY_ACTION.THROW` aborts.
+   * @param {Record<string, string | { regx?: RegExp, regex?: RegExp, val: string }>} map
+   */
+  addInputEntities(map) {
+    this._totalExpansions = 0;
+    this._expandedLength = 0;
+    if (!this._onInputEntity) {
+      this._inputMap = EntityDecoder_mergeEntityMaps(map);
+      return;
+    }
+    const flat = EntityDecoder_mergeEntityMaps(map);
+    const filtered = Object.create(null);
+    for (const [name, value] of Object.entries(flat)) {
+      if (this._applyRegistrationHook(this._onInputEntity, name, value, 'input')) {
+        filtered[name] = value;
+      }
+    }
+    this._inputMap = filtered;
+  }
+
+  // -------------------------------------------------------------------------
+  // Per-document reset
+  // -------------------------------------------------------------------------
+
+  /**
+   * Wipe input/runtime entities and reset counters.
+   * Call this before processing each new document.
+   * @returns {this}
+   */
+  reset() {
+    this._inputMap = Object.create(null);
+    this._totalExpansions = 0;
+    this._expandedLength = 0;
+    return this;
+  }
+
+  // -------------------------------------------------------------------------
+  // XML version (can be set after construction, e.g. once parser reads <?xml?>)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Update the XML version used for NCR classification.
+   * Call this as soon as the document's `<?xml version="...">` declaration is parsed.
+   * @param {1.0|1.1|number} version
+   */
+  setXmlVersion(version) {
+    this._ncrXmlVersion = version === 1.1 ? 1.1 : 1.0;
+  }
+
+  // -------------------------------------------------------------------------
+  // Primary API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Replace all entity references in `str` in a single pass.
+   *
+   * @param {string} str
+   * @returns {string}
+   */
+  decode(str) {
+    if (typeof str !== 'string' || str.length === 0) return str;
+    //TODO: check if needed
+    if (str.indexOf('&') === -1) return str; // fast path — no entities at all
+
+    const original = str;
+    const chunks = [];
+    const len = str.length;
+    let last = 0; // start of next unprocessed literal chunk
+    let i = 0;
+
+    const limitExpansions = this._maxTotalExpansions > 0;
+    const limitLength = this._maxExpandedLength > 0;
+    const checkLimits = limitExpansions || limitLength;
+
+    while (i < len) {
+      // Scan forward to next '&'
+      if (str.charCodeAt(i) !== 38 /* '&' */) { i++; continue; }
+
+      // --- Found '&' at position i ---
+
+      // Scan forward to ';'
+      let j = i + 1;
+      while (j < len && str.charCodeAt(j) !== 59 /* ';' */ && (j - i) <= 32) j++;
+
+      if (j >= len || str.charCodeAt(j) !== 59) {
+        // No closing ';' within window — treat '&' as literal
+        i++;
+        continue;
+      }
+
+      // Raw token between '&' and ';' (exclusive)
+      const token = str.slice(i + 1, j);
+      if (token.length === 0) { i++; continue; }
+
+      let replacement;
+      let tier; // which limit tier this entity belongs to
+
+      if (this._removeSet.has(token)) {
+        // Remove entity: replace with empty string
+        replacement = '';
+        // If entity was unknown (replacement undefined), we still need a tier for limits.
+        // Treat as external tier because it's user-directed removal of an unknown reference.
+        if (tier === undefined) {
+          tier = EntityDecoder_LIMIT_TIER_EXTERNAL;
+        }
+      } else if (this._leaveSet.has(token)) {
+        // Do not replace — keep original &token; as literal
+        i++;
+        continue;
+      } else if (token.charCodeAt(0) === 35 /* '#' */) {
+        // ---- Numeric / NCR reference ----
+        // NCR classification always runs first — prohibited codepoints must be
+        // caught regardless of numericAllowed.
+        const ncrResult = this._resolveNCR(token);
+        if (ncrResult === undefined) {
+          // 'leave' action — keep original &token; as-is
+          i++;
+          continue;
+        }
+        replacement = ncrResult; // '' for remove, char string for allow
+        tier = EntityDecoder_LIMIT_TIER_BASE;
+      } else {
+        // ---- Named reference ----
+        const resolved = this._resolveName(token);
+        replacement = resolved?.value;
+        tier = resolved?.tier;
+      }
+
+      if (replacement === undefined) {
+        // Unknown entity — leave as-is, advance past '&' only
+        i++;
+        continue;
+      }
+
+      // Flush literal chunk before this entity
+      if (i > last) chunks.push(str.slice(last, i));
+      chunks.push(replacement);
+      last = j + 1; // skip past ';'
+      i = last;
+
+      // Apply expansion limits only if this tier is being tracked
+      if (checkLimits && this._tierCounts(tier)) {
+        if (limitExpansions) {
+          this._totalExpansions++;
+          if (this._totalExpansions > this._maxTotalExpansions) {
+            throw new Error(
+              `[EntityReplacer] Entity expansion count limit exceeded: ` +
+              `${this._totalExpansions} > ${this._maxTotalExpansions}`
+            );
+          }
+        }
+        if (limitLength) {
+          // delta: replacement.length minus the raw &token; length (token.length + 2 for '&' and ';')
+          const delta = replacement.length - (token.length + 2);
+          if (delta > 0) {
+            this._expandedLength += delta;
+            if (this._expandedLength > this._maxExpandedLength) {
+              throw new Error(
+                `[EntityReplacer] Expanded content length limit exceeded: ` +
+                `${this._expandedLength} > ${this._maxExpandedLength}`
+              );
+            }
+          }
+        }
+      }
+    }
+
+    // Flush trailing literal
+    if (last < len) chunks.push(str.slice(last));
+
+    // If nothing was replaced, chunks is empty — return original
+    const result = chunks.length === 0 ? str : chunks.join('');
+
+    return this._postCheck(result, original);
+  }
+
+  // -------------------------------------------------------------------------
+  // Private: limit tier check
+  // -------------------------------------------------------------------------
+
+  /**
+   * Returns true if a resolved entity of the given tier should count
+   * against the expansion/length limits.
+   * @param {string} tier  — LIMIT_TIER_EXTERNAL | LIMIT_TIER_BASE
+   * @returns {boolean}
+   */
+  _tierCounts(tier) {
+    if (this._limitTiers.has(EntityDecoder_LIMIT_TIER_ALL)) return true;
+    return this._limitTiers.has(tier);
+  }
+
+  // -------------------------------------------------------------------------
+  // Private: entity resolution
+  // -------------------------------------------------------------------------
+
+  /**
+   * Resolve a named entity token (without & and ;).
+   * Priority: inputMap > externalMap > baseMap
+   * Returns the resolved value tagged with its limit tier.
+   *
+   * @param {string} name
+   * @returns {{ value: string, tier: string }|undefined}
+   */
+  _resolveName(name) {
+    // input and external both count as 'external' tier for limit purposes —
+    // they are injected at runtime and are the untrusted surface.
+    if (name in this._inputMap) return { value: this._inputMap[name], tier: EntityDecoder_LIMIT_TIER_EXTERNAL };
+    if (name in this._externalMap) return { value: this._externalMap[name], tier: EntityDecoder_LIMIT_TIER_EXTERNAL };
+    if (name in this._baseMap) return { value: this._baseMap[name], tier: EntityDecoder_LIMIT_TIER_BASE };
+    return undefined;
+  }
+
+  /**
+   * Classify a codepoint and return the minimum action level that must be applied.
+   * Returns -1 when no minimum is imposed (normal allow path).
+   *
+   * Ranges checked (in priority order):
+   *   1. U+0000            — null, governed by nullNCR (always ≥ remove)
+   *   2. U+D800–U+DFFF     — surrogates, always prohibited (min: remove)
+   *   3. U+0001–U+001F \ {0x09,0x0A,0x0D}  — XML 1.0 restricted C0 (min: remove)
+   *      (skipped in XML 1.1 — C0 controls are allowed when written as NCRs)
+   *
+   * @param {number} cp  — codepoint
+   * @returns {number}   — minimum NCR_LEVEL value, or -1 for no restriction
+   */
+  _classifyNCR(cp) {
+    // 1. Null
+    if (cp === 0) return this._ncrNullLevel;
+
+    // 2. Surrogates — always prohibited, minimum 'remove'
+    if (cp >= 0xD800 && cp <= 0xDFFF) return EntityDecoder_NCR_LEVEL.remove;
+
+    // 3. XML 1.0 restricted C0 controls
+    if (this._ncrXmlVersion === 1.0) {
+      if (cp >= 0x01 && cp <= 0x1F && !EntityDecoder_XML10_ALLOWED_C0.has(cp)) return EntityDecoder_NCR_LEVEL.remove;
+    }
+
+    return -1; // no restriction
+  }
+
+  /**
+   * Execute a resolved NCR action.
+   *
+   * @param {number} action   — NCR_LEVEL value
+   * @param {string} token    — raw token (e.g. '#38') for error messages
+   * @param {number} cp       — codepoint, used only for error messages
+   * @returns {string|undefined}
+   *   - decoded character string  → 'allow'
+   *   - ''                        → 'remove'
+   *   - undefined                 → 'leave' (caller must skip past '&' only)
+   *   - throws Error              → 'throw'
+   */
+  _applyNCRAction(action, token, cp) {
+    switch (action) {
+      case EntityDecoder_NCR_LEVEL.allow: return String.fromCodePoint(cp);
+      case EntityDecoder_NCR_LEVEL.remove: return '';
+      case EntityDecoder_NCR_LEVEL.leave: return undefined; // signal: keep literal
+      case EntityDecoder_NCR_LEVEL.throw:
+        throw new Error(
+          `[EntityDecoder] Prohibited numeric character reference ` +
+          `&${token}; (U+${cp.toString(16).toUpperCase().padStart(4, '0')})`
+        );
+      default: return String.fromCodePoint(cp);
+    }
+  }
+
+  /**
+   * Full NCR resolution pipeline for a numeric token.
+   *
+   * Steps:
+   *   1. Parse the codepoint (decimal or hex).
+   *   2. Validate the raw codepoint range (NaN, <0, >0x10FFFF).
+   *   3. If numericAllowed is false and no minimum restriction applies → leave as-is.
+   *   4. Classify the codepoint to find the minimum required action level.
+   *   5. Resolve effective action = max(onNCR, minimum).
+   *   6. Apply and return.
+   *
+   * @param {string} token  — e.g. '#38', '#x26', '#X26'
+   * @returns {string|undefined}
+   *   - string (incl. '')  — replacement ('' = remove)
+   *   - undefined          — leave original &token; as-is
+   */
+  _resolveNCR(token) {
+    // Step 1: parse codepoint
+    const second = token.charCodeAt(1);
+    let cp;
+    if (second === 120 /* x */ || second === 88 /* X */) {
+      cp = parseInt(token.slice(2), 16);
+    } else {
+      cp = parseInt(token.slice(1), 10);
+    }
+
+    // Step 2: out-of-range → leave as-is unconditionally
+    if (Number.isNaN(cp) || cp < 0 || cp > 0x10FFFF) return undefined;
+
+    // Step 3: classify to get minimum action level
+    const minimum = this._classifyNCR(cp);
+
+    // Step 4: if numericAllowed is false and no hard minimum → leave
+    if (!this._numericAllowed && minimum < EntityDecoder_NCR_LEVEL.remove) return undefined;
+
+    // Step 5: effective action = max(configured onNCR, range minimum)
+    const effective = minimum === -1
+      ? this._ncrOnLevel
+      : Math.max(this._ncrOnLevel, minimum);
+
+    // Step 6: apply
+    return this._applyNCRAction(effective, token, cp);
+  }
+}
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/sql.js
+/**
+ * SQL context patterns — high-precision rules only.
+ *
+ * These rules have very low false-positive risk and are safe to apply to
+ * general user text (names, descriptions, search queries, etc.).
+ * All patterns are ReDoS-safe — unlike the `sql-injection` npm package
+ * which has an active CVE on its own detection regexes.
+ *
+ * For exhaustive coverage including noisier heuristics (comment sequences,
+ * hex literals, stacked queries with semicolons), use 'SQL-STRICT' instead.
+ * Apply 'SQL-STRICT' only to strings that are specifically SQL fragments,
+ * not to general free-text fields.
+ */
+
+const sql_SQL_PATTERNS = [
+  {
+    id: 'sql-block-comment-open',
+    description: 'SQL block comment open: /* ... */ — unusual in legitimate user text',
+    pattern: /\/\*/,
+  },
+  {
+    id: 'sql-union-select',
+    description: 'UNION SELECT — most common SQL injection aggregation attack',
+    pattern: /\bUNION\s{1,20}(?:ALL\s{1,20})?SELECT\b/i,
+  },
+  {
+    id: 'sql-drop-table',
+    description: 'DROP TABLE — destructive DDL injection',
+    pattern: /\bDROP\s{1,20}TABLE\b/i,
+  },
+  {
+    id: 'sql-drop-database',
+    description: 'DROP DATABASE — destructive DDL injection',
+    pattern: /\bDROP\s{1,20}DATABASE\b/i,
+  },
+  {
+    id: 'sql-insert-into',
+    description: 'INSERT INTO — data injection',
+    pattern: /\bINSERT\s{1,20}INTO\b/i,
+  },
+  {
+    id: 'sql-delete-from',
+    description: 'DELETE FROM — data deletion injection',
+    pattern: /\bDELETE\s{1,20}FROM\b/i,
+  },
+  {
+    id: 'sql-update-set',
+    description: 'UPDATE ... SET — data modification injection',
+    // Allows arbitrary content between UPDATE and SET (table name, alias, etc.)
+    pattern: /\bUPDATE\b[\s\S]{1,60}\bSET\b/i,
+  },
+  {
+    id: 'sql-exec-xp',
+    description: 'EXEC xp_ — MSSQL extended stored procedure execution',
+    pattern: /\bEXEC(?:UTE)?\s{1,20}xp_/i,
+  },
+  {
+    id: 'sql-tautology-string',
+    description: "Classic string tautology: ' OR '1'='1 or \" OR \"1\"=\"1\"",
+    // Last quote is optional — injection may truncate it: ' OR '1'='1--
+    pattern: /'\s{0,10}OR\s{0,10}'[^']{0,20}'\s*=\s*'[^']{0,20}/i,
+  },
+  {
+    id: 'sql-tautology-numeric',
+    description: 'Numeric tautology: OR 1=1',
+    pattern: /\bOR\s{1,10}1\s*=\s*1\b/i,
+  },
+  {
+    id: 'sql-always-true-zero',
+    description: 'Numeric tautology: OR 0=0',
+    pattern: /\bOR\s{1,10}0\s*=\s*0\b/i,
+  },
+  {
+    id: 'sql-sleep-benchmark',
+    description: 'Time-based blind injection: SLEEP() or BENCHMARK()',
+    pattern: /\b(?:SLEEP|BENCHMARK)\s*\(/i,
+  },
+  {
+    id: 'sql-waitfor-delay',
+    description: 'MSSQL time-based blind injection: WAITFOR DELAY',
+    pattern: /\bWAITFOR\s{1,20}DELAY\b/i,
+  },
+  {
+    id: 'sql-char-function',
+    description: 'CHAR() function — used to obfuscate injected strings',
+    pattern: /\bCHAR\s*\(\s*\d{1,3}/i,
+  },
+  {
+    id: 'sql-information-schema',
+    description: 'INFORMATION_SCHEMA — reconnaissance query for table/column enumeration',
+    pattern: /\bINFORMATION_SCHEMA\b/i,
+  },
+];
+
+/* harmony default export */ const contexts_sql = (sql_SQL_PATTERNS);
+
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/sql-strict.js
+/**
+ * SQL-STRICT context patterns.
+ *
+ * Extends the base 'SQL' context with three additional rules that are
+ * effective at detecting real injections but carry a higher false-positive
+ * risk on general free-text input.
+ *
+ * Use 'SQL-STRICT' when:
+ *   - The string is specifically a SQL fragment or database identifier
+ *   - You control the input domain (e.g. a dedicated SQL search field)
+ *   - You can tolerate occasional false positives in exchange for broader coverage
+ *
+ * Use 'SQL' (not STRICT) when:
+ *   - The field is general user text (names, descriptions, comments)
+ *   - False positives would block legitimate content (e.g. "see note -- above")
+ *
+ * Rules moved here from 'SQL' due to false-positive risk:
+ *
+ *   sql-line-comment   — "--" fires on "see note -- above", "value--", CSS var(--primary)
+ *   sql-stacked-query  — "; SELECT" fires on legitimate prose with semicolons + SQL words
+ *   sql-hex-encoding   — "0xDEAD" fires on hex values in technical docs and log output
+ */
+
+
+
+const sql_strict_SQL_STRICT_EXTRA = [
+  {
+    id: 'sql-line-comment',
+    description: 'SQL line comment: -- followed by whitespace or end of string',
+    pattern: /--(?:\s|$)/,
+  },
+  {
+    id: 'sql-stacked-query',
+    description: 'Stacked queries: semicolon immediately followed by a SQL keyword',
+    pattern: /;\s{0,10}(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC)\b/i,
+  },
+  {
+    id: 'sql-hex-encoding',
+    description: 'Hex-encoded string injection: 0x41414141 style (MySQL)',
+    pattern: /\b0x[0-9a-f]{4,}/i,
+  },
+];
+
+// SQL-STRICT = all base SQL rules + the three noisy extras
+const sql_strict_SQL_STRICT_PATTERNS = [...contexts_sql, ...sql_strict_SQL_STRICT_EXTRA];
+
+/* harmony default export */ const contexts_sql_strict = (sql_strict_SQL_STRICT_PATTERNS);
+
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/util/decode-entities.js
+/**
+ * Decode the HTML character references that matter for markup-context
+ * detection.
+ *
+ * Browsers decode character references in attribute values before they
+ * interpret a URL, so `javascript&#58;alert(1)` in an href is the
+ * `javascript:` scheme. The HTML/XML/SVG rules match literal characters, so
+ * without this step such payloads slip through.
+ *
+ * Deliberately NOT a full entity decoder. It decodes only:
+ *   - decimal refs  &#58;  &#058;  &#00000058;  &#58   (any leading zeros,
+ *                   trailing ; optional — browsers accept both)
+ *   - hex refs      &#x3a; &#X3A; &#x0000003a; &#x3a   (same)
+ *   - named refs    &colon;  &Tab;  &NewLine;
+ *       Named refs are CASE-SENSITIVE and REQUIRE the trailing ';', exactly
+ *       like a browser (so `&COLON;` and `&colon` are not decoded).
+ *       &Tab; / &NewLine; matter because the URL parser strips tab/newline,
+ *       so `java&Tab;script:` is still a javascript: URL.
+ *
+ * It does NOT decode &amp; (single pass only), so double-encoded text such as
+ * "&amp;lt;script&amp;gt;" stays literal — a browser renders that as text.
+ *
+ * All quantifiers are bounded; no ReDoS risk.
+ *
+ * @param {string} input
+ * @returns {string}
+ */
+const decode_entities_NAMED = Object.freeze({
+  colon: ':',
+  Tab: '\t',
+  NewLine: '\n',
+});
+
+const decode_entities_ENTITY_RE =
+  /&(?:#[xX]0*([0-9a-fA-F]{1,6});?|#0*([0-9]{1,7});?|([a-zA-Z][a-zA-Z0-9]{1,15});)/g;
+
+function decode_entities_decodeEntities(input) {
+  if (input.indexOf('&') === -1) return input;
+
+  return input.replace(decode_entities_ENTITY_RE, (match, hex, dec, name) => {
+    if (name !== undefined) {
+      return Object.prototype.hasOwnProperty.call(decode_entities_NAMED, name) ? decode_entities_NAMED[name] : match;
+    }
+    const cp = hex !== undefined ? parseInt(hex, 16) : parseInt(dec, 10);
+    if (!Number.isFinite(cp) || cp > 0x10ffff) return match;
+    return String.fromCodePoint(cp);
+  });
+}
+
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/html.js
+/**
+ * HTML context patterns.
+ *
+ * Detects XSS vectors that are dangerous when a string ends up rendered as HTML.
+ * All patterns use bounded quantifiers to ensure linear-time matching (ReDoS-safe).
+ *
+ * Each entry is { pattern: RegExp, id: string, description: string }
+ * so callers can inspect which rule fired if they need to.
+ */
+
+const html_HTML_PATTERNS = [
+  {
+    id: 'html-script-open',
+    description: '<script opening tag',
+    pattern: /<script[\s>/]/i,
+  },
+  {
+    id: 'html-script-close',
+    description: '</script closing tag',
+    pattern: /<\/script[\s>]/i,
+  },
+  {
+    id: 'html-javascript-protocol',
+    description: 'javascript: URI scheme (with optional whitespace/encoding)',
+    // Handles j&#x61;vascript:, j\u0061vascript:, and whitespace variants
+    pattern: /j[\t\n\r ]*a[\t\n\r ]*v[\t\n\r ]*a[\t\n\r ]*s[\t\n\r ]*c[\t\n\r ]*r[\t\n\r ]*i[\t\n\r ]*p[\t\n\r ]*t[\t\n\r ]*:/i,
+  },
+  {
+    id: 'html-vbscript-protocol',
+    description: 'vbscript: URI scheme',
+    pattern: /vbscript[\t\n\r ]*:/i,
+  },
+  {
+    id: 'html-data-html',
+    description: 'data:text/html URI — can execute scripts in browsers',
+    pattern: /data[\t\n\r ]*:[\t\n\r ]*text\/html/i,
+  },
+  {
+    id: 'html-data-xhtml',
+    description: 'data:application/xhtml+xml URI',
+    pattern: /data[\t\n\r ]*:[\t\n\r ]*application\/xhtml/i,
+  },
+  {
+    id: 'html-data-svg',
+    description: 'data:image/svg+xml URI — can execute scripts',
+    pattern: /data[\t\n\r ]*:[\t\n\r ]*image\/svg\+xml/i,
+  },
+  {
+    id: 'html-inline-event-handler',
+    description: 'Inline event handler attributes: onclick=, onerror=, onload=, etc.',
+    // \bon ensures we match a word boundary so "phonetic=" is not caught
+    pattern: /\bon\w{1,30}\s*=/i,
+  },
+  {
+    id: 'html-entity-obfuscated-script',
+    description: 'HTML-entity-encoded <script (e.g. &#x3C;script or &lt;script)',
+    // Entities include optional trailing semicolon: &#x3C; or &#x3C (both valid in HTML5)
+    pattern: /(?:&#x0*3[Cc];?|&#0*60;?|&lt;)\s*script/i,
+  },
+  {
+    id: 'html-entity-obfuscated-javascript',
+    description: 'HTML-entity-encoded javascript: (partial — catches common &#106; or &#x6a; for "j")',
+    pattern: /(?:&#x0*6[Aa];?|&#0*106;?)\s*(?:&#x0*61;?|a)[\s\S]{0,80}script\s*:/i,
+  },
+  {
+    id: 'html-style-expression',
+    description: 'CSS expression() — IE-era code execution in style attributes',
+    pattern: /style[\s\S]{0,20}expression\s*\(/i,
+  },
+  {
+    id: 'html-object-embed',
+    description: '<object or <embed tags that can load active content',
+    pattern: /<(?:object|embed)[\s>/]/i,
+  },
+  {
+    id: 'html-base-tag',
+    description: '<base href= — can hijack all relative URLs on a page',
+    pattern: /<base[\s>]/i,
+  },
+  {
+    id: 'html-meta-refresh',
+    description: '<meta http-equiv="refresh" — can redirect users',
+    pattern: /<meta[\s\S]{0,40}http-equiv[\s\S]{0,20}refresh/i,
+  },
+  {
+    id: 'html-srcdoc',
+    description: 'srcdoc= attribute on iframes — embeds HTML that can run scripts',
+    pattern: /srcdoc\s*=/i,
+  },
+  {
+    id: 'html-iframe',
+    description: '<iframe tag',
+    pattern: /<iframe[\s>/]/i,
+  },
+  {
+    id: 'html-form',
+    description: '<form tag — can be used for phishing / credential harvesting injection',
+    pattern: /<form[\s>/]/i,
+  },
+];
+
+/* harmony default export */ const contexts_html = (html_HTML_PATTERNS);
+
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/xml.js
+/**
+ * XML context patterns.
+ *
+ * Detects injection vectors that are specifically dangerous when a string
+ * is inserted into an XML document (not HTML rendering context).
+ *
+ * Key distinction from HTML: these patterns target parser-level attacks —
+ * things that can confuse or subvert an XML parser, trigger external entity
+ * resolution, or inject DTD content. HTML rendering concerns (XSS) belong
+ * in the HTML context.
+ */
+
+const xml_XML_PATTERNS = [
+  {
+    id: 'xml-cdata-injection',
+    description: 'CDATA section injection: <![CDATA[ breaks out of text node context',
+    pattern: /<!\[CDATA\[/i,
+  },
+  {
+    id: 'xml-cdata-close',
+    description: 'CDATA close sequence: ]]> can terminate an enclosing CDATA section',
+    pattern: /\]\]>/,
+  },
+  {
+    id: 'xml-processing-instruction',
+    description: 'XML processing instruction: <?xml-stylesheet or <?php etc.',
+    pattern: /<\?(?:xml[\- ]|php|asp)/i,
+  },
+  {
+    id: 'xml-doctype-injection',
+    description: 'DOCTYPE declaration embedded in content — can define entities',
+    // Match <!DOCTYPE followed by end-of-string, whitespace, or [ (internal subset)
+    pattern: /<!DOCTYPE(?:[\s[]|$)/i,
+  },
+  {
+    id: 'xml-entity-system',
+    description: 'SYSTEM keyword — used in external entity declarations (XXE)',
+    pattern: /\bSYSTEM\s+["']/i,
+  },
+  {
+    id: 'xml-entity-public',
+    description: 'PUBLIC keyword — used in external entity declarations (XXE)',
+    pattern: /\bPUBLIC\s+["']/i,
+  },
+  {
+    id: 'xml-entity-declaration',
+    description: '<!ENTITY declaration — defines entities, potential XXE or entity expansion',
+    pattern: /<!ENTITY[\s%]/i,
+  },
+  {
+    id: 'xml-billion-laughs',
+    description: 'Entity reference chaining / billion laughs: repeated &eX; style references',
+    // Heuristic: 3+ consecutive entity refs suggests expansion attack
+    pattern: /(?:&\w{1,20};){3,}/,
+  },
+  {
+    id: 'xml-namespace-confusion',
+    description: 'xmlns: attribute injection — can redefine namespaces to confuse parsers',
+    // pattern: /\bxmlns\s*(?::\w{1,40})?\s*=/i,
+    pattern: /\bxmlns(?::\w{1,40})?\s*=/i,
+  },
+  {
+    id: 'xml-comment-injection',
+    description: '<!-- comment injection — can hide content from some parsers',
+    pattern: /<!--/,
+  },
+  {
+    id: 'xml-comment-close',
+    description: '--> closes an enclosing XML comment',
+    pattern: /-->/,
+  },
+  {
+    id: 'xml-pi-close',
+    description: '?> closes an enclosing processing instruction',
+    pattern: /\?>/,
+  },
+];
+
+/* harmony default export */ const contexts_xml = (xml_XML_PATTERNS);
+
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/svg.js
+/**
+ * SVG context patterns.
+ *
+ * SVG is XML-based but renders in browsers, giving it a unique attack surface
+ * that combines XML parser behaviour with browser rendering and JavaScript execution.
+ *
+ * Many of these vectors bypass HTML sanitizers that don't understand SVG semantics
+ * (DOMPurify has documented bypass vulnerabilities specifically in SVG/XML context).
+ */
+
+const svg_SVG_PATTERNS = [
+  {
+    id: 'svg-script-element',
+    description: '<script element inside SVG executes JavaScript',
+    pattern: /<script[\s>/]/i,
+  },
+  {
+    id: 'svg-xlink-href-javascript',
+    description: 'xlink:href with javascript: — classic SVG XSS via <a> or <use>',
+    pattern: /xlink\s*:\s*href\s*=\s*["']?\s*javascript\s*:/i,
+  },
+  {
+    id: 'svg-href-javascript',
+    description: 'href= with javascript: in SVG context (<a>, <animate>, etc.)',
+    pattern: /href\s*=\s*["']?\s*javascript\s*:/i,
+  },
+  {
+    id: 'svg-foreignobject',
+    description: '<foreignObject embeds HTML inside SVG — can execute scripts',
+    pattern: /<foreignObject[\s>/]/i,
+  },
+  {
+    id: 'svg-use-external',
+    description: '<use xlink:href or href pointing to external resource (non-fragment URL)',
+    // Match <use with href= where the value starts with a non-# character (external URL)
+    // [\"'][^#] catches quoted values not starting with #; [^\"'#\s>] catches unquoted
+    pattern: /<use[\s\S]{0,60}(?:xlink\s*:\s*)?href\s*=\s*(?:["'][^#]|[^"'#\s>])/i,
+  },
+  {
+    id: 'svg-animate-href',
+    description: '<animate attributeName="href" — can dynamically change href to javascript:',
+    pattern: /<animate[\s\S]{0,80}attributeName\s*=\s*["'][\s]*href["']/i,
+  },
+  {
+    id: 'svg-animate-xlinkhref',
+    description: '<animate attributeName="xlink:href"',
+    pattern: /<animate[\s\S]{0,80}attributeName\s*=\s*["'][\s]*xlink\s*:\s*href["']/i,
+  },
+  {
+    id: 'svg-set-javascript',
+    description: '<set to="javascript:..." — sets an attribute to a javascript: URI',
+    pattern: /<set[\s\S]{0,80}to\s*=\s*["']?\s*javascript\s*:/i,
+  },
+  {
+    id: 'svg-event-handler',
+    description: 'SVG-specific event handler attributes: onload=, onerror=, onactivate=, etc.',
+    pattern: /\bon(?:load|error|activate|begin|end|repeat|focus|blur|click|mouse\w{1,20}|key\w{1,20})\s*=/i,
+  },
+  {
+    id: 'svg-handler-generic',
+    description: 'Generic on* handler catch-all for SVG attributes',
+    pattern: /\bon\w{1,30}\s*=/i,
+  },
+  {
+    id: 'svg-filter-feimage',
+    description: '<feImage href= — filter primitive that can load external resources',
+    pattern: /<feImage[\s\S]{0,80}(?:xlink\s*:\s*)?href\s*=/i,
+  },
+  {
+    id: 'svg-image-external',
+    description: '<image xlink:href with http/https or javascript protocol',
+    pattern: /<image[\s\S]{0,80}(?:xlink\s*:\s*)?href\s*=\s*["']?\s*(?:https?|javascript)\s*:/i,
+  },
+  {
+    id: 'svg-style-javascript',
+    description: 'style= attribute containing javascript: (e.g. background:url(javascript:...))',
+    pattern: /style\s*=[\s\S]{0,60}javascript\s*:/i,
+  },
+];
+
+/* harmony default export */ const contexts_svg = (svg_SVG_PATTERNS);
+
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/shell.js
+/**
+ * SHELL context patterns.
+ *
+ * Detects shell injection vectors and path traversal patterns.
+ * Designed for use when a string will be passed to a shell command,
+ * used as a file path, or interpolated into OS-level operations.
+ */
+
+const shell_SHELL_PATTERNS = [
+  {
+    id: 'shell-path-traversal-unix',
+    description: 'Unix path traversal: ../  — climbing the directory tree',
+    pattern: /\.\.\//,
+  },
+  {
+    id: 'shell-path-traversal-windows',
+    description: 'Windows path traversal: ..\\ — climbing the directory tree',
+    pattern: /\.\.\\/,
+  },
+  {
+    id: 'shell-path-traversal-encoded',
+    description: 'URL-encoded path traversal: %2e%2e or %2f variants',
+    pattern: /%2e%2e|%2f\.\.|\.\.%2f/i,
+  },
+  {
+    id: 'shell-null-byte',
+    description: 'Null byte injection: \\x00 or %00 — truncates strings in C-backed functions',
+    pattern: /\x00|%00/,
+  },
+  {
+    id: 'shell-semicolon',
+    description: 'Semicolon command separator: cmd1; cmd2',
+    pattern: /;/,
+  },
+  {
+    id: 'shell-pipe',
+    description: 'Pipe operator: cmd1 | cmd2',
+    pattern: /\|/,
+  },
+  {
+    id: 'shell-and-operator',
+    description: 'AND operator: cmd1 && cmd2',
+    pattern: /&&/,
+  },
+  {
+    id: 'shell-or-operator',
+    description: 'OR operator: cmd1 || cmd2',
+    pattern: /\|\|/,
+  },
+  {
+    id: 'shell-backtick',
+    description: 'Backtick command substitution: `cmd`',
+    pattern: /`/,
+  },
+  {
+    id: 'shell-dollar-paren',
+    description: 'Dollar-paren command substitution: $(cmd)',
+    pattern: /\$\(/,
+  },
+  {
+    id: 'shell-dollar-brace',
+    description: 'Dollar-brace variable expansion: ${var} — can be abused for injection',
+    pattern: /\$\{/,
+  },
+  {
+    id: 'shell-redirect-out',
+    description: 'Output redirection: cmd > file or cmd >> file',
+    pattern: />{1,2}/,
+  },
+  {
+    id: 'shell-redirect-in',
+    description: 'Input redirection: cmd < file',
+    pattern: /</,
+  },
+  {
+    id: 'shell-newline-injection',
+    description: 'Newline injection: \\n or \\r — can inject new shell commands',
+    pattern: /[\n\r]/,
+  },
+  {
+    id: 'shell-glob-star',
+    description: 'Glob expansion: * or ? — can expand to unintended files',
+    // Only flag when combined with path separators to reduce false positives
+    pattern: /[/\\][*?]/,
+  },
+  {
+    id: 'shell-absolute-root',
+    description: 'Absolute root path injection: string starting with / or \\ (Windows UNC)',
+    pattern: /^(?:\/|\\\\)/,
+  },
+  {
+    id: 'shell-windows-drive',
+    description: 'Windows drive letter path injection: C:\\ or D:/',
+    pattern: /^[a-zA-Z]:[/\\]/,
+  },
+  {
+    id: 'shell-curl-wget',
+    description: 'curl/wget with URL or flags — can exfiltrate data or download payloads',
+    // Require a URL scheme (http/https/ftp) or a flag (-) to reduce false positives
+    // "curl is a tool" won't match; "curl http://..." or "curl -s ..." will
+    pattern: /\b(?:curl|wget)\s+(?:https?:\/\/|ftp:\/\/|-)/i,
+  },
+];
+
+/* harmony default export */ const contexts_shell = (shell_SHELL_PATTERNS);
+
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/redos.js
+/**
+ * REDOS context patterns.
+ *
+ * Detects strings that, if used as regular expressions, could cause
+ * catastrophic backtracking (ReDoS — Regular Expression Denial of Service).
+ *
+ * These patterns detect the structural forms that lead to exponential or
+ * polynomial backtracking in NFA-based regex engines (V8, PCRE, Java, etc.).
+ *
+ * Use this context when user-supplied strings will be compiled into RegExp objects.
+ */
+
+const redos_REDOS_PATTERNS = [
+  {
+    id: 'redos-nested-quantifier-plus',
+    description: 'Nested + quantifier inside a group with outer quantifier: (a+)+, (.+b)*, etc.',
+    // Matches any group containing a + quantifier, with an outer * or + — catches (a+)+, (.+b)*, etc.
+    pattern: /\([^)]*\+[^)]*\)[+*]/,
+  },
+  {
+    id: 'redos-nested-quantifier-star',
+    description: 'Nested * quantifier: (a*)* or (a*)+ — catastrophic backtracking',
+    pattern: /\([^)]*\*[^)]*\)[*+]/,
+  },
+  {
+    id: 'redos-nested-groups',
+    description: 'Doubly nested quantified groups: ((a+)+) — guaranteed catastrophic',
+    pattern: /\(\([^)]{0,40}\)[+*]\)[+*]/,
+  },
+  {
+    id: 'redos-alternation-overlap',
+    description: 'Overlapping alternation under quantifier: (a|a)+ — ambiguous NFA paths',
+    // Detect repeated identical alternatives under a quantifier
+    pattern: /\(([^|()]{1,20})\|(?:\1)(?:\|[^|()]{1,20}){0,5}\)[+*?]{1,2}/,
+  },
+  {
+    id: 'redos-star-plus-concat',
+    description: '(x*x)+ pattern — triggers super-linear backtracking',
+    pattern: /\([^)]{0,10}\*[^)]{0,10}\)[+*]/,
+  },
+  {
+    id: 'redos-dot-star-greedy',
+    description: '(.*){n,} or (.+){n,} — repeated greedy dot quantifiers',
+    pattern: /\(\.[*+]\)\{?\d/,
+  },
+  {
+    id: 'redos-large-repetition',
+    description: 'Very large fixed or range repetition count {1000,} or {1000,n} — denial of service via backtracking',
+    // Matches { followed by 4+ digits (≥1000), then optional ,digits }
+    pattern: /\{\d{4,}(?:,\d*)?\}/,
+  },
+  {
+    id: 'redos-catastrophic-alternation',
+    description: 'Long alternation with many similar branches — polynomial backtracking risk',
+    // Heuristic: 10+ pipe-separated alternatives in a single group
+    pattern: /\([^)]{0,200}(?:\|[^|)]{0,50}){9,}\)/,
+  },
+];
+
+/* harmony default export */ const contexts_redos = (redos_REDOS_PATTERNS);
+
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/nosql.js
+/**
+ * NOSQL context patterns.
+ *
+ * Detects injection vectors specific to NoSQL databases (primarily MongoDB)
+ * and JavaScript-evaluated queries.
+ *
+ * Attack categories:
+ *   1. MongoDB query operator injection: $where, $ne, $gt, $regex, $or, $and, etc.
+ *      These operators, when injected into a JSON query object, can bypass
+ *      authentication or exfiltrate data without knowing passwords.
+ *
+ *   2. JavaScript execution: $where clauses execute arbitrary JS server-side.
+ *
+ *   3. Prototype pollution: __proto__, constructor.prototype — can corrupt
+ *      the prototype chain of all objects in the Node.js process.
+ *
+ * Pattern note: MongoDB operators appear as JSON keys. In JSON, keys are
+ * quoted: {"$where": ...} so the pattern must allow an optional closing
+ * quote between the operator name and the colon: /\$where["'\s]*:/
+ */
+
+// Shared suffix: optional closing quote/whitespace before the colon
+// Handles: $op: (bare), "$op": (JSON), '$op': (single-quoted)
+const nosql_SEP = /["'\s]*:/;
+const nosql_sep = '["\'\\s]*:';
+
+const nosql_NOSQL_PATTERNS = [
+  // ─── MongoDB $ operator injection ────────────────────────────────────────
+  {
+    id: 'nosql-where-operator',
+    description: '$where — executes arbitrary JavaScript server-side in MongoDB',
+    pattern: new RegExp(`\\$where${nosql_sep}`, 'i'),
+  },
+  {
+    id: 'nosql-ne-operator',
+    description: '$ne — "not equal" operator used to bypass equality checks',
+    pattern: new RegExp(`\\$ne${nosql_sep}`, 'i'),
+  },
+  {
+    id: 'nosql-gt-operator',
+    description: '$gt — "greater than" used to bypass password/value checks',
+    pattern: new RegExp(`\\$gte?${nosql_sep}`, 'i'),
+  },
+  {
+    id: 'nosql-lt-operator',
+    description: '$lt / $lte — "less than" bypass variants',
+    pattern: new RegExp(`\\$lte?${nosql_sep}`, 'i'),
+  },
+  {
+    id: 'nosql-regex-operator',
+    description: '$regex — can be used to extract data character by character (blind injection)',
+    pattern: new RegExp(`\\$regex${nosql_sep}`, 'i'),
+  },
+  {
+    id: 'nosql-or-operator',
+    description: '$or — logical OR; used to create always-true conditions',
+    pattern: new RegExp(`\\$or${nosql_sep}\\s*\\[`, 'i'),
+  },
+  {
+    id: 'nosql-and-operator',
+    description: '$and — logical AND operator injection',
+    pattern: new RegExp(`\\$and${nosql_sep}\\s*\\[`, 'i'),
+  },
+  {
+    id: 'nosql-nor-operator',
+    description: '$nor — logical NOR operator injection',
+    pattern: new RegExp(`\\$nor${nosql_sep}\\s*\\[`, 'i'),
+  },
+  {
+    id: 'nosql-exists-operator',
+    description: '$exists — can enumerate fields to determine schema',
+    pattern: new RegExp(`\\$exists${nosql_sep}`, 'i'),
+  },
+  {
+    id: 'nosql-in-operator',
+    description: '$in — matches any value in a list; can enumerate values',
+    pattern: new RegExp(`\\$in${nosql_sep}\\s*\\[`, 'i'),
+  },
+  {
+    id: 'nosql-expr-operator',
+    description: '$expr — allows aggregation expressions in queries (MongoDB 3.6+)',
+    pattern: new RegExp(`\\$expr${nosql_sep}`, 'i'),
+  },
+  {
+    id: 'nosql-function-operator',
+    description: '$function — executes arbitrary JavaScript in MongoDB 4.4+',
+    pattern: new RegExp(`\\$function${nosql_sep}`, 'i'),
+  },
+  {
+    id: 'nosql-accumulator-operator',
+    description: '$accumulator — custom aggregation with arbitrary JS execution',
+    pattern: new RegExp(`\\$accumulator${nosql_sep}`, 'i'),
+  },
+  // ─── Prototype pollution ─────────────────────────────────────────────────
+  {
+    id: 'nosql-proto-pollution',
+    description: '__proto__ — prototype pollution via object key injection',
+    pattern: /__proto__/,
+  },
+  {
+    id: 'nosql-constructor-prototype',
+    description: 'constructor.prototype — alternative prototype pollution vector (dot notation or JSON key)',
+    // Matches dot-notation (obj.constructor.prototype) and JSON key adjacency
+    // ("constructor": {"prototype": ...})
+    pattern: /constructor[\s"':.,{\[]*prototype/i,
+  },
+  {
+    id: 'nosql-proto-bracket',
+    description: '["__proto__"] — bracket-notation prototype pollution',
+    pattern: /\[["']__proto__["']\]/,
+  },
+];
+
+/* harmony default export */ const contexts_nosql = (nosql_NOSQL_PATTERNS);
+
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/log.js
+/**
+ * LOG context patterns.
+ *
+ * Detects injection vectors that are dangerous when a string is written
+ * to a log file, passed to a logging framework, or interpolated into
+ * a log message that will be parsed or displayed.
+ *
+ * Attack categories:
+ *   1. CRLF injection — injects fake log lines by embedding newlines
+ *   2. Log4Shell (CVE-2021-44228) — ${jndi:...} triggers JNDI lookup in Log4j
+ *   3. SSTI in log templates — {{...}}, #{...} trigger template evaluation
+ *      if the log message is passed through a template engine
+ *   4. Null byte injection — truncates log entries in some implementations
+ *   5. ANSI escape injection — manipulates terminal output when logs are
+ *      tailed in a terminal (colour codes, cursor movement, etc.)
+ *
+ * Note: Newline characters (\n, \r) will produce false positives for
+ * multi-line legitimate values. Use this context only for single-line
+ * log field values (usernames, IDs, request parameters, etc.).
+ */
+
+const log_LOG_PATTERNS = [
+  // ─── CRLF / newline injection ─────────────────────────────────────────────
+  {
+    id: 'log-crlf-injection',
+    description: 'CRLF injection: literal \\r or \\n embeds fake log lines',
+    pattern: /[\r\n]/,
+  },
+  {
+    id: 'log-url-encoded-crlf',
+    description: 'URL-encoded CRLF: %0d, %0a, %0D, %0A — decoded by some log parsers',
+    pattern: /%0[dDaA]/,
+  },
+  {
+    id: 'log-unicode-newline',
+    description: 'Unicode newline variants: U+2028 (line separator), U+2029 (paragraph separator)',
+    pattern: /[\u2028\u2029]/,
+  },
+
+  // ─── Log4Shell / JNDI injection (CVE-2021-44228) ─────────────────────────
+  {
+    id: 'log-log4shell-jndi',
+    description: 'Log4Shell: ${jndi:...} triggers remote code execution in Apache Log4j',
+    pattern: /\$\{jndi\s*:/i,
+  },
+  {
+    id: 'log-log4shell-obfuscated',
+    description: 'Obfuscated Log4Shell: ${::-j}... lookup-bypass prefix used to evade WAF detection',
+    // ${::- is the Log4j lookup-bypass escape sequence; presence alone is suspicious
+    pattern: /\$\{::-/,
+  },
+  {
+    id: 'log-log4j-lookup',
+    description: 'Log4j lookup syntax: ${env:...}, ${sys:...}, ${ctx:...} — data exfiltration',
+    pattern: /\$\{(?:env|sys|ctx|main|map|sd|web|docker|k8s|spring)\s*:/i,
+  },
+
+  // ─── Server-Side Template Injection (SSTI) in log messages ───────────────
+  {
+    id: 'log-ssti-double-brace',
+    description: 'SSTI double-brace: {{expression}} — Jinja2, Twig, Handlebars, etc.',
+    pattern: /\{\{[\s\S]{0,80}\}\}/,
+  },
+  {
+    id: 'log-ssti-hash-brace',
+    description: 'SSTI hash-brace: #{expression} — Thymeleaf, Velocity, Ruby ERB',
+    pattern: /#\{[\s\S]{0,80}\}/,
+  },
+  {
+    id: 'log-ssti-dollar-brace',
+    description: 'SSTI/EL injection: ${expression with operators or method calls} — JSP EL, Freemarker, SpEL',
+    // Require that the ${...} content looks like an expression, not a plain variable name.
+    // Flags if the content contains: . ( * + operators, or known SSTI keywords.
+    // This avoids flagging ${PATH}, ${HOME} etc. (plain shell variables).
+    pattern: /\$\{[^}]*(?:\.|\(|\*|\+|\bclass\b|\bruntime\b|\bprocess\b|\bexec\b)[^}]{0,80}\}/i,
+  },
+  {
+    id: 'log-ssti-percent-tag',
+    description: 'SSTI ERB/ASP tag: <%= expression %> — Ruby ERB, ASP',
+    pattern: /<%=[\s\S]{0,80}%>/,
+  },
+
+  // ─── Null byte ────────────────────────────────────────────────────────────
+  {
+    id: 'log-null-byte',
+    description: 'Null byte: \\x00 or %00 — can truncate log entries in C-backed loggers',
+    pattern: /\x00|%00/,
+  },
+
+  // ─── ANSI escape injection ────────────────────────────────────────────────
+  {
+    id: 'log-ansi-escape',
+    description: 'ANSI escape sequence: ESC[ — can manipulate terminal output when logs are tailed',
+    pattern: /\x1b\[/,
+  },
+];
+
+/* harmony default export */ const contexts_log = (log_LOG_PATTERNS);
+
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/index.js
+/**
+ * is-unsafe v2
+ *
+ * Zero-dependency, DOM-free, pure predicate for detecting unsafe strings
+ * across HTML, XML, SVG, SQL, SQL-STRICT, SHELL, REDOS, NOSQL, and LOG contexts.
+ *
+ * v2 change: contexts are imported as named pattern arrays rather than resolved
+ * via a string-keyed registry. This makes each context independently
+ * tree-shakeable — bundlers can drop any context you never import.
+ *
+ * @module is-unsafe
+ */
+
+// ─── Context pattern arrays (named exports) ────────────────────────────────
+// Import only the ones you need. Each is independently tree-shakeable.
+
+
+
+
+
+
+
+
+
+
+// SQL-STRICT needs a quoted identifier because of the hyphen
+
+
+
+// Markup contexts are also matched against an entity-decoded copy of the input,
+// because browsers decode HTML character references before interpreting a URL
+// scheme (e.g. javascript&#58;… is a javascript: URL).
+
+
+// ─── VALID_CONTEXTS convenience re-export ─────────────────────────────────
+// Importing this pulls in ALL contexts. Use it only when you need all of them
+// (e.g. for validation UI, tooling, or exhaustive audits).
+// If you only need a subset, import the named contexts directly instead.
+
+
+
+
+
+
+
+
+
+
+// ─── Attach labels to named contexts ──────────────────────────────────────
+// Each built-in PatternList carries its canonical name so matchList can read
+// list.label directly — no registry lookup needed at match time.
+// Custom PatternLists default to 'CUSTOM' unless the caller sets list.label.
+
+contexts_html.label       = 'HTML';
+contexts_xml.label        = 'XML';
+contexts_svg.label        = 'SVG';
+
+// Markup contexts: also test an entity-decoded copy (see util/decode-entities.js).
+// Non-markup contexts (SQL, SHELL, LOG, …) are matched byte-for-byte as supplied.
+contexts_html.decodeEntities = true;
+contexts_xml.decodeEntities  = true;
+contexts_svg.decodeEntities  = true;
+contexts_sql.label        = 'SQL';
+contexts_sql_strict.label = 'SQL-STRICT';
+contexts_shell.label      = 'SHELL';
+contexts_redos.label      = 'REDOS';
+contexts_nosql.label      = 'NOSQL';
+contexts_log.label        = 'LOG';
+
+const src_VALID_CONTEXTS = Object.freeze({
+  HTML: contexts_html,
+  XML: contexts_xml,
+  SVG: contexts_svg,
+  SQL: contexts_sql,
+  'SQL-STRICT': contexts_sql_strict,
+  SHELL: contexts_shell,
+  REDOS: contexts_redos,
+  NOSQL: contexts_nosql,
+  LOG: contexts_log,
+});
+
+// ─── Types ────────────────────────────────────────────────────────────────
+
+/**
+ * @typedef {{ id: string, description: string, pattern: RegExp }} Rule
+ */
+
+/**
+ * @typedef {Rule[]} PatternList
+ */
+
+/**
+ * @typedef {Object} MatchResult
+ * @property {string} context     - Label identifying which context matched ('HTML', 'CUSTOM', etc.)
+ * @property {string} id          - Rule identifier
+ * @property {string} description - Human-readable description of what was matched
+ * @property {RegExp} pattern     - The pattern that matched
+ */
+
+// ─── Internal helpers ──────────────────────────────────────────────────────
+
+/**
+ * @param {unknown} value
+ */
+function src_assertString(value) {
+  if (typeof value !== 'string') {
+    throw new TypeError(
+      `is-unsafe: first argument must be a string, got ${typeof value}`
+    );
+  }
+}
+
+/**
+ * @param {unknown} context
+ */
+function src_assertContext(context) {
+  if (context instanceof RegExp) return;
+
+  if (Array.isArray(context)) {
+    if (context.length === 0) {
+      throw new TypeError('is-unsafe: context must not be an empty array');
+    }
+    // Detect array-of-arrays vs flat pattern list
+    if (Array.isArray(context[0])) {
+      // Array of PatternLists
+      for (const list of context) {
+        if (!Array.isArray(list) || list.length === 0) {
+          throw new TypeError(
+            'is-unsafe: each context in the array must be a non-empty pattern array (PatternList)'
+          );
+        }
+      }
+    }
+    // else: flat PatternList — trust it, no deep validation needed
+    return;
+  }
+
+  throw new TypeError(
+    `is-unsafe: second argument must be a PatternList (e.g. HTML), ` +
+    `an array of PatternLists (e.g. [HTML, XML]), or a RegExp. Got: ${typeof context}`
+  );
+}
+
+/**
+ * Normalise any valid context arg into an array of PatternLists.
+ *
+ * @param {Rule[]|Rule[][]|RegExp} context
+ * @returns {{ lists: Rule[][]|null, regex: RegExp|null }}
+ */
+function src_normalise(context) {
+  if (context instanceof RegExp) return { lists: null, regex: context };
+  // Distinguish PatternList (array of rule objects) from array of PatternLists
+  if (Array.isArray(context[0])) return { lists: context, regex: null };
+  return { lists: [context], regex: null };
+}
+
+/**
+ * For markup contexts, return an entity-decoded copy of `value` to test
+ * alongside the raw input, or null when there is nothing extra to test.
+ *
+ * @param {string} value
+ * @param {Rule[]} list
+ * @returns {string|null}
+ */
+function src_decodedCopy(value, list) {
+  if (!list.decodeEntities) return null;
+  const decoded = decode_entities_decodeEntities(value);
+  return decoded === value ? null : decoded;
+}
+
+/**
+ * Test value against a single PatternList. Returns the first MatchResult or null.
+ *
+ * @param {string} value
+ * @param {Rule[]} list
+ * @returns {MatchResult|null}
+ */
+function src_matchList(value, list) {
+  const label = list.label ?? 'CUSTOM';
+  const decoded = src_decodedCopy(value, list);
+  for (const rule of list) {
+    if (rule.pattern.test(value) || (decoded !== null && rule.pattern.test(decoded))) {
+      return { context: label, id: rule.id, description: rule.description, pattern: rule.pattern };
+    }
+  }
+  return null;
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────
+
+/**
+ * Returns `true` if `value` is unsafe in the given context(s), `false` otherwise.
+ *
+ * @param {string} value - The string to test
+ * @param {PatternList | PatternList[] | RegExp} context
+ *   - A PatternList imported from is-unsafe (e.g. `HTML`, `XML`)
+ *   - An array of PatternLists — returns true if unsafe in **any** of them
+ *   - A custom RegExp — returns true if the pattern matches
+ * @returns {boolean}
+ *
+ * @example
+ * import { isUnsafe, HTML, SQL } from 'is-unsafe';
+ *
+ * isUnsafe('<script>alert(1)</script>', HTML)       // true
+ * isUnsafe('hello world', HTML)                     // false
+ * isUnsafe('value', [HTML, SQL])                    // false
+ * isUnsafe('value', /my-pattern/i)                  // false
+ */
+function src_isUnsafe(value, context) {
+  src_assertString(value);
+  src_assertContext(context);
+
+  const { lists, regex } = src_normalise(context);
+
+  if (regex) return regex.test(value);
+
+  for (const list of lists) {
+    if (src_matchList(value, list) !== null) return true;
+  }
+  return false;
+}
+
+/**
+ * Like `isUnsafe`, but returns the first `MatchResult` describing **why**
+ * the value was flagged, or `null` if it is safe.
+ *
+ * @param {string} value
+ * @param {PatternList | PatternList[] | RegExp} context
+ * @returns {MatchResult|null}
+ *
+ * @example
+ * import { whyUnsafe, HTML } from 'is-unsafe';
+ *
+ * whyUnsafe('<script>alert(1)</script>', HTML)
+ * // { context: 'HTML', id: 'html-script-open', description: '...', pattern: /.../ }
+ */
+function src_whyUnsafe(value, context) {
+  src_assertString(value);
+  src_assertContext(context);
+
+  const { lists, regex } = src_normalise(context);
+
+  if (regex) {
+    return regex.test(value)
+      ? { context: 'CUSTOM', id: 'custom-regex', description: 'Matched caller-supplied pattern', pattern: regex }
+      : null;
+  }
+
+  for (const list of lists) {
+    const result = src_matchList(value, list);
+    if (result !== null) return result;
+  }
+  return null;
+}
+
+/**
+ * Returns **all** matching rules across the given context(s), or an empty
+ * array if the value is safe. Useful for comprehensive auditing.
+ *
+ * @param {string} value
+ * @param {PatternList | PatternList[] | RegExp} context
+ * @returns {MatchResult[]}
+ */
+function src_allUnsafe(value, context) {
+  src_assertString(value);
+  src_assertContext(context);
+
+  const { lists, regex } = src_normalise(context);
+  const results = [];
+
+  if (regex) {
+    if (regex.test(value)) {
+      results.push({ context: 'CUSTOM', id: 'custom-regex', description: 'Matched caller-supplied pattern', pattern: regex });
+    }
+    return results;
+  }
+
+  for (const list of lists) {
+    const label = list.label ?? 'CUSTOM';
+    const decoded = src_decodedCopy(value, list);
+    for (const rule of list) {
+      if (rule.pattern.test(value) || (decoded !== null && rule.pattern.test(decoded))) {
+        results.push({ context: label, id: rule.id, description: rule.description, pattern: rule.pattern });
+      }
+    }
+  }
+
+  return results;
+}
+
+
+/* harmony default export */ const is_unsafe_src = ((/* unused pure expression or super */ null && (src_isUnsafe)));
+
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/OrderedObjParser.js
+
+///@ts-check
+
+
+
+
+
+
+
+
+
+
+
+
+// const regx =
+//   '<((!\\[CDATA\\[([\\s\\S]*?)(]]>))|((NAME:)?(NAME))([^>]*)>|((\\/)(NAME)\\s*>))([^<]*)'
+//   .replace(/NAME/g, util.nameRegexp);
+
+//const tagsRegx = new RegExp("<(\\/?[\\w:\\-\._]+)([^>]*)>(\\s*"+cdataRegx+")*([^<]+)?","g");
+//const tagsRegx = new RegExp("<(\\/?)((\\w*:)?([\\w:\\-\._]+))([^>]*)>([^<]*)("+cdataRegx+"([^<]*))*([^<]+)?","g");
+
+// Helper functions for attribute and namespace handling
+
+/**
+ * Extract raw attributes (without prefix) from prefixed attribute map
+ * @param {object} prefixedAttrs - Attributes with prefix from buildAttributesMap
+ * @param {object} options - Parser options containing attributeNamePrefix
+ * @returns {object} Raw attributes for matcher
+ */
+function OrderedObjParser_extractRawAttributes(prefixedAttrs, options) {
+  if (!prefixedAttrs) return {};
+
+  // Handle attributesGroupName option
+  const attrs = options.attributesGroupName
+    ? prefixedAttrs[options.attributesGroupName]
+    : prefixedAttrs;
+
+  if (!attrs) return {};
+
+  const rawAttrs = {};
+  for (const key in attrs) {
+    // Remove the attribute prefix to get raw name
+    if (key.startsWith(options.attributeNamePrefix)) {
+      const rawName = key.substring(options.attributeNamePrefix.length);
+      rawAttrs[rawName] = attrs[key];
+    } else {
+      // Attribute without prefix (shouldn't normally happen, but be safe)
+      rawAttrs[key] = attrs[key];
+    }
+  }
+  return rawAttrs;
+}
+
+/**
+ * Extract namespace from raw tag name
+ * @param {string} rawTagName - Tag name possibly with namespace (e.g., "soap:Envelope")
+ * @returns {string|undefined} Namespace or undefined
+ */
+function OrderedObjParser_extractNamespace(rawTagName) {
+  if (!rawTagName || typeof rawTagName !== 'string') return undefined;
+
+  const colonIndex = rawTagName.indexOf(':');
+  if (colonIndex !== -1 && colonIndex > 0) {
+    const ns = rawTagName.substring(0, colonIndex);
+    // Don't treat xmlns as a namespace
+    if (ns !== 'xmlns') {
+      return ns;
+    }
+  }
+  return undefined;
+}
+
+class OrderedObjParser_OrderedObjParser {
+  constructor(options, externalEntities) {
+    this.options = options;
+    this.currentNode = null;
+    this.tagsNodeStack = [];
+    this.parseXml = OrderedObjParser_parseXml;
+    this.parseTextData = OrderedObjParser_parseTextData;
+    this.resolveNameSpace = OrderedObjParser_resolveNameSpace;
+    this.buildAttributesMap = OrderedObjParser_buildAttributesMap;
+    this.isItStopNode = OrderedObjParser_isItStopNode;
+    this.replaceEntitiesValue = OrderedObjParser_replaceEntitiesValue;
+    this.readStopNodeData = OrderedObjParser_readStopNodeData;
+    this.saveTextToParentTag = OrderedObjParser_saveTextToParentTag;
+    this.addChild = OrderedObjParser_addChild;
+    this.ignoreAttributesFn = ignoreAttributes_getIgnoreAttributesFn(this.options.ignoreAttributes)
+    this.entityExpansionCount = 0;
+    this.currentExpandedLength = 0;
+    this.doctypefound = false;
+    let namedEntities = { ...entities_XML };
+    if (this.options.entityDecoder) {
+      this.entityDecoder = this.options.entityDecoder
+    } else {
+      if (typeof this.options.htmlEntities === "object") namedEntities = this.options.htmlEntities;
+      else if (this.options.htmlEntities === true) namedEntities = { ...entities_COMMON_HTML, ...entities_CURRENCY };
+      this.entityDecoder = new EntityDecoder_EntityDecoder({
+        namedEntities: { ...namedEntities, ...externalEntities },
+        numericAllowed: this.options.htmlEntities,
+        limit: {
+          maxTotalExpansions: this.options.processEntities.maxTotalExpansions,
+          maxExpandedLength: this.options.processEntities.maxExpandedLength,
+          applyLimitsTo: this.options.processEntities.appliesTo,
+        },
+        // onExternalEntity: (name, value) => isUnsafe(value) ? 'block' : 'allow',
+        onInputEntity: (name, value) =>
+          //TODO: VALID_CONTEXTS.HTML should be set only if this.options.htmlEntities
+          src_isUnsafe(value, [contexts_html, contexts_xml]) ? EntityDecoder_ENTITY_ACTION.BLOCK : EntityDecoder_ENTITY_ACTION.ALLOW,
+
+        //postCheck: resolved => resolved
+      });
+    }
+
+    // Initialize path matcher for path-expression-matcher
+    this.matcher = new Matcher_Matcher();
+    this.readonlyMatcher = this.matcher.readOnly();
+
+    // Flag to track if current node is a stop node (optimization)
+    this.isCurrentNodeStopNode = false;
+
+    // Pre-compile stopNodes expressions
+    this.stopNodeExpressionsSet = new ExpressionSet_ExpressionSet();
+    const stopNodesOpts = this.options.stopNodes;
+    if (stopNodesOpts && stopNodesOpts.length > 0) {
+      for (let i = 0; i < stopNodesOpts.length; i++) {
+        const stopNodeExp = stopNodesOpts[i];
+        if (typeof stopNodeExp === 'string') {
+          // Convert string to Expression object
+          this.stopNodeExpressionsSet.add(new Expression_Expression(stopNodeExp));
+        } else if (stopNodeExp instanceof Expression_Expression) {
+          // Already an Expression object
+          this.stopNodeExpressionsSet.add(stopNodeExp);
+        }
+      }
+      this.stopNodeExpressionsSet.seal();
+    }
+  }
+
+}
+
+
+/**
+ * @param {string} val
+ * @param {string} tagName
+ * @param {string|Matcher} jPath - jPath string or Matcher instance based on options.jPath
+ * @param {boolean} dontTrim
+ * @param {boolean} hasAttributes
+ * @param {boolean} isLeafNode
+ * @param {boolean} escapeEntities
+ */
+function OrderedObjParser_parseTextData(val, tagName, jPath, dontTrim, hasAttributes, isLeafNode, escapeEntities) {
+  const options = this.options;
+  if (val !== undefined) {
+    if (options.trimValues && !dontTrim) {
+      val = val.trim();
+    }
+    if (val.length > 0) {
+      if (!escapeEntities) val = this.replaceEntitiesValue(val, tagName, jPath);
+
+      // Pass jPath string or matcher based on options.jPath setting
+      const jPathOrMatcher = options.jPath ? jPath.toString() : jPath;
+      const newval = options.tagValueProcessor(tagName, val, jPathOrMatcher, hasAttributes, isLeafNode);
+      if (newval === null || newval === undefined) {
+        //don't parse
+        return val;
+      } else if (typeof newval !== typeof val || newval !== val) {
+        //overwrite
+        return newval;
+      } else if (options.trimValues) {
+        return OrderedObjParser_parseValue(val, options.parseTagValue, options.numberParseOptions);
+      } else {
+        const trimmedVal = val.trim();
+        if (trimmedVal === val) {
+          return OrderedObjParser_parseValue(val, options.parseTagValue, options.numberParseOptions);
+        } else {
+          return val;
+        }
+      }
+    }
+  }
+}
+
+function OrderedObjParser_resolveNameSpace(tagname) {
+  if (this.options.removeNSPrefix) {
+    const tags = tagname.split(':');
+    const prefix = tagname.charAt(0) === '/' ? '/' : '';
+    if (tags[0] === 'xmlns') {
+      return '';
+    }
+    if (tags.length === 2) {
+      tagname = prefix + tags[1];
+    }
+  }
+  return tagname;
+}
+
+//TODO: change regex to capture NS
+//const attrsRegx = new RegExp("([\\w\\-\\.\\:]+)\\s*=\\s*(['\"])((.|\n)*?)\\2","gm");
+// The value is matched with a negated class per quote type rather than a lazy `[\s\S]*?` up to a
+// backreference, which is much slower on long values (SVG paths, data URIs)
+const OrderedObjParser_attrsRegx = /([^\s=]+)\s*(=\s*(?:"([^"]*)"|'([^']*)'))?/gm;
+
+// value inside double quotes, or inside single quotes, or undefined when there is no value
+function OrderedObjParser_attrValue(match) {
+  return match[3] !== undefined ? match[3] : match[4];
+}
+
+function OrderedObjParser_buildAttributesMap(attrStr, jPath, tagName, force = false) {
+  const options = this.options;
+  if (force === true || (options.ignoreAttributes !== true && typeof attrStr === 'string')) {
+    // attrStr = attrStr.replace(/\r?\n/g, ' ');
+    //attrStr = attrStr || attrStr.trim();
+
+    const matches = getAllMatches(attrStr, OrderedObjParser_attrsRegx);
+    const len = matches.length; //don't make it inline
+    const attrs = {};
+
+    // Pre-process values once: trim + entity replacement
+    // Reused in both matcher update and second pass
+    const processedVals = new Array(len);
+    let hasRawAttrs = false;
+    const rawAttrsForMatcher = {};
+
+    for (let i = 0; i < len; i++) {
+      const attrName = this.resolveNameSpace(matches[i][1]);
+      const oldVal = OrderedObjParser_attrValue(matches[i]);
+
+      if (attrName.length && oldVal !== undefined) {
+        let val = oldVal;
+        if (options.trimValues) val = val.trim();
+        val = this.replaceEntitiesValue(val, tagName, this.readonlyMatcher);
+        processedVals[i] = val;
+
+        rawAttrsForMatcher[attrName] = val;
+        hasRawAttrs = true;
+      }
+    }
+
+    // Update matcher ONCE before second pass, if applicable
+    if (hasRawAttrs && typeof jPath === 'object' && jPath.updateCurrent) {
+      jPath.updateCurrent(rawAttrsForMatcher);
+    }
+
+    // Hoist toString() once — path doesn't change during attribute processing
+    const jPathStr = options.jPath ? jPath.toString() : this.readonlyMatcher;
+
+    // Second pass: apply processors, build final attrs
+    let hasAttrs = false;
+    for (let i = 0; i < len; i++) {
+      const attrName = this.resolveNameSpace(matches[i][1]);
+
+      if (this.ignoreAttributesFn(attrName, jPathStr)) continue;
+
+      let aName = options.attributeNamePrefix + attrName;
+
+      if (attrName.length) {
+        if (options.transformAttributeName) {
+          aName = options.transformAttributeName(aName);
+        }
+        aName = OrderedObjParser_sanitizeName(aName, options);
+
+        if (OrderedObjParser_attrValue(matches[i]) !== undefined) {
+          // Reuse already-processed value — no double entity replacement
+          const oldVal = processedVals[i];
+
+          const newVal = options.attributeValueProcessor(attrName, oldVal, jPathStr);
+          if (newVal === null || newVal === undefined) {
+            attrs[aName] = oldVal;
+          } else if (typeof newVal !== typeof oldVal || newVal !== oldVal) {
+            attrs[aName] = newVal;
+          } else {
+            attrs[aName] = OrderedObjParser_parseValue(oldVal, options.parseAttributeValue, options.numberParseOptions);
+          }
+          hasAttrs = true;
+        } else if (options.allowBooleanAttributes) {
+          attrs[aName] = true;
+          hasAttrs = true;
+        }
+      }
+    }
+
+    if (!hasAttrs) return;
+
+    if (options.attributesGroupName && !options.preserveOrder) {
+      const attrCollection = {};
+      attrCollection[options.attributesGroupName] = attrs;
+      return attrCollection;
+    }
+    return attrs;
+  }
+}
+const OrderedObjParser_parseXml = function (xmlData) {
+  const options = this.options;
+  const crlfPositions = options.captureMetaData ? [] : undefined;
+  xmlData = xmlData.replace(/\r\n?/g, options.captureMetaData ? (newline, index) => {
+    if (newline.length === 2) {
+      // Store the position after earlier CRLF pairs have been normalized.
+      crlfPositions.push(index - crlfPositions.length);
+    }
+    return "\n";
+  } : "\n");
+  const xmlObj = new xmlNode_XmlNode('!xml');
+  let currentNode = xmlObj;
+  let textData = "";
+
+  // Reset matcher for new document
+  this.matcher.reset();
+  this.entityDecoder.reset();
+
+  // Reset entity expansion counters for this document
+  this.entityExpansionCount = 0;
+  this.currentExpandedLength = 0;
+  this.doctypefound = false;
+  const docTypeReader = new DocTypeReader_DocTypeReader(options.processEntities);
+  const xmlLen = xmlData.length;
+  for (let i = 0; i < xmlLen; i++) {//for each char in XML data
+    const ch = xmlData[i];
+    if (ch === '<') {
+      // const nextIndex = i+1;
+      // const _2ndChar = xmlData[nextIndex];
+      const c1 = xmlData.charCodeAt(i + 1);
+      if (c1 === 47) {//Closing Tag '/'
+        const closeIndex = OrderedObjParser_findClosingIndex(xmlData, ">", i, "Closing Tag is not closed.")
+        let tagName = xmlData.substring(i + 2, closeIndex).trim();
+
+        if (options.removeNSPrefix) {
+          const colonIndex = tagName.indexOf(":");
+          if (colonIndex !== -1) {
+            tagName = tagName.substr(colonIndex + 1);
+          }
+        }
+
+        tagName = OrderedObjParser_transformTagName(options.transformTagName, tagName, "", options).tagName;
+
+        if (currentNode) {
+          textData = this.saveTextToParentTag(textData, currentNode, this.readonlyMatcher);
+        }
+
+        //check if last tag of nested tag was unpaired tag
+        const lastTagName = this.matcher.getCurrentTag();
+        if (tagName && options.unpairedTagsSet.has(tagName)) {
+          throw new Error(`Unpaired tag can not be used as closing tag: </${tagName}>`);
+        }
+        if (lastTagName && options.unpairedTagsSet.has(lastTagName)) {
+          // Pop the unpaired tag
+          this.matcher.pop();
+          this.tagsNodeStack.pop();
+        }
+        // Pop the closing tag
+        this.matcher.pop();
+        this.isCurrentNodeStopNode = false; // Reset flag when closing tag
+
+        //a closing tag with no matching opening tag leaves the stack empty
+        currentNode = this.tagsNodeStack.pop() || xmlObj;//avoid recursion, set the parent tag scope
+
+        if (options.captureMetaData && currentNode) {
+          currentNode.addEndIndex(OrderedObjParser_getOriginalIndex(closeIndex + 1, crlfPositions));
+        }
+        textData = "";
+        i = closeIndex;
+      } else if (c1 === 63) { //'?'
+
+        let tagData = OrderedObjParser_readTagExp(xmlData, i, false, "?>");
+        if (!tagData) throw new Error("Pi Tag is not closed.");
+
+        textData = this.saveTextToParentTag(textData, currentNode, this.readonlyMatcher);
+        const attsMap = this.buildAttributesMap(tagData.tagExp, this.matcher, tagData.tagName, true);
+        if (attsMap) {
+          const ver = attsMap[this.options.attributeNamePrefix + "version"];
+          this.entityDecoder.setXmlVersion(Number(ver) || 1.0);
+          docTypeReader.setXmlVersion(Number(ver) || 1.0);
+        }
+        if ((options.ignoreDeclaration && tagData.tagName === "?xml") || options.ignorePiTags) {
+          //do nothing
+        } else {
+
+          const childNode = new xmlNode_XmlNode(tagData.tagName);
+          childNode.add(options.textNodeName, "");
+
+          if (tagData.tagName !== tagData.tagExp && tagData.attrExpPresent && options.ignoreAttributes !== true) {
+            childNode[":@"] = attsMap
+          }
+          const startIndex = options.captureMetaData ? OrderedObjParser_getOriginalIndex(i, crlfPositions) : i;
+          this.addChild(currentNode, childNode, this.readonlyMatcher, startIndex);
+
+          if (options.captureMetaData) {
+            // closeIndex points at '?' of the closing '?>'
+            currentNode.addEndIndex(OrderedObjParser_getOriginalIndex(tagData.closeIndex + 2, crlfPositions));
+          }
+        }
+
+
+        i = tagData.closeIndex + 1;
+      } else if (c1 === 33
+        && xmlData.charCodeAt(i + 2) === 45
+        && xmlData.charCodeAt(i + 3) === 45) { //'!--'
+        const endIndex = OrderedObjParser_findClosingIndex(xmlData, "-->", i + 4, "Comment is not closed.")
+        if (options.commentPropName) {
+          const comment = xmlData.substring(i + 4, endIndex - 2);
+
+          textData = this.saveTextToParentTag(textData, currentNode, this.readonlyMatcher);
+
+          currentNode.add(options.commentPropName, [{ [options.textNodeName]: comment }]);
+        }
+        i = endIndex;
+      } else if (c1 === 33
+        && xmlData.charCodeAt(i + 2) === 68) { //'!D'
+        if (this.doctypefound) throw new Error("Multiple DOCTYPE declarations found.");
+        this.doctypefound = true;
+        const result = docTypeReader.readDocType(xmlData, i);
+        this.entityDecoder.addInputEntities(result.entities);
+        i = result.i;
+      } else if (c1 === 33
+        && xmlData.charCodeAt(i + 2) === 91) { // '!['
+        const closeIndex = OrderedObjParser_findClosingIndex(xmlData, "]]>", i, "CDATA is not closed.") - 2;
+        const tagExp = xmlData.substring(i + 9, closeIndex);
+
+        textData = this.saveTextToParentTag(textData, currentNode, this.readonlyMatcher);
+
+        let val = this.parseTextData(tagExp, currentNode.tagname, this.readonlyMatcher, true, false, true, true);
+        if (val == undefined) val = "";
+
+        //cdata should be set even if it is 0 length string
+        if (options.cdataPropName) {
+          currentNode.add(options.cdataPropName, [{ [options.textNodeName]: tagExp }]);
+        } else {
+          currentNode.add(options.textNodeName, val);
+        }
+
+        i = closeIndex + 2;
+      } else {//Opening tag
+        let result = OrderedObjParser_readTagExp(xmlData, i, options.removeNSPrefix);
+
+        // Safety check: readTagExp can return undefined
+        if (!result) {
+          // Log context for debugging
+          const context = xmlData.substring(Math.max(0, i - 50), Math.min(xmlLen, i + 50));
+          throw new Error(`readTagExp returned undefined at position ${i}. Context: "${context}"`);
+        }
+
+        let tagName = result.tagName;
+        const rawTagName = result.rawTagName;
+        let tagExp = result.tagExp;
+        let attrExpPresent = result.attrExpPresent;
+        let closeIndex = result.closeIndex;
+
+        ({ tagName, tagExp } = OrderedObjParser_transformTagName(options.transformTagName, tagName, tagExp, options));
+
+        if (options.strictReservedNames &&
+          (tagName === options.commentPropName
+            || tagName === options.cdataPropName
+            || tagName === options.textNodeName
+            || tagName === options.attributesGroupName
+          )) {
+          throw new Error(`Invalid tag name: ${tagName}`);
+        }
+
+        //save text as child node
+        if (currentNode && textData) {
+          if (currentNode.tagname !== '!xml') {
+            //when nested tag is found
+            textData = this.saveTextToParentTag(textData, currentNode, this.readonlyMatcher, false);
+          }
+        }
+
+        //check if last tag was unpaired tag
+        const lastTag = currentNode;
+        if (lastTag && options.unpairedTagsSet.has(lastTag.tagname)) {
+          currentNode = this.tagsNodeStack.pop();
+          this.matcher.pop();
+        }
+
+        // Clean up self-closing syntax BEFORE processing attributes
+        // This is where tagExp gets the trailing / removed
+        let isSelfClosing = false;
+        if (tagExp.length > 0 && tagExp.lastIndexOf("/") === tagExp.length - 1) {
+          isSelfClosing = true;
+          if (tagName[tagName.length - 1] === "/") {
+            tagName = tagName.substr(0, tagName.length - 1);
+            tagExp = tagName;
+          } else {
+            tagExp = tagExp.substr(0, tagExp.length - 1);
+          }
+
+          // Re-check attrExpPresent after cleaning
+          attrExpPresent = (tagName !== tagExp);
+        }
+
+        // Now process attributes with CLEAN tagExp (no trailing /)
+        let prefixedAttrs = null;
+        let rawAttrs = {};
+        let namespace = undefined;
+
+        // Extract namespace from rawTagName
+        namespace = OrderedObjParser_extractNamespace(rawTagName);
+
+        // Push tag to matcher FIRST (with empty attrs for now) so callbacks see correct path
+        if (tagName !== xmlObj.tagname) {
+          this.matcher.push(tagName, {}, namespace);
+        }
+
+        // Now build attributes - callbacks will see correct matcher state
+        if (tagName !== tagExp && attrExpPresent) {
+          // Build attributes (returns prefixed attributes for the tree)
+          // Note: buildAttributesMap now internally updates the matcher with raw attributes
+          prefixedAttrs = this.buildAttributesMap(tagExp, this.matcher, tagName);
+
+          if (prefixedAttrs) {
+            // Extract raw attributes (without prefix) for our use
+            //TODO: seems a performance overhead
+            rawAttrs = OrderedObjParser_extractRawAttributes(prefixedAttrs, options);
+          }
+        }
+
+        // Now check if this is a stop node (after attributes are set)
+        if (tagName !== xmlObj.tagname) {
+          this.isCurrentNodeStopNode = this.isItStopNode();
+        }
+
+        const startIndex = options.captureMetaData ? OrderedObjParser_getOriginalIndex(i, crlfPositions) : i;
+        if (this.isCurrentNodeStopNode) {
+          let tagContent = "";
+
+          // For self-closing tags, content is empty
+          if (isSelfClosing) {
+            i = result.closeIndex;
+          }
+          //unpaired tag
+          else if (options.unpairedTagsSet.has(tagName)) {
+            i = result.closeIndex;
+          }
+          //normal tag
+          else {
+            //read until closing tag is found
+            const result = this.readStopNodeData(xmlData, rawTagName, closeIndex + 1);
+            if (!result) throw new Error(`Unexpected end of ${rawTagName}`);
+            i = result.i;
+            tagContent = result.tagContent;
+          }
+
+          const childNode = new xmlNode_XmlNode(tagName);
+
+          if (prefixedAttrs) {
+            childNode[":@"] = prefixedAttrs;
+          }
+
+          // For stop nodes, store raw content as-is without any processing
+          childNode.add(options.textNodeName, tagContent);
+
+          this.matcher.pop(); // Pop the stop node tag
+          this.isCurrentNodeStopNode = false; // Reset flag
+
+          this.addChild(currentNode, childNode, this.readonlyMatcher, startIndex);
+
+          if (options.captureMetaData) {
+            currentNode.addEndIndex(OrderedObjParser_getOriginalIndex(i + 1, crlfPositions));
+          }
+        } else {
+          //selfClosing tag
+          if (isSelfClosing) {
+            ({ tagName, tagExp } = OrderedObjParser_transformTagName(options.transformTagName, tagName, tagExp, options));
+
+            const childNode = new xmlNode_XmlNode(tagName);
+            if (prefixedAttrs) {
+              childNode[":@"] = prefixedAttrs;
+            }
+            this.addChild(currentNode, childNode, this.readonlyMatcher, startIndex);
+
+            if (options.captureMetaData) {
+              currentNode.addEndIndex(OrderedObjParser_getOriginalIndex(closeIndex + 1, crlfPositions));
+            }
+            this.matcher.pop(); // Pop self-closing tag
+            this.isCurrentNodeStopNode = false; // Reset flag
+          }
+          else if (options.unpairedTagsSet.has(tagName)) {//unpaired tag
+            const childNode = new xmlNode_XmlNode(tagName);
+            if (prefixedAttrs) {
+              childNode[":@"] = prefixedAttrs;
+            }
+            this.addChild(currentNode, childNode, this.readonlyMatcher, startIndex);
+
+            if (options.captureMetaData) {
+              currentNode.addEndIndex(OrderedObjParser_getOriginalIndex(result.closeIndex + 1, crlfPositions));
+            }
+            this.matcher.pop(); // Pop unpaired tag
+            this.isCurrentNodeStopNode = false; // Reset flag
+            i = result.closeIndex;
+            // Continue to next iteration without changing currentNode
+            continue;
+          }
+          //opening tag
+          else {
+            const childNode = new xmlNode_XmlNode(tagName);
+            if (this.tagsNodeStack.length > options.maxNestedTags) {
+              throw new Error("Maximum nested tags exceeded");
+            }
+            this.tagsNodeStack.push(currentNode);
+
+            if (prefixedAttrs) {
+              childNode[":@"] = prefixedAttrs;
+            }
+            this.addChild(currentNode, childNode, this.readonlyMatcher, startIndex);
+            currentNode = childNode;
+          }
+          textData = "";
+          i = closeIndex;
+        }
+      }
+    } else {
+      textData += xmlData[i];
+    }
+  }
+  return xmlObj.child;
+}
+
+function OrderedObjParser_getOriginalIndex(index, crlfPositions) {
+  let low = 0;
+  let high = crlfPositions.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (crlfPositions[middle] < index) low = middle + 1;
+    else high = middle;
+  }
+  return index + low;
+}
+
+function OrderedObjParser_addChild(currentNode, childNode, matcher, startIndex) {
+  // unset startIndex if not requested
+  if (!this.options.captureMetaData) startIndex = undefined;
+
+  // Pass jPath string or matcher based on options.jPath setting
+  const jPathOrMatcher = this.options.jPath ? matcher.toString() : matcher;
+  const result = this.options.updateTag(childNode.tagname, jPathOrMatcher, childNode[":@"])
+  if (result === false) {
+    //do nothing
+  } else if (typeof result === "string") {
+    childNode.tagname = result
+    currentNode.addChild(childNode, startIndex);
+  } else {
+    currentNode.addChild(childNode, startIndex);
+  }
+}
+
+/**
+ * @param {object} val - Entity object with regex and val properties
+ * @param {string} tagName - Tag name
+ * @param {string|Matcher} jPath - jPath string or Matcher instance based on options.jPath
+ */
+function OrderedObjParser_replaceEntitiesValue(val, tagName, jPath) {
+  const entityConfig = this.options.processEntities;
+
+  if (!entityConfig || !entityConfig.enabled) {
+    return val;
+  }
+
+  // Check if tag is allowed to contain entities
+  if (entityConfig.allowedTags) {
+    const jPathOrMatcher = this.options.jPath ? jPath.toString() : jPath;
+    const allowed = Array.isArray(entityConfig.allowedTags)
+      ? entityConfig.allowedTags.includes(tagName)
+      : entityConfig.allowedTags(tagName, jPathOrMatcher);
+
+    if (!allowed) {
+      return val;
+    }
+  }
+
+  // Apply custom tag filter if provided
+  if (entityConfig.tagFilter) {
+    const jPathOrMatcher = this.options.jPath ? jPath.toString() : jPath;
+    if (!entityConfig.tagFilter(tagName, jPathOrMatcher)) {
+      return val; // Skip based on custom filter
+    }
+  }
+
+  return this.entityDecoder.decode(val);
+}
+
+
+function OrderedObjParser_saveTextToParentTag(textData, parentNode, matcher, isLeafNode) {
+  if (textData) { //store previously collected data as textNode
+    if (isLeafNode === undefined) isLeafNode = parentNode.child.length === 0
+
+    textData = this.parseTextData(textData,
+      parentNode.tagname,
+      matcher,
+      false,
+      parentNode[":@"] ? Object.keys(parentNode[":@"]).length !== 0 : false,
+      isLeafNode);
+
+    if (textData !== undefined && textData !== "")
+      parentNode.add(this.options.textNodeName, textData);
+    textData = "";
+  }
+  return textData;
+}
+
+/**
+ * @param {Array<Expression>} stopNodeExpressions - Array of compiled Expression objects
+ * @param {Matcher} matcher - Current path matcher
+ */
+function OrderedObjParser_isItStopNode() {
+  if (this.stopNodeExpressionsSet.size === 0) return false;
+
+  return this.matcher.matchesAny(this.stopNodeExpressionsSet);
+}
+
+/**
+ * Returns the tag Expression and where it is ending handling single-double quotes situation
+ * @param {string} xmlData 
+ * @param {number} i starting index
+ * @returns 
+ */
+function OrderedObjParser_tagExpWithClosingIndex(xmlData, i, closingChar = ">") {
+  //TODO: ignore boolean attributes in tag expression
+  //TODO: if ignore attributes, dont read full attribute expression but the end. But read for xml declaration
+  const len = xmlData.length;
+  const closeCode0 = closingChar.charCodeAt(0);
+  const closeCode1 = closingChar.length > 1 ? closingChar.charCodeAt(1) : -1;
+
+  let result = '';
+  let segmentStart = i;
+
+  for (let index = i; index < len; index++) {
+    const code = xmlData.charCodeAt(index);
+
+    if (code === 34 || code === 39) { // " or '
+      // Skip the quoted value in one step: nothing inside it can close the tag
+      index = xmlData.indexOf(xmlData[index], index + 1);
+      if (index === -1) return;
+    } else if (code === closeCode0) {
+      if (closeCode1 !== -1) {
+        if (xmlData.charCodeAt(index + 1) === closeCode1) {
+          result += xmlData.substring(segmentStart, index);
+          return { data: result, index };
+        }
+      } else {
+        result += xmlData.substring(segmentStart, index);
+        return { data: result, index };
+      }
+    } else if (code === 9) { // \t - only replace with space outside attribute values
+      // Flush accumulated segment, add space, start new segment
+      result += xmlData.substring(segmentStart, index) + ' ';
+      segmentStart = index + 1;
+    }
+  }
+}
+
+function OrderedObjParser_findClosingIndex(xmlData, str, i, errMsg) {
+  const closingIndex = xmlData.indexOf(str, i);
+  if (closingIndex === -1) {
+    throw new Error(errMsg)
+  } else {
+    return closingIndex + str.length - 1;
+  }
+}
+
+function OrderedObjParser_findClosingChar(xmlData, char, i, errMsg) {
+  const closingIndex = xmlData.indexOf(char, i);
+  if (closingIndex === -1) throw new Error(errMsg);
+  return closingIndex; // no offset needed
+}
+
+function OrderedObjParser_readTagExp(xmlData, i, removeNSPrefix, closingChar = ">") {
+  const result = OrderedObjParser_tagExpWithClosingIndex(xmlData, i + 1, closingChar);
+  if (!result) return;
+  let tagExp = result.data;
+  const closeIndex = result.index;
+  const separatorIndex = tagExp.search(/\s/);
+  let tagName = tagExp;
+  let attrExpPresent = true;
+  if (separatorIndex !== -1) {//separate tag name and attributes expression
+    tagName = tagExp.substring(0, separatorIndex);
+    tagExp = tagExp.substring(separatorIndex + 1).trimStart();
+  }
+
+  const rawTagName = tagName;
+  if (removeNSPrefix) {
+    const colonIndex = tagName.indexOf(":");
+    if (colonIndex !== -1) {
+      tagName = tagName.substr(colonIndex + 1);
+      attrExpPresent = tagName !== result.data.substr(colonIndex + 1);
+    }
+  }
+
+  return {
+    tagName: tagName,
+    tagExp: tagExp,
+    closeIndex: closeIndex,
+    attrExpPresent: attrExpPresent,
+    rawTagName: rawTagName,
+  }
+}
+/**
+ * find paired tag for a stop node
+ * @param {string} xmlData 
+ * @param {string} tagName 
+ * @param {number} i 
+ */
+function OrderedObjParser_readStopNodeData(xmlData, tagName, i) {
+  const startIndex = i;
+  // Starting at 1 since we already have an open tag
+  let openTagCount = 1;
+  let lenient = false; // set once a quote-aware tag scan fails
+  let nextGt = -1; // cached index of the next '>'
+
+  const xmllen = xmlData.length;
+  for (; i < xmllen; i++) {
+    if (xmlData[i] === "<") {
+      const c1 = xmlData.charCodeAt(i + 1);
+      if (c1 === 47) {//close tag '/'
+        const closeIndex = OrderedObjParser_findClosingChar(xmlData, ">", i, `${tagName} is not closed`);
+        let closeTagName = xmlData.substring(i + 2, closeIndex).trim();
+        if (closeTagName === tagName) {
+          openTagCount--;
+          if (openTagCount === 0) {
+            return {
+              tagContent: xmlData.substring(startIndex, i),
+              i: closeIndex
+            }
+          }
+        }
+        i = closeIndex;
+      } else if (c1 === 63) { //?
+        const closeIndex = OrderedObjParser_findClosingIndex(xmlData, "?>", i + 1, "StopNode is not closed.")
+        i = closeIndex;
+      } else if (c1 === 33
+        && xmlData.charCodeAt(i + 2) === 45
+        && xmlData.charCodeAt(i + 3) === 45) { // '!--'
+        const closeIndex = OrderedObjParser_findClosingIndex(xmlData, "-->", i + 3, "StopNode is not closed.")
+        i = closeIndex;
+      } else if (c1 === 33
+        && xmlData.charCodeAt(i + 2) === 91) { // '!['
+        const closeIndex = OrderedObjParser_findClosingIndex(xmlData, "]]>", i, "StopNode is not closed.") - 2;
+        i = closeIndex;
+      } else {
+        const tagData = lenient ? undefined : OrderedObjParser_readTagExp(xmlData, i, false);
+
+        if (tagData) {
+          const openTagName = tagData.tagName;
+          if (openTagName === tagName && tagData.tagExp[tagData.tagExp.length - 1] !== "/") {
+            openTagCount++;
+          }
+          i = tagData.closeIndex;
+        } else {
+          // no closing '>'. use lenient approach to find '<' instead of readTagExp, to avoid repeated rescans.
+          lenient = true;
+          if (nextGt < i) {
+            nextGt = xmlData.indexOf(">", i);
+            if (nextGt === -1) return; // no '>' left, so no closing tag can follow
+          }
+          const nextLt = xmlData.indexOf("<", i + 1);
+          if (nextLt === -1 || nextLt > nextGt) { // looks like a real tag
+            const exp = xmlData.substring(i + 1, nextGt);
+            const sep = exp.search(/\s/);
+            const name = sep === -1 ? exp : exp.substring(0, sep);
+            if (name === tagName && exp[exp.length - 1] !== "/") openTagCount++;
+            i = nextGt;
+          } // else: treat this '<' as plain text
+        }
+      }
+    }
+  }//end for loop
+}
+
+function OrderedObjParser_parseValue(val, shouldParse, options) {
+  if (shouldParse && typeof val === 'string') {
+    //console.log(options)
+    const newval = val.trim();
+    if (newval === 'true') return true;
+    else if (newval === 'false') return false;
+    else return strnum_toNumber(val, options);
+  } else {
+    if (isExist(val)) {
+      return val;
+    } else {
+      return '';
+    }
+  }
+}
+
+function OrderedObjParser_fromCodePoint(str, base, prefix) {
+  const codePoint = Number.parseInt(str, base);
+
+  if (codePoint >= 0 && codePoint <= 0x10FFFF) {
+    return String.fromCodePoint(codePoint);
+  } else {
+    return prefix + str + ";";
+  }
+}
+
+function OrderedObjParser_transformTagName(fn, tagName, tagExp, options) {
+  if (fn) {
+    const newTagName = fn(tagName);
+    if (tagExp === tagName) {
+      tagExp = newTagName
+    }
+    tagName = newTagName;
+  }
+  tagName = OrderedObjParser_sanitizeName(tagName, options);
+  return { tagName, tagExp };
+}
+
+
+
+function OrderedObjParser_sanitizeName(name, options) {
+  if (criticalProperties.includes(name)) {
+    throw new Error(`[SECURITY] Invalid name: "${name}" is a reserved JavaScript keyword that could cause prototype pollution`);
+  } else if (DANGEROUS_PROPERTY_NAMES.includes(name)) {
+    return options.onDangerousProperty(name);
+  }
+  return name;
+}
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/node2json.js
+
+
+
+
+
+const xmlparser_node2json_METADATA_SYMBOL = xmlNode_XmlNode.getMetaDataSymbol();
+
+/**
+ * Helper function to strip attribute prefix from attribute map
+ * @param {object} attrs - Attributes with prefix (e.g., {"@_class": "code"})
+ * @param {string} prefix - Attribute prefix to remove (e.g., "@_")
+ * @returns {object} Attributes without prefix (e.g., {"class": "code"})
+ */
+function node2json_stripAttributePrefix(attrs, prefix) {
+  if (!attrs || typeof attrs !== 'object') return {};
+  if (!prefix) return attrs;
+
+  const rawAttrs = {};
+  for (const key in attrs) {
+    if (key.startsWith(prefix)) {
+      const rawName = key.substring(prefix.length);
+      rawAttrs[rawName] = attrs[key];
+    } else {
+      // Attribute without prefix (shouldn't normally happen, but be safe)
+      rawAttrs[key] = attrs[key];
+    }
+  }
+  return rawAttrs;
+}
+
+/**
+ * 
+ * @param {array} node 
+ * @param {any} options 
+ * @param {Matcher} matcher - Path matcher instance
+ * @returns 
+ */
+function node2json_prettify(node, options, matcher, readonlyMatcher) {
+  return node2json_compress(node, options, matcher, readonlyMatcher);
+}
+
+/**
+ * @param {array} arr 
+ * @param {object} options 
+ * @param {Matcher} matcher - Path matcher instance
+ * @returns object
+ */
+function node2json_compress(arr, options, matcher, readonlyMatcher) {
+  let text;
+  const compressedObj = {}; //This is intended to be a plain object
+  for (let i = 0; i < arr.length; i++) {
+    const tagObj = arr[i];
+    const property = node2json_propName(tagObj);
+
+    // Push current property to matcher WITH RAW ATTRIBUTES (no prefix)
+    if (property !== undefined && property !== options.textNodeName) {
+      const rawAttrs = node2json_stripAttributePrefix(
+        tagObj[":@"] || {},
+        options.attributeNamePrefix
+      );
+      matcher.push(property, rawAttrs);
+    }
+
+    if (property === options.textNodeName) {
+      if (text === undefined) text = tagObj[property];
+      else text += "" + tagObj[property];
+    } else if (property === undefined) {
+      continue;
+    } else if (tagObj[property]) {
+
+      let val = node2json_compress(tagObj[property], options, matcher, readonlyMatcher);
+      const isLeaf = node2json_isLeafTag(val, options);
+
+      if (Object.keys(val).length === 0 && options.alwaysCreateTextNode) {
+        val[options.textNodeName] = "";
+      }
+
+      if (tagObj[":@"]) {
+        node2json_assignAttributes(val, tagObj[":@"], readonlyMatcher, options);
+      } else if (Object.keys(val).length === 1 && val[options.textNodeName] !== undefined && !options.alwaysCreateTextNode) {
+        val = val[options.textNodeName];
+      } else if (Object.keys(val).length === 0) {
+        if (options.alwaysCreateTextNode) val[options.textNodeName] = "";
+        else val = "";
+      }
+
+      if (tagObj[xmlparser_node2json_METADATA_SYMBOL] !== undefined && typeof val === "object" && val !== null) {
+        val[xmlparser_node2json_METADATA_SYMBOL] = tagObj[xmlparser_node2json_METADATA_SYMBOL]; // copy over metadata
+      }
+
+
+      if (compressedObj[property] !== undefined && Object.prototype.hasOwnProperty.call(compressedObj, property)) {
+        if (!Array.isArray(compressedObj[property])) {
+          compressedObj[property] = [compressedObj[property]];
+        }
+        compressedObj[property].push(val);
+      } else {
+        //TODO: if a node is not an array, then check if it should be an array
+        //also determine if it is a leaf node
+
+        // Pass jPath string or readonlyMatcher based on options.jPath setting
+        const jPathOrMatcher = options.jPath ? readonlyMatcher.toString() : readonlyMatcher;
+        if (options.isArray(property, jPathOrMatcher, isLeaf)) {
+          compressedObj[property] = [val];
+        } else {
+          compressedObj[property] = val;
+        }
+      }
+
+      // Pop property from matcher after processing
+      if (property !== undefined && property !== options.textNodeName) {
+        matcher.pop();
+      }
+    }
+
+  }
+  // if(text && text.length > 0) compressedObj[options.textNodeName] = text;
+  if (typeof text === "string") {
+    if (text.length > 0) compressedObj[options.textNodeName] = text;
+  } else if (text !== undefined) compressedObj[options.textNodeName] = text;
+
+
+  return compressedObj;
+}
+
+function node2json_propName(obj) {
+  const keys = Object.keys(obj);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (key !== ":@") return key;
+  }
+}
+
+function node2json_assignAttributes(obj, attrMap, readonlyMatcher, options) {
+  if (attrMap) {
+    const keys = Object.keys(attrMap);
+    const len = keys.length; //don't make it inline
+    for (let i = 0; i < len; i++) {
+      const atrrName = keys[i];  // This is the PREFIXED name (e.g., "@_class")
+
+      // Strip prefix for matcher path (for isArray callback)
+      const rawAttrName = atrrName.startsWith(options.attributeNamePrefix)
+        ? atrrName.substring(options.attributeNamePrefix.length)
+        : atrrName;
+
+      // For attributes, we need to create a temporary path
+      // Pass jPath string or matcher based on options.jPath setting
+      const jPathOrMatcher = options.jPath
+        ? readonlyMatcher.toString() + "." + rawAttrName
+        : readonlyMatcher;
+
+      if (options.isArray(atrrName, jPathOrMatcher, true, true)) {
+        obj[atrrName] = [attrMap[atrrName]];
+      } else {
+        obj[atrrName] = attrMap[atrrName];
+      }
+    }
+  }
+}
+
+function node2json_isLeafTag(obj, options) {
+  const { textNodeName } = options;
+  const propCount = Object.keys(obj).length;
+
+  if (propCount === 0) {
+    return true;
+  }
+
+  if (
+    propCount === 1 &&
+    (obj[textNodeName] || typeof obj[textNodeName] === "boolean" || obj[textNodeName] === 0)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/XMLParser.js
+/* global Uint8Array */
+
+
+
+
+
+
+class XMLParser_XMLParser {
+
+    constructor(options) {
+        this.externalEntities = {};
+        this.options = OptionsBuilder_buildOptions(options);
+
+    }
+    /**
+     * Parse XML dats to JS object 
+     * @param {string|Uint8Array} xmlData 
+     * @param {boolean|Object} validationOption 
+     */
+    parse(xmlData, validationOption) {
+        if (typeof xmlData !== "string" && xmlData.toString) {
+            if (xmlData instanceof Uint8Array &&
+                !(typeof Buffer !== "undefined" && Buffer.isBuffer(xmlData))) {
+                xmlData = new TextDecoder("utf-8", { ignoreBOM: true }).decode(xmlData);
+            } else {
+                xmlData = xmlData.toString();
+            }
+        } else if (typeof xmlData !== "string") {
+            throw new Error("XML data is accepted in String or Bytes[] form.")
+        }
+
+        if (validationOption) {
+            if (validationOption === true) validationOption = {}; //validate with default options
+
+            const result = validate(xmlData, validationOption);
+            if (result !== true) {
+                throw Error(`${result.err.msg}:${result.err.line}:${result.err.col}`)
+            }
+        }
+        const orderedObjParser = new OrderedObjParser_OrderedObjParser(this.options, this.externalEntities);
+        // orderedObjParser.entityDecoder.setExternalEntities(this.externalEntities);
+        const orderedResult = orderedObjParser.parseXml(xmlData);
+        if (this.options.preserveOrder || orderedResult === undefined) return orderedResult;
+        else return node2json_prettify(orderedResult, this.options, orderedObjParser.matcher, orderedObjParser.readonlyMatcher);
+    }
+
+    /**
+     * Add Entity which is not by default supported by this library
+     * @param {string} key 
+     * @param {string} value 
+     */
+    addEntity(key, value) {
+        if (value.indexOf("&") !== -1) {
+            throw new Error("Entity value can't have '&'")
+        } else if (key.indexOf("&") !== -1 || key.indexOf(";") !== -1) {
+            throw new Error("An entity must be set without '&' and ';'. Eg. use '#xD' for '&#xD;'")
+        } else if (value === "&") {
+            throw new Error("An entity with value '&' is not permitted");
+        } else {
+            this.externalEntities[key] = value;
+        }
+    }
+
+    /**
+     * Returns a Symbol that can be used to access the metadata
+     * property on a node.
+     * 
+     * If Symbol is not available in the environment, an ordinary property is used
+     * and the name of the property is here returned.
+     * 
+     * The XMLMetaData property is only present when `captureMetaData`
+     * is true in the options.
+     */
+    static getMetaDataSymbol() {
+        return xmlNode_XmlNode.getMetaDataSymbol();
     }
 }
 ;// CONCATENATED MODULE: ./node_modules/fast-xml-builder/src/util.js
@@ -7435,8 +16834,8 @@ function toXml(jArray, options) {
         for (let i = 0; i < options.stopNodes.length; i++) {
             const node = options.stopNodes[i];
             if (typeof node === 'string') {
-                stopNodeExpressions.push(new Expression(node));
-            } else if (node instanceof Expression) {
+                stopNodeExpressions.push(new Expression_Expression(node));
+            } else if (node instanceof Expression_Expression) {
                 stopNodeExpressions.push(node);
             }
         }
@@ -7444,9 +16843,9 @@ function toXml(jArray, options) {
 
     // Detect XML version for use in name validation
     const xmlVersion = detectXmlVersionFromArray(jArray, options);
-    const qNameValidator = createValidator('qName', { xmlVersion });
+    const qNameValidator = src_createValidator('qName', { xmlVersion });
     // Initialize matcher for path tracking
-    const matcher = new Matcher();
+    const matcher = new Matcher_Matcher();
 
     return arrToStr(jArray, options, indentation, matcher, stopNodeExpressions, qNameValidator);
 }
@@ -7736,7 +17135,7 @@ function orderedJs2Xml_replaceEntitiesValue(textValue, options) {
     return textValue;
 }
 ;// CONCATENATED MODULE: ./node_modules/fast-xml-builder/src/ignoreAttributes.js
-function ignoreAttributes_getIgnoreAttributesFn(ignoreAttributes) {
+function src_ignoreAttributes_getIgnoreAttributesFn(ignoreAttributes) {
     if (typeof ignoreAttributes === 'function') {
         return ignoreAttributes
     }
@@ -7825,8 +17224,8 @@ function Builder(options) {
     for (let i = 0; i < this.options.stopNodes.length; i++) {
       const node = this.options.stopNodes[i];
       if (typeof node === 'string') {
-        this.stopNodeExpressions.push(new Expression(node));
-      } else if (node instanceof Expression) {
+        this.stopNodeExpressions.push(new Expression_Expression(node));
+      } else if (node instanceof Expression_Expression) {
         this.stopNodeExpressions.push(node);
       }
     }
@@ -7837,7 +17236,7 @@ function Builder(options) {
       return false;
     };
   } else {
-    this.ignoreAttributesFn = ignoreAttributes_getIgnoreAttributesFn(this.options.ignoreAttributes)
+    this.ignoreAttributesFn = src_ignoreAttributes_getIgnoreAttributesFn(this.options.ignoreAttributes)
     this.attrPrefixLen = this.options.attributeNamePrefix.length;
     this.isAttribute = isAttribute;
   }
@@ -7887,9 +17286,9 @@ Builder.prototype.build = function (jObj) {
       }
     }
     // Initialize matcher for path tracking
-    const matcher = new Matcher();
+    const matcher = new Matcher_Matcher();
     const xmlVersion = detectXmlVersionFromObj(jObj, this.options);
-    const qNameValidator = createValidator('qName', { xmlVersion });
+    const qNameValidator = src_createValidator('qName', { xmlVersion });
     return this.j2x(jObj, 0, matcher, qNameValidator).val;
   }
 };
@@ -8371,7 +17770,7 @@ class CoberturaReport {
 				"Coverage must be valid Cobertura XML without entity declarations.",
 			);
 		}
-		this.document = new XMLParser({
+		this.document = new XMLParser_XMLParser({
 			ignoreAttributes: false,
 			parseAttributeValue: false,
 		}).parse(content);
@@ -8493,937 +17892,2922 @@ class CoberturaReport {
 	}
 }
 
-;// CONCATENATED MODULE: ./src/CoverageReports.js
+;// CONCATENATED MODULE: ./src/NativeReports.js
 
 
 
 
 
 
-class CoverageReports {
-	constructor({ identity, temporaryDirectory }) {
-		if (
-			!identity ||
-			!/^[\w.-]+\/[\w.-]+$/.test(identity.repository) ||
-			!/^[a-f0-9]{40}$/.test(identity.sha) ||
-			!/^\d+$/.test(identity.runId) ||
-			!/^[1-9]\d*$/.test(identity.attempt)
-		)
-			throw new Error("Invalid coverage run identity.");
-		this.identity = identity;
-		this.temporaryDirectory = external_node_fs_namespaceObject.realpathSync(temporaryDirectory);
+
+/** Validate native formats without installing or executing project dependencies. */
+class NativeReports {
+	constructor() {
+		this.parsers = new ParserFactory(null).parsers;
 	}
 
-	static list(value, name) {
-		const list = typeof value === "string" ? JSON.parse(value) : value;
+	parse(content, filename, kind) {
+		if (Buffer.byteLength(content) > Protocol.maxFileBytes)
+			throw new Error("Native report exceeds 64 MiB.");
+		// Cobertura generators commonly emit an external DTD. It is metadata,
+		// never fetched; internal subsets and entity declarations remain rejected.
+		if (kind === "coverage")
+			content = content.replace(
+				/<!DOCTYPE coverage SYSTEM ["'][^"'<>\r\n]+["']\s*>/g,
+				"",
+			);
 		if (
-			!Array.isArray(list) ||
-			!list.length ||
-			list.length > 256 ||
-			list.some(
-				(item) => !item || typeof item !== "object" || Array.isArray(item),
-			)
+			kind === "lint" &&
+			external_node_path_namespaceObject.basename(filename) === "super-linter-summary.md"
 		) {
-			throw new Error(`${name} must contain 1-256 report objects.`);
+			if (!content.trim() || !/^\|.*\|/m.test(content))
+				throw new Error("Expected the native Super-Linter summary table.");
+			return {
+				format: "super-linter-summary",
+				data: { tests: [], lintIssues: [], summary: content },
+				sourceFiles: [],
+			};
 		}
-		return list;
-	}
-
-	static label(value) {
-		if (typeof value !== "string" || !/^[\w.-][\w./-]{0,199}$/.test(value))
-			throw new Error(
-				"Coverage labels must contain 1-200 letters, numbers, underscores, dots, slashes or hyphens.",
-			);
-		return value;
-	}
-
-	static job(value) {
-		if (typeof value !== "string" || !/^[\w-]+$/.test(value))
-			throw new Error("Coverage report-group must be a job ID.");
-		return value;
-	}
-
-	static language(value) {
 		if (
-			typeof value !== "string" ||
-			!/^[A-Za-z][A-Za-z0-9 #+.-]{0,79}$/.test(value)
+			content.trimStart().startsWith("<") &&
+			(/<!DOCTYPE\b|<!ENTITY\b/i.test(content) ||
+				XMLValidator.validate(content) !== true)
 		)
-			throw new Error("Coverage reports require a Linguist language name.");
-		return value;
-	}
-
-	static digest(content) {
-		return (0,external_node_crypto_namespaceObject.createHash)("sha256").update(content).digest("hex");
-	}
-
-	static file(directory, file) {
-		if (!/^report-\d+\.xml$/.test(file))
-			throw new Error("Unexpected coverage artifact filename.");
-		const result = external_node_path_namespaceObject.join(directory, file);
-		if (!external_node_fs_namespaceObject.lstatSync(result).isFile() || external_node_fs_namespaceObject.realpathSync(result) !== result)
 			throw new Error(
-				"Coverage artifacts must contain regular files, not symlinks.",
+				"Invalid XML or unsafe XML declarations in native report.",
 			);
-		return result;
-	}
-
-	source(project, workspace, sourceSha, sourcePrefix) {
-		let repository;
-		let actual;
-		let checkout = false;
-		try {
-			repository = external_node_fs_namespaceObject.realpathSync(
-				(0,external_node_child_process_namespaceObject.execFileSync)("git", ["-C", project, "rev-parse", "--show-toplevel"], {
-					encoding: "utf8",
-					stdio: ["ignore", "pipe", "pipe"],
-				}).trim(),
-			);
-			actual = (0,external_node_child_process_namespaceObject.execFileSync)("git", ["-C", project, "rev-parse", "HEAD"], {
-				encoding: "utf8",
-			}).trim();
-			checkout = true;
-		} catch {
-			if (!sourceSha || sourcePrefix === "")
-				throw new Error(
-					"Coverage needs a Git checkout, or explicit source-sha and source-prefix for a prebuilt container.",
-				);
-			repository = workspace;
-			actual = sourceSha;
-		}
-		if (actual !== this.identity.sha || (sourceSha && sourceSha !== actual))
-			throw new Error(
-				"Coverage must measure the PR head commit (or the current push commit), not a merge commit or another image revision.",
-			);
-		const checkoutPrefix =
-			external_node_path_namespaceObject.relative(repository, project).split(external_node_path_namespaceObject.sep).join("/") || ".";
-		if (checkout && sourcePrefix && sourcePrefix !== checkoutPrefix)
-			throw new Error(
-				"source-prefix must match the actual checkout directory.",
-			);
-		const prefix = sourcePrefix || checkoutPrefix;
-		if (prefix !== ".") CoberturaReport.relative(prefix);
-		return { project, repository, prefix };
-	}
-
-	prepare({
-		directory,
-		workspace,
-		reports,
-		group,
-		sourceSha = "",
-		sourcePrefix = "",
-	}) {
-		const project = external_node_fs_namespaceObject.realpathSync(directory);
-		const source = this.source(
-			project,
-			external_node_fs_namespaceObject.realpathSync(workspace),
-			sourceSha,
-			sourcePrefix,
+		const candidates = this.parsers.filter(
+			(parser) =>
+				parser.getCategory() === kind && parser.canParse(filename, content),
 		);
-		const entries = CoverageReports.list(reports, "reports");
-		const labels = new Set();
-		const prepared = entries.map((entry) => {
-			const label = CoverageReports.label(
-				entry.label ||
-					(entries.length === 1
-						? source.prefix === "."
-							? "root"
-							: source.prefix
-						: ""),
+		if (candidates.length !== 1)
+			throw new Error(
+				`Expected one supported ${kind} format for ${filename}; found ${candidates.length}.`,
 			);
-			if (labels.has(label))
-				throw new Error(`Duplicate coverage label: ${label}`);
-			labels.add(label);
-			const file = external_node_path_namespaceObject.resolve(project, CoberturaReport.relative(entry.file));
+		const parser = candidates[0];
+		const data = parser.parse(content, filename);
+		if (kind === "test" && !data.tests.length)
+			throw new Error("Required test report has no test cases.");
+		if (
+			kind === "coverage" &&
+			(!data.coverage || data.coverage.lines.total < 1)
+		)
+			throw new Error("Required coverage report has no instrumented lines.");
+		const format = parser.constructor.name.replace(/Parser$/, "").toLowerCase();
+		let sourceFiles = [];
+		if (format === "cobertura")
+			sourceFiles = new CoberturaReport(content).classes.map(
+				(entry) => entry["@_filename"],
+			);
+		if (format === "lcov") {
+			sourceFiles = [...content.matchAll(/^SF:(.+)$/gm)].map((match) =>
+				match[1].trim(),
+			);
 			if (
-				!external_node_fs_namespaceObject.lstatSync(file).isFile() ||
-				!external_node_fs_namespaceObject.realpathSync(file).startsWith(`${project}${external_node_path_namespaceObject.sep}`)
+				!sourceFiles.length ||
+				(content.match(/^end_of_record\s*$/gm) || []).length !==
+					sourceFiles.length
 			)
 				throw new Error(
-					"Coverage report must be a regular file inside working-directory.",
+					"LCOV records must identify sources and end with end_of_record.",
 				);
-			return {
-				label,
-				language: CoverageReports.language(entry.language),
-				content: new CoberturaReport(external_node_fs_namespaceObject.readFileSync(file, "utf8")).normalize(
-					source,
-				),
-			};
-		});
-		return this.write(prepared, CoverageReports.job(group));
-	}
-
-	write(reports, group) {
-		const directory = external_node_fs_namespaceObject.mkdtempSync(
-			external_node_path_namespaceObject.join(this.temporaryDirectory, "ci-coverage-"),
-		);
-		const entries = reports.map(({ content, ...report }, index) => {
-			const file = `report-${index}.xml`;
-			external_node_fs_namespaceObject.writeFileSync(external_node_path_namespaceObject.join(directory, file), content);
-			return { ...report, file, sha256: CoverageReports.digest(content) };
-		});
-		external_node_fs_namespaceObject.writeFileSync(
-			external_node_path_namespaceObject.join(directory, "manifest.json"),
-			JSON.stringify({
-				version: 1,
-				identity: this.identity,
-				group,
-				reports: entries,
-			}),
-		);
-		return {
-			directory,
-			name: `ci-coverage-${this.identity.attempt}-${group}-${(0,external_node_crypto_namespaceObject.randomUUID)()}`,
-			reports: entries,
-		};
-	}
-
-	read(directory) {
-		const manifestFile = external_node_path_namespaceObject.join(directory, "manifest.json");
-		if (
-			!external_node_fs_namespaceObject.lstatSync(manifestFile).isFile() ||
-			external_node_fs_namespaceObject.realpathSync(manifestFile) !== manifestFile
-		)
-			throw new Error("Coverage manifest must be a regular file.");
-		const manifest = JSON.parse(external_node_fs_namespaceObject.readFileSync(manifestFile, "utf8"));
-		if (
-			manifest.version !== 1 ||
-			Object.entries(this.identity).some(
-				([key, value]) => manifest.identity?.[key] !== value,
-			)
-		)
-			throw new Error(
-				"Coverage artifact belongs to a different repository, commit, run or attempt.",
-			);
-		CoverageReports.job(manifest.group);
-		const entries = CoverageReports.list(manifest.reports, "manifest reports");
-		return entries.map((entry) => {
-			CoverageReports.label(entry.label);
-			CoverageReports.language(entry.language);
-			const content = external_node_fs_namespaceObject.readFileSync(
-				CoverageReports.file(directory, entry.file),
-				"utf8",
-			);
-			if (CoverageReports.digest(content) !== entry.sha256)
-				throw new Error(`Coverage artifact checksum mismatch: ${entry.label}`);
-			return {
-				...entry,
-				content,
-				group: manifest.group,
-				files: new CoberturaReport(content).files(),
-			};
-		});
-	}
-
-	collect({ directory, expected, jobs }) {
-		directory = external_node_fs_namespaceObject.realpathSync(directory);
-		const inventory = CoverageReports.list(expected, "expected-reports");
-		const labels = new Map();
-		for (const report of inventory) {
-			CoverageReports.label(report.label);
-			CoverageReports.job(report.job);
-			if (labels.has(report.label))
-				throw new Error(`Duplicate expected coverage label: ${report.label}`);
-			if (jobs[report.job]?.result !== "success")
-				throw new Error(
-					`Coverage producer ${report.job} did not succeed; its artifacts remain available for diagnostics.`,
+			if (new Set(sourceFiles).size !== sourceFiles.length)
+				throw new Error("Duplicate LCOV sources require a native merge.");
+			for (const record of content.split("end_of_record").slice(0, -1)) {
+				const lines = [...record.matchAll(/^DA:(.+)$/gm)].map((match) =>
+					match[1].split(","),
 				);
-			labels.set(report.label, report.job);
-		}
-		const found = new Map();
-		const sources = new Map();
-		const entries = external_node_fs_namespaceObject.readdirSync(directory, { withFileTypes: true });
-		// The official downloader extracts a single matching artifact directly.
-		const single = entries.some((entry) => entry.name === "manifest.json");
-		if (
-			entries.some((entry) => (single ? !entry.isFile() : !entry.isDirectory()))
-		) {
-			throw new Error(
-				"Coverage collection expects one flat artifact or separate artifact directories.",
-			);
-		}
-		const directories = single
-			? [directory]
-			: entries.map((entry) => external_node_path_namespaceObject.join(directory, entry.name));
-		for (const artifact of directories) {
-			for (const report of this.read(artifact)) {
-				if (labels.get(report.label) !== report.group)
-					throw new Error(
-						`Unexpected coverage component or producer: ${report.label}`,
-					);
-				if (found.has(report.label))
-					throw new Error(
-						`Duplicate coverage component: ${report.label}. Publish only the designated runtime version and merge shards first.`,
-					);
-				for (const file of report.files) {
-					if (sources.has(file))
-						throw new Error(
-							`Overlapping coverage for ${file}: ${sources.get(file)} and ${report.label}. Merge these reports with the test framework first.`,
-						);
-					sources.set(file, report.label);
-				}
-				found.set(report.label, report);
+				if (
+					lines.some(
+						([line, hits]) =>
+							!/^\d+$/.test(line) ||
+							Number(line) < 1 ||
+							!/^\d+$/.test(hits) ||
+							!Number.isSafeInteger(Number(hits)),
+					) ||
+					new Set(lines.map(([line]) => line)).size !== lines.length
+				)
+					throw new Error("Invalid or duplicate LCOV line measurements.");
 			}
 		}
-		const missing = [...labels.keys()].filter((label) => !found.has(label));
-		if (missing.length)
+		return { format, data: JSON.parse(JSON.stringify(data)), sourceFiles };
+	}
+
+	static mapPath(
+		filename,
+		{ workspace, project, mappings = {} },
+		required = false,
+	) {
+		if (!filename) return "";
+		let input = filename.replace(/\\/g, "/");
+		const mapped = Object.entries(mappings).filter(
+			([prefix]) => input === prefix || input.startsWith(`${prefix}/`),
+		);
+		if (mapped.length > 1)
+			throw new Error(`Conflicting source mappings for ${filename}.`);
+		if (mapped.length)
+			input = external_node_path_namespaceObject.posix.join(mapped[0][1], input.slice(mapped[0][0].length));
+		const candidates = [
+			external_node_path_namespaceObject.resolve(workspace, project, input),
+			external_node_path_namespaceObject.resolve(workspace, input),
+		];
+		const matches = new Set();
+		for (const candidate of candidates) {
+			if (!external_node_fs_namespaceObject.existsSync(candidate) || !external_node_fs_namespaceObject.statSync(candidate).isFile())
+				continue;
+			const relative = external_node_path_namespaceObject.relative(external_node_fs_namespaceObject.realpathSync(workspace), external_node_fs_namespaceObject.realpathSync(candidate))
+				.split(external_node_path_namespaceObject.sep)
+				.join("/");
+			Protocol.relative(relative);
+			matches.add(relative);
+		}
+		if (matches.size > 1 || (required && matches.size !== 1))
 			throw new Error(
-				`Missing coverage components: ${missing.join(", ")}. Rerun all producer jobs.`,
+				`Source must resolve to one repository file: ${filename}`,
 			);
-		return this.write(
-			inventory.map(({ label }) => {
-				const { content, language } = found.get(label);
-				return { content, language, label };
-			}),
-			"validated",
+		return [...matches][0] || "";
+	}
+
+	static language(files) {
+		const languages = {
+			".js": "JavaScript",
+			".jsx": "JavaScript",
+			".mjs": "JavaScript",
+			".cjs": "JavaScript",
+			".ts": "TypeScript",
+			".tsx": "TypeScript",
+			".py": "Python",
+			".go": "Go",
+			".php": "PHP",
+			".java": "Java",
+			".rs": "Rust",
+			".rb": "Ruby",
+			".cs": "C#",
+		};
+		const detected = new Set(
+			files.map((file) => languages[external_node_path_namespaceObject.extname(file)]),
+		);
+		if (detected.size === 1 && !detected.has(undefined))
+			return [...detected][0];
+		throw new Error(
+			"Coverage language is ambiguous. Use the language-specific action to supply the dataset language.",
 		);
 	}
 
-	verify({ directory, reports }) {
-		const requested = CoverageReports.list(reports, "reports");
-		if (requested.length !== 1)
-			throw new Error("Verify one publication report at a time.");
-		const selected = requested[0];
-		const report = this.read(external_node_fs_namespaceObject.realpathSync(directory)).find(
-			(entry) =>
-				entry.label === selected.label &&
-				entry.file === selected.file &&
-				entry.language === selected.language,
-		);
-		if (report?.group !== "validated")
-			throw new Error(
-				"Requested report does not match the validated coverage artifact.",
-			);
-		return {
-			file: CoverageReports.file(external_node_fs_namespaceObject.realpathSync(directory), report.file),
-			label: report.label,
-			language: report.language,
+	static measurement(content, format, sourceMap) {
+		const lines = new Map();
+		const add = (source, number, hits) => {
+			const key = `${sourceMap[source]}:${number}`;
+			lines.set(key, lines.get(key) || Number(hits) > 0);
 		};
+		if (format === "lcov") {
+			let source;
+			for (const line of content.split(/\r?\n/)) {
+				if (line.startsWith("SF:")) source = line.slice(3).trim();
+				if (line.startsWith("DA:")) {
+					const [number, hits] = line.slice(3).split(",");
+					add(source, Number(number), hits);
+				}
+			}
+		} else if (format === "cobertura") {
+			for (const item of new CoberturaReport(content).classes)
+				for (const line of CoberturaReport.array(item.lines?.line))
+					add(item["@_filename"], Number(line["@_number"]), line["@_hits"]);
+		}
+		if (!lines.size)
+			throw new Error("Coverage has no comparable source line measurements.");
+		const covered = [...lines.values()].filter(Boolean).length;
+		return {
+			measurementDigest: Protocol.digest(
+				JSON.stringify(
+					[...lines].sort(([left], [right]) => left.localeCompare(right)),
+				),
+			),
+			lines: {
+				total: lines.size,
+				covered,
+				percentage: (covered / lines.size) * 100,
+			},
+		};
+	}
+
+	validate(directory, definition, workspace) {
+		const assets = [];
+		const errors = [];
+		const found = new Map();
+		let totalBytes = 0;
+		for (const selector of definition.reports) {
+			const matches = [...external_node_fs_namespaceObject.globSync(selector.pattern, { cwd: directory })];
+			if (!matches.length && !selector.optional)
+				errors.push(
+					`Missing required ${selector.kind} report: ${selector.pattern}`,
+				);
+			for (const relative of matches) {
+				try {
+					if (found.has(relative)) {
+						if (
+							JSON.stringify(found.get(relative)) !== JSON.stringify(selector)
+						)
+							throw new Error(`Conflicting report selectors for ${relative}.`);
+						continue;
+					}
+					found.set(relative, selector);
+					const file = Protocol.file(directory, relative);
+					const bytes = external_node_fs_namespaceObject.readFileSync(file);
+					totalBytes += bytes.length;
+					if (totalBytes > Protocol.maxBundleBytes || assets.length >= 512)
+						throw new Error("Report bundle exceeds its resource limit.");
+					const parsed = this.parse(
+						bytes.toString("utf8"),
+						relative,
+						selector.kind,
+					);
+					const sourceMap = {};
+					const options = {
+						workspace,
+						project: definition.project,
+						mappings: definition["path-mapping"],
+					};
+					if (parsed.format === "cobertura") {
+						const report = new CoberturaReport(bytes.toString("utf8"));
+						const originals = report.classes.map((item) => item["@_filename"]);
+						report.normalize({
+							project: external_node_path_namespaceObject.join(workspace, definition.project),
+							repository: workspace,
+							prefix: definition.project === "." ? "" : definition.project,
+						});
+						report.classes.forEach((item, index) => {
+							sourceMap[originals[index]] = item["@_filename"];
+						});
+					} else
+						for (const source of parsed.sourceFiles)
+							sourceMap[source] = NativeReports.mapPath(source, options, true);
+					for (const item of [
+						...parsed.data.tests,
+						...parsed.data.lintIssues,
+					]) {
+						if (item.file)
+							sourceMap[item.file] = NativeReports.mapPath(item.file, options);
+						item.file = sourceMap[item.file] || "";
+					}
+					if (selector.kind === "coverage") {
+						const measurement = NativeReports.measurement(
+							bytes.toString("utf8"),
+							parsed.format,
+							sourceMap,
+						);
+						parsed.measurementDigest = measurement.measurementDigest;
+						parsed.data.coverage.lines = measurement.lines;
+					}
+					assets.push({
+						file: relative,
+						size: bytes.length,
+						sha256: Protocol.digest(bytes),
+						selector,
+						...(selector.kind === "coverage"
+							? {
+									language:
+										selector.language ||
+										NativeReports.language(Object.values(sourceMap)),
+								}
+							: {}),
+						...parsed,
+						sourceMap,
+					});
+				} catch (error) {
+					errors.push(`${relative}: ${error.message}`);
+					// Preserve safe malformed evidence for diagnosis, never for publication.
+					try {
+						const bytes = external_node_fs_namespaceObject.readFileSync(Protocol.file(directory, relative));
+						if (
+							totalBytes <= Protocol.maxBundleBytes &&
+							assets.length < 512 &&
+							!assets.some((asset) => asset.file === relative)
+						)
+							assets.push({
+								file: relative,
+								size: bytes.length,
+								sha256: Protocol.digest(bytes),
+								selector,
+								invalid: error.message,
+							});
+					} catch {
+						// Symlinks, directories and oversized files are not retained.
+					}
+				}
+			}
+		}
+		return { assets, errors };
+	}
+
+	verify(directory, asset) {
+		const bytes = external_node_fs_namespaceObject.readFileSync(Protocol.file(directory, asset.file));
+		if (asset.size !== bytes.length || asset.sha256 !== Protocol.digest(bytes))
+			throw new Error("Report asset integrity check failed.");
+		if (asset.invalid) {
+			if (typeof asset.invalid !== "string")
+				throw new Error("Invalid diagnostic reason.");
+			return {
+				file: asset.file,
+				size: asset.size,
+				sha256: asset.sha256,
+				selector: asset.selector,
+				invalid: asset.invalid,
+			};
+		}
+		const parsed = this.parse(
+			bytes.toString("utf8"),
+			asset.file,
+			asset.selector.kind,
+		);
+		if (parsed.format !== asset.format)
+			throw new Error("Native report format changed.");
+		for (const value of Object.values(asset.sourceMap || {}))
+			if (value) Protocol.relative(value);
+		for (const source of parsed.sourceFiles)
+			if (!asset.sourceMap[source])
+				throw new Error("Coverage source mapping is incomplete.");
+		for (const item of [...parsed.data.tests, ...parsed.data.lintIssues])
+			item.file = asset.sourceMap[item.file] || "";
+		if (asset.selector.kind === "coverage") {
+			const measurement = NativeReports.measurement(
+				bytes.toString("utf8"),
+				parsed.format,
+				asset.sourceMap,
+			);
+			parsed.measurementDigest = measurement.measurementDigest;
+			parsed.data.coverage.lines = measurement.lines;
+			parsed.language =
+				asset.selector.language ||
+				NativeReports.language(Object.values(asset.sourceMap));
+		}
+		return { ...asset, ...parsed };
 	}
 }
 
-;// CONCATENATED MODULE: external "node:util"
-const external_node_util_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:util");
-;// CONCATENATED MODULE: ./src/ReportPlan.js
+;// CONCATENATED MODULE: ./src/Reporters.js
 
 
+const Reporters = {
+	selections: {
+		lint: {
+			allowed: ["annotations", "comment", "code-scanning"],
+			default: "annotations",
+		},
+		test: { allowed: ["annotations", "comment"], default: "annotations" },
+		coverage: {
+			allowed: ["auto", "github", "codecov", "coveralls", "comment"],
+			default: "auto",
+		},
+	},
 
+	parse(inputs = {}) {
+		return Object.fromEntries(
+			Object.entries(Reporters.selections).map(([kind, config]) => {
+				const value = inputs[kind] ?? config.default;
+				if (typeof value !== "string")
+					throw new Error(`${kind} reporters must be newline-separated text.`);
+				const selected = [
+					...new Set(
+						value
+							.split(/\r?\n/)
+							.map((line) => line.trim())
+							.filter(Boolean),
+					),
+				];
+				for (const reporter of selected)
+					if (!config.allowed.includes(reporter))
+						throw new Error(
+							`Unknown ${kind} reporter ${reporter}. Allowed: ${config.allowed.join(", ")}.`,
+						);
+				return [kind, selected];
+			}),
+		);
+	},
 
-/** Expected producer executions, created from the same configuration as the jobs. */
-class ReportPlan {
-	constructor(identity) {
-		this.identity = identity;
-	}
-	static parse(value) {
-		return typeof value === "string" ? JSON.parse(value) : value;
-	}
-
-	create(producers) {
-		const identity = this.identity;
-		producers = ReportPlan.parse(producers);
-		if (!Array.isArray(producers) || producers.length > 256) {
-			throw new Error("producers must be an array with at most 256 entries.");
-		}
-		const plan = { version: 1, identity, group: (0,external_node_crypto_namespaceObject.randomUUID)(), producers };
-		this.validate(plan);
-		return plan;
-	}
-
-	validate(value) {
-		const identity = this.identity;
-		const plan = ReportPlan.parse(value);
+	receipt({ dataset, reporter, status, message = "", id, url }) {
 		if (
-			plan?.version !== 1 ||
-			!/^[a-f0-9-]{36}$/.test(plan.group) ||
-			!Array.isArray(plan.producers) ||
-			plan.producers.length > 256 ||
-			Object.entries(identity).some(
-				([key, value]) => plan.identity?.[key] !== value,
+			![
+				"published",
+				"submitted",
+				"unavailable",
+				"superseded",
+				"failed",
+			].includes(status)
+		)
+			throw new Error("Invalid publication outcome.");
+		return {
+			dataset: dataset.id,
+			source: dataset.source.sha,
+			digest: dataset.digest,
+			reporter,
+			status,
+			message,
+			...(id ? { id } : {}),
+			...(url ? { url } : {}),
+		};
+	},
+
+	subject(collection, kind = "run") {
+		return {
+			id: kind,
+			source: { sha: collection.identity.sha },
+			digest: Protocol.digest(
+				JSON.stringify(
+					kind === "run"
+						? collection
+						: collection.checks.filter((check) =>
+								check.check.reports.some((report) => report.kind === kind),
+							),
+				),
+			),
+		};
+	},
+
+	expected(collection, receipts, { includeComment = true } = {}) {
+		const expected = [];
+		for (const kind of ["test", "lint"]) {
+			if (
+				!collection.checks.some((check) =>
+					check.check.reports.some((report) => report.kind === kind),
+				)
 			)
-		) {
-			throw new Error(
-				"Report plan belongs to a different repository, run or attempt, or has an unsupported schema.",
+				continue;
+			for (const reporter of collection.reporters[kind].filter(
+				(value) => value !== "comment",
+			))
+				expected.push({
+					dataset: Reporters.subject(collection, kind),
+					reporter,
+				});
+		}
+		for (const dataset of collection.datasets.filter(
+			(item) => item.role === "primary",
+		)) {
+			for (const reporter of ["github", "codecov", "coveralls"]) {
+				if (
+					collection.reporters.coverage.includes(reporter) ||
+					(reporter === "github" &&
+						collection.reporters.coverage.includes("auto"))
+				)
+					expected.push({ dataset, reporter });
+			}
+		}
+		if (
+			includeComment &&
+			(Object.values(collection.reporters).some((values) =>
+				values.includes("comment"),
+			) ||
+				receipts.some((receipt) => receipt.fallback === "comment"))
+		)
+			expected.push({
+				dataset: Reporters.subject(collection),
+				reporter: "comment",
+			});
+		if (
+			collection.reporters.coverage.includes("coveralls") &&
+			collection.datasets.some((item) => item.role === "primary")
+		)
+			expected.push({
+				dataset: Reporters.subject(collection),
+				reporter: "coveralls-finish",
+			});
+		return expected;
+	},
+
+	complete(collection, receipts, jobs = {}, options = {}) {
+		const errors = [...collection.errors];
+		for (const [name, job] of Object.entries(collection.jobs))
+			if (["failure", "cancelled"].includes(job.result))
+				errors.push(`${name}: ${job.result}`);
+		for (const check of collection.checks) {
+			if (check.result?.outcome !== "success")
+				errors.push(
+					`${check.check.name}: ${check.result?.outcome || "missing result"}`,
+				);
+			errors.push(
+				...(check.result?.errors || []).map(
+					(error) => `${check.check.name}: ${error}`,
+				),
 			);
-		}
-		const keys = new Set();
-		for (const producer of plan.producers) {
 			if (
-				!producer ||
-				!/^[\w.-]{1,100}$/.test(producer.key) ||
-				keys.has(producer.key)
-			) {
-				throw new Error("Every planned producer needs a unique key.");
-			}
-			keys.add(producer.key);
-			if (producer.job !== undefined && !/^[\w-]+$/.test(producer.job))
-				throw new Error("An outer matrix producer job must be a job ID.");
-			if (!["test", "lint"].includes(producer.type))
-				throw new Error("Producer type must be test or lint.");
-			const directory = producer.directory ?? ".";
-			if (
-				typeof directory !== "string" ||
-				external_node_path_namespaceObject.posix.isAbsolute(directory) ||
-				directory.includes("\\") ||
-				directory.split("/").includes("..")
-			) {
-				throw new Error(
-					"Planned working directories must be repository-relative.",
-				);
-			}
-			producer.directory = external_node_path_namespaceObject.posix.normalize(directory);
-			producer.label ??=
-				producer.directory === "." ? "root" : producer.directory;
-			if (
-				!/^[\w.-][\w./-]{0,199}$/.test(producer.label) ||
-				producer.label
-					.split("/")
-					.some((part) => !part || part === "." || part === "..")
+				check.result?.assets.some(
+					(asset) =>
+						asset.data?.tests?.some((test) =>
+							["failed", "error"].includes(test.status),
+						) ||
+						asset.data?.lintIssues?.some((issue) => issue.severity === "error"),
+				)
 			)
-				throw new Error("Invalid report label.");
-			producer.coverage ??= [];
-			if (!Array.isArray(producer.coverage))
-				throw new Error(
-					"Producer coverage must be an array of report descriptions.",
+				errors.push(
+					`${check.check.name}: native reports contain failing tests or lint errors.`,
 				);
-			const labels = new Set();
-			for (const report of producer.coverage) {
-				if (
-					!report ||
-					typeof report.file !== "string" ||
-					!report.file ||
-					external_node_path_namespaceObject.posix.isAbsolute(report.file) ||
-					report.file.includes("\\") ||
-					report.file.split("/").includes("..") ||
-					/[\r\n*?]/.test(report.file)
-				) {
-					throw new Error(
-						"Coverage reports need explicit project-relative file paths.",
-					);
-				}
-				report.label ??= producer.coverage.length === 1 ? producer.label : "";
-				if (
-					!/^[\w.-][\w./-]{0,199}$/.test(report.label) ||
-					report.label
-						.split("/")
-						.some((part) => !part || part === "." || part === "..") ||
-					labels.has(report.label)
-				)
-					throw new Error(
-						"Every coverage component needs a unique stable label.",
-					);
-				if (
-					typeof report.language !== "string" ||
-					!/^[A-Za-z][A-Za-z0-9 #+.-]{0,79}$/.test(report.language)
-				)
-					throw new Error("Coverage needs a Linguist language name.");
-				labels.add(report.label);
-			}
 		}
-		return plan;
+		for (const receipt of receipts)
+			if (["failed", "superseded"].includes(receipt.status))
+				errors.push(
+					`${receipt.reporter}: ${receipt.message || receipt.status}`,
+				);
+		for (const { dataset, reporter } of Reporters.expected(
+			collection,
+			receipts,
+			options,
+		)) {
+			const matching = receipts.filter(
+				(receipt) =>
+					receipt.dataset === dataset.id &&
+					receipt.reporter === reporter &&
+					receipt.source === dataset.source.sha &&
+					receipt.digest === dataset.digest,
+			);
+			if (matching.length !== 1) {
+				errors.push(
+					`${reporter} / ${dataset.label || dataset.id}: expected one publication receipt, received ${matching.length}.`,
+				);
+				continue;
+			}
+			const receipt = matching[0];
+			if (
+				receipt.status === "submitted" &&
+				!["codecov", "coveralls", "coveralls-finish"].includes(reporter)
+			)
+				errors.push(
+					`${reporter}: submission alone does not confirm publication.`,
+				);
+			if (
+				receipt.status === "unavailable" &&
+				reporter !== "comment" &&
+				!(
+					reporter === "github" &&
+					collection.reporters.coverage.includes("auto") &&
+					!collection.reporters.coverage.includes("github")
+				)
+			)
+				errors.push(`${reporter}: required publication is unavailable.`);
+			if (
+				reporter === "github" &&
+				receipt.status === "published" &&
+				!receipt.id
+			)
+				errors.push("GitHub publication has no processed report ID.");
+		}
+		for (const [name, job] of Object.entries(jobs))
+			if (["failure", "cancelled"].includes(job.result))
+				errors.push(`${name}: ${job.result}`);
+		return [...new Set(errors)];
+	},
+};
+
+;// CONCATENATED MODULE: ./src/Collector.js
+
+
+
+
+
+
+
+
+/** One collector consumes registrations from the whole originating workflow run. */
+class Collector {
+	constructor({
+		execution,
+		github,
+		context,
+		artifacts,
+		core,
+		temporaryDirectory,
+		token,
+	}) {
+		Object.assign(this, {
+			execution,
+			github,
+			context,
+			artifacts,
+			core,
+			temporaryDirectory,
+			token,
+		});
+		this.native = new NativeReports();
 	}
 
-	static selections(plan) {
+	identity() {
+		return {
+			repository: `${this.context.repo.owner}/${this.context.repo.repo}`,
+			repositoryId: String(this.context.payload.repository.id),
+			runId: String(this.context.runId),
+			attempt: this.execution.attempt,
+			sha: this.context.sha,
+			workflow:
+				process.env.GITHUB_WORKFLOW_REF?.split("@")[0] || this.context.workflow,
+		};
+	}
+
+	static jobs(value) {
+		Protocol.object(value, "job-results");
+		if (!Object.keys(value).length)
+			throw new Error("job-results must contain the terminal needs context.");
+		for (const [name, job] of Object.entries(value)) {
+			if (
+				!/^[\w-]+$/.test(name) ||
+				!["success", "failure", "cancelled", "skipped"].includes(job?.result)
+			)
+				throw new Error("Invalid job-results entry.");
+		}
+		return Object.fromEntries(
+			Object.entries(value).map(([key, { result }]) => [key, { result }]),
+		);
+	}
+
+	async discover(directory) {
+		const all = await this.github.paginate(
+			this.github.rest.actions.listWorkflowRunArtifacts,
+			{ ...this.context.repo, run_id: this.context.runId, per_page: 100 },
+		);
+		const artifacts = all.filter(
+			(artifact) =>
+				artifact.name.startsWith(`${Protocol.prefix}registration-`) ||
+				artifact.name.startsWith(`${Protocol.prefix}result-`),
+		);
+		if (artifacts.length > 1024)
+			throw new Error("Report artifact count exceeds 1024.");
+		let bytes = 0;
+		for (const artifact of artifacts) {
+			if (
+				!/^ci-report-v2-(registration|result)-[a-f0-9-]{36}$/.test(
+					artifact.name,
+				) ||
+				artifact.workflow_run?.id !== this.context.runId ||
+				String(artifact.workflow_run?.repository_id) !==
+					String(this.context.payload.repository.id)
+			)
+				throw new Error("Invalid report artifact provenance.");
+			if (artifact.expired)
+				throw new Error(
+					`Report artifact ${artifact.name} expired. Rerun its producer.`,
+				);
+			bytes += artifact.size_in_bytes;
+		}
+		if (bytes > 1024 * 1024 * 1024)
+			throw new Error("Run report artifacts exceed 1 GiB.");
+		if (
+			new Set(artifacts.map((artifact) => artifact.name)).size !==
+			artifacts.length
+		)
+			throw new Error("Duplicate immutable report artifacts.");
+		if (artifacts.length)
+			await new ArtifactDownload({
+				client: this.artifacts,
+				core: this.core,
+			}).download({
+				artifactIds: artifacts.map((artifact) => artifact.id).join(","),
+				destination: directory,
+				mergeMultiple: false,
+				skipDecompress: false,
+				findBy: {
+					token: this.token,
+					repositoryOwner: this.context.repo.owner,
+					repositoryName: this.context.repo.repo,
+					workflowRunId: this.context.runId,
+				},
+			});
+		return artifacts;
+	}
+
+	async collect({ jobs, reporters }) {
+		const selectedReporters = Reporters.parse(reporters);
+		jobs = Collector.jobs(jobs);
+		if (Object.values(jobs).some((job) => job.result === "cancelled"))
+			throw new Error(
+				"Producer cancellation stops collection and publication.",
+			);
+		const directory = external_node_fs_namespaceObject.mkdtempSync(
+			external_node_path_namespaceObject.join(this.temporaryDirectory, "ci-collection-"),
+		);
+		const inputs = external_node_path_namespaceObject.join(directory, "inputs");
+		external_node_fs_namespaceObject.mkdirSync(inputs);
+		try {
+			const artifacts = await this.discover(inputs);
+			const registrations = artifacts
+				.filter((artifact) =>
+					artifact.name.startsWith(`${Protocol.prefix}registration-`),
+				)
+				.map((artifact) => {
+					const stage =
+						artifacts.length === 1 ? inputs : external_node_path_namespaceObject.join(inputs, artifact.name);
+					const record = Protocol.registration(
+						Protocol.read(stage, "registration.json"),
+						this.identity(),
+					);
+					if (artifact.name !== `${Protocol.prefix}registration-${record.id}`)
+						throw new Error("Registration artifact identity changed.");
+					return {
+						...record,
+						registrationDigest: Protocol.digest(
+							external_node_fs_namespaceObject.readFileSync(Protocol.file(stage, "registration.json")),
+						),
+					};
+				});
+			const { selected, errors } = await this.execution.select(registrations);
+			for (const artifact of artifacts.filter((item) =>
+				item.name.startsWith(`${Protocol.prefix}result-`),
+			))
+				if (
+					!registrations.some(
+						(item) => artifact.name === `${Protocol.prefix}result-${item.id}`,
+					)
+				)
+					throw new Error("Result has no immutable registration.");
+			const collection = {
+				version: Protocol.version,
+				identity: this.identity(),
+				jobs,
+				reporters: selectedReporters,
+				checks: [],
+				datasets: [],
+				errors,
+			};
+			for (const { registration, job } of selected) {
+				const check = { ...registration, job };
+				collection.checks.push(check);
+				const artifact = artifacts.find(
+					(item) => item.name === `${Protocol.prefix}result-${registration.id}`,
+				);
+				if (!artifact) {
+					errors.push(
+						`${registration.check.name}: registered check did not retain its result. Open job ${job.id}.`,
+					);
+					continue;
+				}
+				const stage =
+					artifacts.length === 1 ? inputs : external_node_path_namespaceObject.join(inputs, artifact.name);
+				const result = Protocol.read(stage, "result.json");
+				if (
+					result.version !== Protocol.version ||
+					result.id !== registration.id ||
+					result.registrationDigest !== registration.registrationDigest ||
+					JSON.stringify(result.execution) !==
+						JSON.stringify(registration.execution) ||
+					JSON.stringify(result.source) !== JSON.stringify(registration.source)
+				)
+					throw new Error("Result does not match its immutable registration.");
+				if (
+					!["success", "failure", "cancelled"].includes(result.outcome) ||
+					!Array.isArray(result.errors) ||
+					result.errors.some((error) => typeof error !== "string") ||
+					!Array.isArray(result.assets) ||
+					result.assets.length > 512
+				)
+					throw new Error("Invalid result contract.");
+				check.result = result;
+				const pr = this.context.payload.pull_request;
+				const expectedSha =
+					registration.source.kind === "pr-head"
+						? pr?.head.sha
+						: this.context.sha;
+				if (
+					registration.source.sha !== expectedSha ||
+					(registration.source.kind === "pr-merge" && !pr) ||
+					(registration.source.kind === "branch" && pr)
+				)
+					throw new Error(
+						"Registered source does not match the originating event.",
+					);
+				for (const selector of registration.check.reports) {
+					const matches = result.assets.filter(
+						(asset) =>
+							JSON.stringify(asset.selector) === JSON.stringify(selector),
+					);
+					if (!selector.optional && !matches.length)
+						result.errors.push(
+							`Missing required ${selector.kind}: ${selector.pattern}`,
+						);
+				}
+				const destination = external_node_path_namespaceObject.join(directory, "checks", registration.id);
+				external_node_fs_namespaceObject.mkdirSync(destination, { recursive: true });
+				const verifiedAssets = [];
+				for (const asset of result.assets) {
+					try {
+						if (
+							!asset.file.startsWith("reports/") ||
+							!external_node_path_namespaceObject.matchesGlob(asset.file.slice(8), asset.selector.pattern)
+						)
+							throw new Error(
+								"Asset path does not match its promised selector.",
+							);
+						const validated = this.native.verify(stage, asset);
+						if (
+							!registration.check.reports.some(
+								(selector) =>
+									JSON.stringify(selector) === JSON.stringify(asset.selector),
+							)
+						)
+							throw new Error("Result contains an undeclared report selector.");
+						Object.assign(asset, validated);
+						if (asset.invalid) {
+							delete asset.data;
+							result.errors.push(`${asset.file}: ${asset.invalid}`);
+						}
+						const target = external_node_path_namespaceObject.join(destination, asset.file);
+						external_node_fs_namespaceObject.mkdirSync(external_node_path_namespaceObject.dirname(target), { recursive: true });
+						external_node_fs_namespaceObject.copyFileSync(Protocol.file(stage, asset.file), target);
+						asset.file = `checks/${registration.id}/${asset.file}`;
+						verifiedAssets.push(asset);
+					} catch (error) {
+						result.errors.push(`Invalid report asset: ${error.message}`);
+					}
+				}
+				result.assets = verifiedAssets;
+			}
+			this.datasets(collection);
+			await new CoverageBaseline(this).attach(collection);
+			Protocol.write(directory, "collection.json", collection);
+			external_node_fs_namespaceObject.rmSync(inputs, { recursive: true, force: true });
+			return { directory, collection };
+		} catch (error) {
+			external_node_fs_namespaceObject.rmSync(directory, { recursive: true, force: true });
+			throw error;
+		}
+	}
+
+	datasets(collection) {
+		const datasets = new Map();
+		const owners = new Map();
+		for (const check of collection.checks) {
+			for (const selector of check.check.reports.filter(
+				(report) => report.kind === "coverage",
+			)) {
+				const label = `${check.check.project === "." ? "root" : check.check.project}/${selector.dataset}`;
+				const key = `${label}:${check.source.sha}`;
+				const assets = (check.result?.assets || []).filter(
+					(asset) =>
+						!asset.invalid &&
+						JSON.stringify(asset.selector) === JSON.stringify(selector),
+				);
+				if (selector.optional && !assets.length) continue;
+				let dataset = datasets.get(key);
+				if (!dataset) {
+					dataset = {
+						id: Protocol.digest(key).slice(0, 24),
+						label,
+						project: check.check.project,
+						source: check.source,
+						language: selector.language || assets[0]?.language,
+						role: selector.role,
+						assets: [],
+						errors: [],
+						checkId: check.id,
+					};
+					datasets.set(key, dataset);
+				} else if (dataset.checkId !== check.id)
+					dataset.errors.push(
+						"Overlapping coverage executions require a native provider merge.",
+					);
+				if (!assets.length)
+					dataset.errors.push("Required coverage evidence is missing.");
+				dataset.assets.push(...assets);
+				if (
+					dataset.assets.some(
+						(asset) =>
+							asset.measurementDigest !== dataset.assets[0].measurementDigest,
+					)
+				)
+					dataset.errors.push(
+						"Alternative coverage representations cover different source lines.",
+					);
+				if (
+					new Set(dataset.assets.map((asset) => asset.format)).size !==
+					dataset.assets.length
+				)
+					dataset.errors.push(
+						"Multiple files of one coverage format require a native provider merge.",
+					);
+				if (
+					dataset.assets.some(
+						(asset) =>
+							asset.data.coverage.lines.total !==
+								dataset.assets[0].data.coverage.lines.total ||
+							asset.data.coverage.lines.covered !==
+								dataset.assets[0].data.coverage.lines.covered ||
+							JSON.stringify(
+								[...new Set(Object.values(asset.sourceMap))].sort(),
+							) !==
+								JSON.stringify(
+									[
+										...new Set(Object.values(dataset.assets[0].sourceMap)),
+									].sort(),
+								),
+					)
+				)
+					dataset.errors.push(
+						"Alternative coverage representations describe different measurements.",
+					);
+				for (const asset of assets)
+					for (const source of Object.values(asset.sourceMap)) {
+						if (selector.role !== "primary") continue;
+						const owner = owners.get(`${check.source.sha}:${source}`);
+						if (owner && owner !== key) {
+							dataset.errors.push(
+								"Primary coverage datasets overlap; merge them in the provider.",
+							);
+							datasets
+								.get(owner)
+								.errors.push(
+									"Primary coverage datasets overlap; merge them in the provider.",
+								);
+						}
+						owners.set(`${check.source.sha}:${source}`, key);
+					}
+			}
+		}
+		collection.datasets = [...datasets.values()].map((dataset) => ({
+			...dataset,
+			digest: Protocol.digest(
+				dataset.assets
+					.map((asset) => asset.sha256)
+					.sort()
+					.join("\n"),
+			),
+		}));
+		for (const dataset of collection.datasets)
+			collection.errors.push(
+				...dataset.errors.map((error) => `${dataset.label}: ${error}`),
+			);
+	}
+}
+
+;// CONCATENATED MODULE: external "node:child_process"
+const external_node_child_process_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:child_process");
+;// CONCATENATED MODULE: ./src/Recording.js
+
+
+
+
+
+
+
+/** Register before execution, then retain validated results independently of outcome. */
+class Recording {
+	constructor({
+		execution,
+		artifacts,
+		workspace,
+		temporaryDirectory,
+		context,
+	}) {
+		Object.assign(this, { execution, artifacts, context });
+		this.workspace = external_node_fs_namespaceObject.realpathSync(workspace);
+		this.temporaryDirectory = external_node_fs_namespaceObject.realpathSync(temporaryDirectory);
+		this.native = new NativeReports();
+	}
+
+	source(definition) {
+		const sha = (0,external_node_child_process_namespaceObject.execFileSync)(
+			"git",
+			["-C", this.workspace, "rev-parse", "HEAD"],
+			{ encoding: "utf8" },
+		).trim();
+		if (definition.source && definition.source.sha !== sha)
+			throw new Error(
+				"Declared tested source differs from the actual checkout.",
+			);
+		if (!/^[a-f0-9]{40}$/.test(sha))
+			throw new Error("Invalid checkout revision.");
+		const pr = this.context.payload.pull_request;
+		const kind = pr
+			? sha === pr.head.sha
+				? "pr-head"
+				: sha === this.context.sha
+					? "pr-merge"
+					: "other"
+			: sha === this.context.sha
+				? "branch"
+				: "other";
+		if (kind === "other")
+			throw new Error("Checkout source is unrelated to this workflow event.");
+		return {
+			sha,
+			kind,
+			...(pr
+				? { pr: { number: pr.number, head: pr.head.sha, base: pr.base.sha } }
+				: {}),
+		};
+	}
+
+	async upload(name, directory, files) {
+		const result = await this.artifacts.uploadArtifact(
+			name,
+			files.map((file) => Protocol.file(directory, file)),
+			directory,
+			{ retentionDays: 7 },
+		);
+		if (!result.id)
+			throw new Error("GitHub did not acknowledge the report artifact upload.");
+		return result.id;
+	}
+
+	async prepare(definition) {
+		const check = Protocol.definition(definition);
+		const project = external_node_fs_namespaceObject.realpathSync(external_node_path_namespaceObject.join(this.workspace, check.project));
+		const relative =
+			external_node_path_namespaceObject.relative(this.workspace, project).split(external_node_path_namespaceObject.sep).join("/") || ".";
+		if (
+			!external_node_fs_namespaceObject.statSync(project).isDirectory() ||
+			Protocol.relative(relative, { root: true }) !== check.project
+		)
+			throw new Error(
+				"Project directory must be inside the checkout without symlink aliases.",
+			);
+		const registration = {
+			version: Protocol.version,
+			id: (0,external_node_crypto_namespaceObject.randomUUID)(),
+			check,
+			execution: await this.execution.current(),
+			source: this.source(check),
+			createdAt: new Date().toISOString(),
+		};
+		const directory = external_node_fs_namespaceObject.mkdtempSync(
+			external_node_path_namespaceObject.join(this.temporaryDirectory, "ci-recording-"),
+		);
+		try {
+			external_node_fs_namespaceObject.mkdirSync(external_node_path_namespaceObject.join(directory, "reports"), { mode: 0o700 });
+			Protocol.write(directory, "registration.json", registration);
+			const artifactId = await this.upload(
+				`${Protocol.prefix}registration-${registration.id}`,
+				directory,
+				["registration.json"],
+			);
+			Protocol.write(directory, "handle.json", {
+				version: Protocol.version,
+				registrationDigest: Protocol.digest(
+					external_node_fs_namespaceObject.readFileSync(external_node_path_namespaceObject.join(directory, "registration.json")),
+				),
+				artifactId,
+			});
+			return {
+				recording: directory,
+				"report-directory": external_node_path_namespaceObject.join(directory, "reports"),
+				"registration-id": registration.id,
+			};
+		} catch (error) {
+			external_node_fs_namespaceObject.rmSync(directory, { recursive: true, force: true });
+			throw error;
+		}
+	}
+
+	async finalize({ recording, outcome, exitCode }) {
+		if (!["success", "failure", "cancelled"].includes(outcome))
+			throw new Error(
+				"Finalize requires success, failure or cancelled outcome.",
+			);
+		if (
+			exitCode !== undefined &&
+			(!Number.isSafeInteger(exitCode) ||
+				exitCode < 0 ||
+				exitCode > 255 ||
+				(outcome === "success" && exitCode !== 0))
+		)
+			throw new Error("Invalid or contradictory command exit code.");
+		const directory = external_node_fs_namespaceObject.realpathSync(recording);
+		if (
+			external_node_path_namespaceObject.dirname(directory) !== this.temporaryDirectory ||
+			!external_node_path_namespaceObject.basename(directory).startsWith("ci-recording-")
+		)
+			throw new Error(
+				"Recording handle is outside this runner's private storage.",
+			);
+		const handle = Protocol.read(directory, "handle.json");
+		const registration = Protocol.read(directory, "registration.json");
+		if (
+			handle.registrationDigest !==
+			Protocol.digest(
+				external_node_fs_namespaceObject.readFileSync(Protocol.file(directory, "registration.json")),
+			)
+		)
+			throw new Error("Recording registration changed after preparation.");
+		const execution = await this.execution.current();
+		if (JSON.stringify(execution) !== JSON.stringify(registration.execution))
+			throw new Error("Recording must finish in its original job execution.");
+		if (
+			JSON.stringify(this.source(registration.check)) !==
+			JSON.stringify(registration.source)
+		)
+			throw new Error("Tested checkout changed during the check.");
+		const { assets, errors } = this.native.validate(
+			external_node_path_namespaceObject.join(directory, "reports"),
+			registration.check,
+			this.workspace,
+		);
+		if (
+			assets.some(
+				(asset) =>
+					asset.data?.tests?.some((item) =>
+						["failed", "error"].includes(item.status),
+					) ||
+					asset.data?.lintIssues?.some((item) => item.severity === "error"),
+			)
+		)
+			errors.push("Native reports contain failing tests or lint errors.");
+		const result = {
+			version: Protocol.version,
+			id: registration.id,
+			registrationDigest: handle.registrationDigest,
+			execution,
+			source: registration.source,
+			outcome,
+			...(exitCode === undefined ? {} : { exitCode }),
+			assets: assets.map((asset) => ({
+				...asset,
+				file: `reports/${asset.file}`,
+			})),
+			errors,
+		};
+		Protocol.write(directory, "result.json", result);
+		try {
+			const artifactId = await this.upload(
+				`${Protocol.prefix}result-${registration.id}`,
+				directory,
+				["result.json", ...result.assets.map((asset) => asset.file)],
+			);
+			return {
+				"artifact-id": artifactId,
+				complete: errors.length === 0,
+				errors,
+				outcome,
+			};
+		} finally {
+			external_node_fs_namespaceObject.rmSync(directory, { recursive: true, force: true });
+		}
+	}
+}
+
+;// CONCATENATED MODULE: ../parse-ci-reports/src/formatters/CIReportFormatter.js
+/** One normalized model, a compact selected comment and a complete run summary. */
+class ReportRenderer {
+	constructor({ collection, receipts = [], errors = [], runUrl, sourceUrl }) {
+		Object.assign(this, { collection, receipts, errors, runUrl, sourceUrl });
+	}
+
+	static text(value, limit = 400) {
+		return String(value ?? "")
+			.slice(0, limit)
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/@/g, "&#64;")
+			.replace(/[\r\n]+/g, " ")
+			.replace(/([\\`*_[\]|])/g, "\\$1");
+	}
+
+	static table(headers, rows, limit = 30) {
+		const visible = rows.slice(0, limit);
+		const table = [
+			`| ${headers.join(" | ")} |`,
+			`| ${headers.map(() => "---").join(" | ")} |`,
+			...visible.map((row) => `| ${row.join(" | ")} |`),
+		];
+		if (rows.length > visible.length)
+			table.push(
+				`\nShowing ${visible.length} of ${rows.length} rows. Full details are retained in the report artifacts.`,
+			);
+		return table.join("\n");
+	}
+
+	static details(label, body) {
+		return `<details>\n<summary>${ReportRenderer.text(label, 250)}</summary>\n\n${body}\n\n</details>`;
+	}
+
+	link(label, url) {
+		if (!/^https:\/\//.test(url || "")) return ReportRenderer.text(label);
+		return `[${ReportRenderer.text(label)}](${url.replace(/[()\s]/g, encodeURIComponent)})`;
+	}
+
+	source(file, sha, line) {
+		if (!file) return "See job logs";
+		const url = `${this.sourceUrl}/${sha}/${file.split("/").map(encodeURIComponent).join("/")}${Number.isSafeInteger(line) && line > 0 ? `#L${line}` : ""}`;
+		return this.link(`${file}${line ? `:${line}` : ""}`, url);
+	}
+
+	findings() {
+		const tests = [];
+		const lint = new Map();
+		for (const check of this.collection.checks) {
+			for (const asset of check.result?.assets || []) {
+				for (const test of asset.data?.tests || [])
+					tests.push({
+						...test,
+						check,
+						owner: asset.selector.owner || "collector",
+					});
+				for (const issue of asset.data?.lintIssues || []) {
+					const key = JSON.stringify([
+						check.check.project,
+						check.source.sha,
+						issue.source || asset.format,
+						issue.rule,
+						issue.file,
+						issue.line,
+						issue.column,
+						issue.message,
+					]);
+					if (!lint.has(key))
+						lint.set(key, {
+							...issue,
+							check,
+							owner: asset.selector.owner || "collector",
+						});
+				}
+			}
+		}
+		return { tests, lint: [...lint.values()] };
+	}
+
+	selected(comment) {
+		if (!comment) return { test: true, lint: true, coverage: true };
 		const selections = Object.fromEntries(
-			plan.producers.map((producer) => [
-				producer.key,
-				{ ...plan, producers: [producer] },
+			Object.entries(this.collection.reporters).map(([kind, values]) => [
+				kind,
+				values.includes("comment"),
 			]),
 		);
-		// Single-kind invocations can keep an outer matrix's unique execution key.
-		for (const type of ["lint", "test"]) {
-			const producers = plan.producers.filter(
-				(producer) => producer.type === type,
-			);
-			if (producers.length === 1 && !selections[type])
-				selections[type] = { ...plan, producers };
-		}
+		if (
+			this.receipts.some(
+				(receipt) =>
+					receipt.reporter === "github" && receipt.fallback === "comment",
+			)
+		)
+			selections.coverage = true;
 		return selections;
 	}
 
-	fromJobs(jobs) {
-		const plans = new Map();
-		for (const [job, result] of Object.entries(jobs)) {
-			if (
-				!/^[\w-]+$/.test(job) ||
-				!["success", "failure", "cancelled", "skipped", "abandoned"].includes(
-					result?.result,
-				)
-			) {
-				throw new Error("job-results must contain completed job results.");
-			}
-			const value = result.outputs?.["report-plan"];
-			if (!value) continue;
-			const forwarded = ReportPlan.parse(value);
-			const inventory = Array.isArray(forwarded) ? forwarded : [forwarded];
-			for (const entry of inventory) {
-				const plan = this.validate(entry);
-				for (const producer of plan.producers) {
-					const id = `${plan.group}-${producer.key}`;
-					const owner = producer.job || job;
-					if (!jobs[owner])
-						throw new Error(
-							`Planned producer job ${owner} is absent from job-results.`,
-						);
-					const expected = {
-						plan: { ...plan, producers: [producer] },
-						producer,
-						job: owner,
-						result: jobs[owner].result,
-					};
-					if (plans.has(id)) {
-						// An explicit outer inventory and the matrix's last output can overlap.
-						// Only an identical definition tied to the same outer job is redundant.
-						if (producer.job && (0,external_node_util_namespaceObject.isDeepStrictEqual)(plans.get(id), expected))
-							continue;
-						throw new Error(
-							`Duplicate report plan for ${producer.label}. Forward a matrix's complete plan once, from its configuration job.`,
-						);
-					}
-					plans.set(id, expected);
-				}
-			}
+	tests(tests, comment) {
+		if (!tests.length) return "";
+		const failed = tests.filter((item) =>
+			["failed", "error"].includes(item.status),
+		);
+		const passed = tests.filter((item) => item.status === "passed").length;
+		const skipped = tests.filter((item) => item.status === "skipped").length;
+		const projects = new Map();
+		for (const item of tests) {
+			const key = item.check.check.project;
+			if (!projects.has(key))
+				projects.set(key, { passed: 0, failed: 0, skipped: 0 });
+			projects.get(key)[
+				["failed", "error"].includes(item.status) ? "failed" : item.status
+			]++;
 		}
-		return plans;
+		const body = [
+			ReportRenderer.table(
+				["Project", "Executions"],
+				[...projects].map(([name, counts]) => [
+					ReportRenderer.text(name),
+					`${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped`,
+				]),
+			),
+			"Counts include every runtime execution, not globally unique test cases.",
+		];
+		const cases = new Map();
+		for (const item of failed) {
+			const key = JSON.stringify([
+				item.check.check.project,
+				item.check.source.sha,
+				item.suite,
+				item.name,
+				item.file,
+				item.message,
+			]);
+			if (!cases.has(key)) cases.set(key, { item, executions: [] });
+			cases
+				.get(key)
+				.executions.push(
+					this.link(
+						Object.values(item.check.check.variant).join(" / ") ||
+							item.check.check.name,
+						item.check.job.html_url,
+					),
+				);
+		}
+		if (cases.size)
+			body.push(
+				ReportRenderer.table(
+					["Failing case", "Executions", "Diagnostic"],
+					[...cases.values()].map(({ item, executions }) => [
+						ReportRenderer.text(`${item.suite} / ${item.name}`),
+						[...new Set(executions)].join(", "),
+						ReportRenderer.text(item.message),
+					]),
+				),
+			);
+		if (!comment)
+			body.push(
+				ReportRenderer.table(
+					["Check / runtime", "Result", "Evidence"],
+					this.collection.checks
+						.filter((check) =>
+							check.check.reports.some((report) => report.kind === "test"),
+						)
+						.map((check) => [
+							ReportRenderer.text(
+								`${check.check.name} / ${Object.values(check.check.variant).join(" / ")}`,
+							),
+							ReportRenderer.text(check.result?.outcome || "Missing result"),
+							this.link("Job and artifacts", check.job.html_url),
+						]),
+					100,
+				),
+			);
+		return ReportRenderer.details(
+			`Tests: ${passed} passed, ${failed.length} failed${skipped ? `, ${skipped} skipped` : ""} executions`,
+			body.join("\n\n"),
+		);
+	}
+
+	lint(issues) {
+		const checks = this.collection.checks.filter((check) =>
+			check.check.reports.some((report) => report.kind === "lint"),
+		);
+		if (!checks.length) return "";
+		const errors = issues.filter((issue) => issue.severity === "error").length;
+		const warnings = issues.filter(
+			(issue) => issue.severity === "warning",
+		).length;
+		const body = [
+			ReportRenderer.table(
+				["Check", "Result", "Evidence"],
+				checks.map((check) => [
+					ReportRenderer.text(check.check.name),
+					ReportRenderer.text(check.result?.outcome || "Missing result"),
+					this.link("Lint job", check.job.html_url),
+				]),
+			),
+		];
+		for (const check of checks)
+			for (const asset of check.result?.assets || [])
+				if (asset.data?.summary)
+					body.push(
+						`**${ReportRenderer.text(check.check.name)} native summary**\n\n${asset.data.summary
+							.split("\n")
+							.filter((line) => line.startsWith("|"))
+							.slice(0, 80)
+							.map(
+								(line) =>
+									`| ${line
+										.split("|")
+										.slice(1, -1)
+										.map((cell) => ReportRenderer.text(cell.trim(), 300))
+										.join(" | ")} |`,
+							)
+							.join("\n")}`,
+					);
+		if (issues.length)
+			body.push(
+				ReportRenderer.table(
+					["Location", "Rule", "Finding"],
+					issues.map((issue) => [
+						this.source(issue.file, issue.check.source.sha, issue.line),
+						ReportRenderer.text(issue.rule),
+						ReportRenderer.text(`${issue.severity}: ${issue.message}`),
+					]),
+				),
+			);
+		const failed = checks.filter(
+			(check) => check.result?.outcome === "failure",
+		).length;
+		const incomplete = checks.filter(
+			(check) => !check.result || check.result.errors.length,
+		).length;
+		const status = [
+			`${checks.length} ${checks.length === 1 ? "check" : "checks"}`,
+			...(failed ? [`${failed} failed`] : []),
+			...(incomplete ? [`${incomplete} incomplete`] : []),
+			...(issues.length ? [`${errors} errors`, `${warnings} warnings`] : []),
+		];
+		if (!failed && !incomplete && !errors) status.push("passed");
+		return ReportRenderer.details(
+			`Lint: ${status.join(", ")}`,
+			body.join("\n\n"),
+		);
+	}
+
+	coverage(comment) {
+		const datasets = this.collection.datasets;
+		if (!datasets.length) return "";
+		const measurements = datasets.map((dataset) => {
+			const coverage = dataset.errors.length
+				? null
+				: dataset.assets[0]?.data?.coverage;
+			const lines = coverage?.lines;
+			return {
+				dataset,
+				coverage,
+				label: `${dataset.label}: ${lines ? `${lines.percentage.toFixed(1)}%` : "unknown"}`,
+			};
+		});
+		const title =
+			measurements.length <= 2
+				? measurements.map(({ label }) => label).join("; ")
+				: `${measurements.length} datasets; ${measurements.filter(({ coverage }) => !coverage).length} unavailable`;
+		const body = [
+			ReportRenderer.table(
+				["Dataset", "Lines", "Change"],
+				measurements.map(({ dataset, coverage }) => {
+					const base = dataset.baseline?.coverage?.lines;
+					const delta =
+						coverage && base
+							? coverage.lines.percentage - base.percentage
+							: null;
+					return [
+						ReportRenderer.text(dataset.label),
+						coverage
+							? `${coverage.lines.percentage.toFixed(1)}% (${coverage.lines.covered}/${coverage.lines.total})`
+							: "**Unknown: missing or invalid report**",
+						delta === null
+							? ReportRenderer.text(
+									dataset.baseline?.reason || "No comparable baseline",
+								)
+							: this.link(
+									`${delta >= 0 ? "+" : ""}${delta.toFixed(1)} pp vs ${dataset.baseline.sha.slice(0, 7)}`,
+									dataset.baseline.url,
+								),
+					];
+				}),
+			),
+			"Measurements remain separate by dataset. No coverage gate is configured by this reporting workflow. Changes require a comparable base-commit measurement.",
+		];
+		if (!comment)
+			body.push(
+				ReportRenderer.table(
+					["Dataset", "Native metrics", "Tested source"],
+					measurements.map(({ dataset, coverage }) => [
+						ReportRenderer.text(dataset.label),
+						["branches", "functions", "statements"]
+							.map(
+								(metric) =>
+									`${metric}: ${coverage?.[metric]?.total ? `${coverage[metric].percentage.toFixed(1)}%` : "unavailable"}`,
+							)
+							.join("; "),
+						`\`${dataset.source.sha.slice(0, 7)}\` (${ReportRenderer.text(dataset.source.kind)})`,
+					]),
+				),
+			);
+		return ReportRenderer.details(`Coverage: ${title}`, body.join("\n\n"));
+	}
+
+	render({ comment = false } = {}) {
+		const selected = this.selected(comment);
+		if (comment && !Object.values(selected).some(Boolean)) return "";
+		const errors = this.errors;
+		const { tests, lint } = this.findings();
+		const publicationFailed = this.receipts.some(
+			(receipt) => receipt.status === "failed",
+		);
+		const incomplete =
+			this.collection.errors.length ||
+			this.collection.checks.some(
+				(check) => !check.result || check.result.errors.length,
+			);
+		const title = errors.length
+			? publicationFailed
+				? "Publication failed"
+				: incomplete
+					? "Reports incomplete"
+					: "CI checks failed"
+			: "CI checks passed";
+		const outcome = errors.length
+			? "Required execution, evidence, or publication did not complete successfully."
+			: "Checks, report validation, and selected publication completed successfully.";
+		const identity = this.collection.identity;
+		const parts = [
+			`## ${errors.length ? "❌" : "✅"} ${title}`,
+			outcome,
+			`${this.link(`Run ${identity.runId}, attempt ${identity.attempt}`, this.runUrl)} · Workflow revision \`${identity.sha.slice(0, 7)}\`.`,
+			`Tested sources: ${[...new Set(this.collection.checks.map((check) => `\`${check.source.sha.slice(0, 7)}\` (${ReportRenderer.text(check.source.kind)})`))].join(", ")}.`,
+		];
+		if (errors.length)
+			parts.push(
+				`### Needs attention\n\n${errors
+					.slice(0, 8)
+					.map((error) => `- ${ReportRenderer.text(error, 220)}`)
+					.join(
+						"\n",
+					)}${errors.length > 8 ? `\n\nShowing 8 of ${errors.length} problems. See the full report artifacts.` : ""}`,
+			);
+		const failures = tests.filter((item) =>
+			["failed", "error"].includes(item.status),
+		);
+		if (selected.test && failures.length)
+			parts.push(
+				`**${failures.length} failed test executions.** ${this.link("Open a failing job", failures[0].check.job.html_url)}.`,
+			);
+		if (selected.lint && lint.some((issue) => issue.severity === "error"))
+			parts.push(
+				`**${lint.filter((issue) => issue.severity === "error").length} lint errors.** ${this.link("Open lint diagnostics", lint.find((issue) => issue.severity === "error").check.job.html_url)}.`,
+			);
+		if (selected.test) parts.push(this.tests(tests, comment));
+		if (selected.lint) parts.push(this.lint(lint));
+		if (selected.coverage) parts.push(this.coverage(comment));
+		if (!comment)
+			parts.push(
+				ReportRenderer.details(
+					"Workflow checks and conditional skips",
+					`${ReportRenderer.table(
+						["Caller job", "Outcome"],
+						Object.entries(this.collection.jobs).map(([name, job]) => [
+							ReportRenderer.text(name),
+							ReportRenderer.text(job.result),
+						]),
+					)}\n\nThese are job outcomes. Status-only checks do not imply structured test counts. Existing route validators determine whether skips are intentional.`,
+				),
+			);
+		const receipts = comment
+			? this.receipts.filter((receipt) => receipt.reporter !== "comment")
+			: this.receipts;
+		if (receipts.length)
+			parts.push(
+				ReportRenderer.details(
+					`Publication: ${receipts.filter((receipt) => receipt.status === "failed").length} failed; ${receipts.filter((receipt) => receipt.status === "unavailable").length} unavailable`,
+					ReportRenderer.table(
+						["Destination / dataset", "Outcome", "Details"],
+						receipts.map((receipt) => [
+							ReportRenderer.text(
+								`${receipt.reporter} / ${this.collection.datasets.find((dataset) => dataset.id === receipt.dataset)?.label || receipt.dataset}`,
+							),
+							ReportRenderer.text(receipt.status),
+							receipt.url
+								? this.link(receipt.message || "Provider result", receipt.url)
+								: ReportRenderer.text(receipt.message),
+						]),
+					),
+				),
+			);
+		if (!comment)
+			parts.push(
+				ReportRenderer.details(
+					"Report provenance and rerun details",
+					`${ReportRenderer.table(
+						["Check", "Original execution", "Source"],
+						this.collection.checks.map((check) => [
+							ReportRenderer.text(check.check.name),
+							this.link(
+								`Attempt ${check.execution.attempt}, job ${check.execution.job.id}`,
+								check.job.html_url,
+							),
+							`\`${check.source.sha.slice(0, 7)}\` (${ReportRenderer.text(check.source.kind)})`,
+						]),
+						100,
+					)}\n\nEarlier evidence is reused only for executions verified unchanged in this run.`,
+				),
+			);
+		parts.push(
+			`${this.link("Full Actions report and native artifacts", this.runUrl)}.`,
+		);
+		const budget = comment ? 32 * 1024 : 256 * 1024;
+		let markdown = `${parts.filter(Boolean).join("\n\n")}\n`;
+		if (Buffer.byteLength(markdown) > budget) {
+			const notice = `\n\nDetailed results exceed this view's size limit. ${this.link("Read all retained results", this.runUrl)}.\n`;
+			markdown = "";
+			for (const part of parts.filter(Boolean))
+				if (Buffer.byteLength(markdown + part + notice) < budget - 2)
+					markdown += `${part}\n\n`;
+			markdown += notice;
+		}
+		return markdown;
 	}
 }
 
-;// CONCATENATED MODULE: ./src/ReportBundle.js
+;// CONCATENATED MODULE: ./src/CheckRunner.js
 
 
 
-
-
-
-
-/** Transfer report data independently of producer job names and publication policy. */
-class ReportBundle {
-	static compose({ directory, runUrl, tests, lint, coverage, parseOutcome }) {
-		const collection = ReportBundle.readJson(directory, "collection.json");
-		if (collection.reportFiles.length && parseOutcome !== "success")
-			collection.errors.push(
-				"Some report data could not be parsed. Available diagnostics are shown below.",
-			);
-		collection.complete = collection.errors.length === 0;
-		const outcomes = ["success", "failure", "cancelled", "skipped", "abandoned"]
-			.map(
-				(result) =>
-					`${Object.values(collection.jobs).filter((job) => job.result === result).length} ${result}`,
-			)
-			.join(" · ");
-		const lines = [
-			`[Workflow run and full artifacts](${runUrl})`,
-			`**Jobs:** ${outcomes}.`,
-		];
-		if (collection.errors.length)
-			lines.push(
-				"**Reporting incomplete:**\n" +
-					collection.errors
-						.slice(0, 50)
-						.map((error) => `- ${error.replace(/[<>]/g, "").slice(0, 500)}`)
-						.join("\n"),
-			);
-		if (tests) lines.push(tests);
-		if (lint) lines.push(lint);
-		for (const summary of collection.summaries) {
-			const content = external_node_fs_namespaceObject.readFileSync(
-				ReportBundle.file(directory, summary.file),
-				"utf8",
-			);
-			lines.push(
-				`<details>\n<summary>${summary.label}</summary>\n\n${content.length < 15000 ? content : `See the full artifact in the [workflow run](${runUrl}).`}\n\n</details>`,
-			);
-		}
-		if (collection.provider === "github")
-			lines.push(
-				"**Coverage:** Native GitHub publication requested. The completion check includes publication.",
-			);
-		else if (coverage) lines.push(coverage);
-		const rows = collection.statuses
-			.map(
-				(item) =>
-					`| ${item.label} | ${item.key} | ${item.job} | ${item.reports} | ${item.sha ? item.sha.slice(0, 7) : "unknown"} |`,
-			)
-			.join("\n");
-		lines.push(
-			`<details>\n<summary>Report availability</summary>\n\n| Component | Execution | Job | Files | Commit |\n| --- | --- | --- | --- | --- |\n${rows}\n\nOnly the current attempt is included. Rerun all producers after a partial rerun.\n\n</details>`,
-		);
-		let markdown = lines.join("\n\n");
-		if (markdown.length > 60000)
-			markdown = `${lines.slice(0, collection.errors.length ? 3 : 2).join("\n\n")}\n\nDetailed results exceed the comment limit. [Read the full artifacts](${runUrl}).`;
-		external_node_fs_namespaceObject.writeFileSync(external_node_path_namespaceObject.join(directory, "summary.md"), markdown);
-		external_node_fs_namespaceObject.writeFileSync(
-			external_node_path_namespaceObject.join(directory, "collection.json"),
-			JSON.stringify(collection),
-		);
-		return { markdown, complete: collection.complete };
-	}
-	constructor({ identity, temporaryDirectory }) {
-		this.identity = identity;
-		this.planIdentity = Object.fromEntries(
-			Object.entries(identity).filter(([key]) => key !== "sha"),
-		);
-		this.plans = new ReportPlan(this.planIdentity);
-		this.temporaryDirectory = external_node_fs_namespaceObject.realpathSync(temporaryDirectory);
-		this.coverage = new CoverageReports({ identity, temporaryDirectory });
+/** Custom commands own their resources; this wrapper owns only report storage. */
+class CheckRunner {
+	constructor({ recording, execute = CheckRunner.execute }) {
+		Object.assign(this, { recording, execute });
 	}
 
-	plan({ producers, plan }) {
-		const result = plan
-			? this.plans.validate(plan)
-			: this.plans.create(producers);
-		return { plan: result, selections: ReportPlan.selections(result) };
-	}
-
-	static file(directory, filename) {
-		if (
-			!filename ||
-			external_node_path_namespaceObject.isAbsolute(filename) ||
-			filename.includes("\\") ||
-			filename.split("/").some((part) => !part || part === "." || part === "..")
-		)
-			throw new Error("Unsafe report artifact path.");
-		const file = external_node_path_namespaceObject.join(directory, filename);
-		if (!external_node_fs_namespaceObject.lstatSync(file).isFile() || external_node_fs_namespaceObject.realpathSync(file) !== file)
-			throw new Error(
-				"Report artifacts must contain regular files, not symlinks.",
+	static execute(command, options) {
+		return new Promise((resolve, reject) => {
+			const child = (0,external_node_child_process_namespaceObject.spawn)(
+				"bash",
+				["--noprofile", "--norc", "-eo", "pipefail", "-c", command],
+				{ ...options, stdio: "inherit" },
 			);
-		return file;
+			child.once("error", reject);
+			child.once("exit", (code, signal) => resolve({ code, signal }));
+		});
 	}
 
-	static readJson(directory, filename) {
-		const file = ReportBundle.file(directory, filename);
-		if (external_node_fs_namespaceObject.statSync(file).size > 4 * 1024 * 1024)
-			throw new Error("Report metadata exceeds 4 MiB.");
-		return JSON.parse(external_node_fs_namespaceObject.readFileSync(file, "utf8"));
-	}
-
-	record({
-		directory,
-		workspace,
-		plan,
-		files = [],
-		categories = [],
-		testCount,
-		summaryFile = "",
-		sourceSha = "",
-		sourcePrefix = "",
-		parseOutcome = "success",
-		summaries = {},
-		metadata = {},
+	async run({
+		command,
+		name,
+		project,
+		testResults = "",
+		testCoverage = "",
+		lintResults = "",
 	}) {
-		plan = this.plans.validate(plan);
-		if (plan.producers.length !== 1)
-			throw new Error("Record exactly one planned producer execution.");
-		const producer = plan.producers[0];
-		metadata = ReportPlan.parse(metadata);
-		if (!metadata || typeof metadata !== "object" || Array.isArray(metadata))
-			throw new Error("Report metadata must be a JSON object.");
-		const project = external_node_fs_namespaceObject.realpathSync(directory);
-		const stage = external_node_fs_namespaceObject.mkdtempSync(
-			external_node_path_namespaceObject.join(this.temporaryDirectory, "ci-report-"),
-		);
-		const errors = [];
-		let actualSha = sourceSha;
-		try {
-			actualSha = (0,external_node_child_process_namespaceObject.execFileSync)("git", ["-C", project, "rev-parse", "HEAD"], {
-				encoding: "utf8",
-				stdio: ["ignore", "pipe", "pipe"],
-			}).trim();
-		} catch {
-			// Diagnostics from prebuilt containers may have no source metadata.
-			// Coverage preparation below still requires an explicit, matching revision.
-			actualSha = sourceSha;
+		if (typeof command !== "string" || !command.trim())
+			throw new Error("command is required.");
+		const reports = [];
+		for (const [kind, patterns] of [
+			["test", testResults],
+			["coverage", testCoverage],
+			["lint", lintResults],
+		]) {
+			for (const pattern of patterns
+				.split(/\r?\n/)
+				.map((value) => value.trim())
+				.filter(Boolean))
+				reports.push({ kind, pattern });
 		}
-		if (actualSha && !/^[a-f0-9]{40}$/.test(actualSha))
-			errors.push("Invalid report source commit.");
-		if (sourceSha && sourceSha !== actualSha)
-			errors.push("source-sha differs from the actual checkout.");
-		if (parseOutcome !== "success" && !summaryFile)
-			errors.push(
-				"Report parsing did not complete. Available diagnostics are retained.",
-			);
-		const records = [];
-		categories = ReportPlan.parse(categories);
-		if (
-			producer.type === "test" &&
-			testCount !== undefined &&
-			Number(testCount) < 1
-		)
-			errors.push(
-				"No executed tests were reported. Disable intentionally absent producers in the plan.",
-			);
-		files = ReportPlan.parse(files);
-		if (!Array.isArray(files))
-			throw new Error("Parsed files must be an array.");
-		if (summaryFile) files.push(external_node_path_namespaceObject.resolve(project, summaryFile));
-		const coverageFiles = new Set(
-			producer.coverage.map((report) => external_node_path_namespaceObject.resolve(project, report.file)),
+		const prepared = await this.recording.prepare({
+			name: name || "Custom check",
+			project: project || ".",
+			reports,
+		});
+		let execution;
+		try {
+			execution = await this.execute(command, {
+				cwd: external_node_path_namespaceObject.join(this.recording.workspace, project || "."),
+				env: { ...process.env, CI_REPORTS_DIR: prepared["report-directory"] },
+			});
+		} catch (error) {
+			const result = await this.recording.finalize({
+				recording: prepared.recording,
+				outcome: "failure",
+			});
+			return {
+				...result,
+				errors: [error.message, ...result.errors],
+				complete: false,
+			};
+		}
+		return this.recording.finalize({
+			recording: prepared.recording,
+			outcome: execution.signal
+				? "cancelled"
+				: execution.code === 0
+					? "success"
+					: "failure",
+			...(execution.code === null ? {} : { exitCode: execution.code }),
+		});
+	}
+}
+
+;// CONCATENATED MODULE: ./src/CoveragePublication.js
+
+
+
+
+
+
+
+/** Stage explicit, source-normalized inputs without searching the consumer tree. */
+class CoveragePublication {
+	constructor({
+		directory,
+		actionPath,
+		temporaryDirectory,
+		execute = external_node_child_process_namespaceObject.execFileSync,
+	}) {
+		Object.assign(this, { directory, actionPath, temporaryDirectory, execute });
+	}
+
+	normalized(asset) {
+		const input = external_node_fs_namespaceObject.readFileSync(Protocol.file(this.directory, asset.file));
+		if (Protocol.digest(input) !== asset.sha256)
+			throw new Error("Coverage changed after collection.");
+		if (asset.format === "lcov")
+			return input
+				.toString("utf8")
+				.replace(/^SF:(.+)$/gm, (_line, filename) => {
+					const mapped = asset.sourceMap[filename.trim()];
+					if (!mapped) throw new Error("LCOV source mapping is missing.");
+					return `SF:${Protocol.relative(mapped)}`;
+				});
+		if (asset.format === "cobertura") {
+			const report = new CoberturaReport(input.toString("utf8"));
+			for (const item of report.classes)
+				item["@_filename"] = Protocol.relative(
+					asset.sourceMap[item["@_filename"]],
+				);
+			report.document.coverage.sources = { source: "." };
+			delete report.document["!DOCTYPE"];
+			return new json2xml({ ignoreAttributes: false }).build(report.document);
+		}
+		throw new Error(
+			`Unsupported coverage normalization: ${asset.format}. Native evidence is retained.`,
 		);
-		for (const [index, input] of [...new Set(files)].entries()) {
-			try {
-				const real = external_node_fs_namespaceObject.realpathSync(input);
+	}
+
+	prepare(dataset, reporter) {
+		if (dataset.errors.length || !dataset.assets.length)
+			throw new Error("Cannot publish incomplete coverage.");
+		const preferred =
+			reporter === "github" ? ["cobertura", "lcov"] : ["lcov", "cobertura"];
+		const asset = preferred
+			.map((format) => dataset.assets.find((item) => item.format === format))
+			.find(Boolean);
+		if (!asset)
+			throw new Error(
+				`No supported ${reporter} representation for ${dataset.label}.`,
+			);
+		const stage = external_node_path_namespaceObject.join(this.directory, "publication", dataset.id);
+		external_node_fs_namespaceObject.mkdirSync(stage, { recursive: true });
+		const file = external_node_path_namespaceObject.join(
+			stage,
+			asset.format === "lcov" ? "coverage.info" : "coverage.xml",
+		);
+		external_node_fs_namespaceObject.writeFileSync(file, this.normalized(asset));
+		if (reporter !== "github" || asset.format === "cobertura")
+			return { file, format: asset.format };
+		const output = external_node_path_namespaceObject.join(stage, "coverage.xml");
+		const packages = external_node_path_namespaceObject.join(
+			this.temporaryDirectory,
+			"ci-coverage-converter",
+		);
+		if (!external_node_fs_namespaceObject.existsSync(external_node_path_namespaceObject.join(packages, "lcov_cobertura"))) {
+			this.execute(
+				"python3",
+				[
+					"-I",
+					"-m",
+					"pip",
+					"--isolated",
+					"install",
+					"--disable-pip-version-check",
+					"--no-deps",
+					"--no-cache-dir",
+					"--only-binary=:all:",
+					"--require-hashes",
+					"--target",
+					packages,
+					"-r",
+					external_node_path_namespaceObject.join(this.actionPath, "converters", "requirements.txt"),
+				],
+				{ cwd: this.actionPath, timeout: 60000, stdio: "pipe" },
+			);
+		}
+		this.execute(
+			"python3",
+			[
+				"-I",
+				external_node_path_namespaceObject.join(this.actionPath, "converters", "lcov.py"),
+				packages,
+				file,
+				output,
+			],
+			{ cwd: stage, timeout: 30000, stdio: "pipe" },
+		);
+		const converted = new CoberturaReport(external_node_fs_namespaceObject.readFileSync(output, "utf8"));
+		for (const source of converted.files())
+			if (!Object.values(asset.sourceMap).includes(source))
+				throw new Error(
+					"Converted coverage changed the verified source mapping.",
+				);
+		return { file: output, format: "cobertura" };
+	}
+}
+
+;// CONCATENATED MODULE: external "node:zlib"
+const external_node_zlib_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:zlib");
+;// CONCATENATED MODULE: ./src/Diagnostics.js
+
+
+
+
+/** Deduplicate diagnostics and preserve the publisher selected by their producer. */
+class Diagnostics {
+	constructor({
+		collection,
+		core,
+		github,
+		context,
+		sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+	}) {
+		Object.assign(this, { collection, core, github, context, sleep });
+		this.findings = new ReportRenderer({ collection }).findings();
+	}
+
+	annotations(kind) {
+		const dataset = Reporters.subject(this.collection, kind);
+		const findings =
+			kind === "lint"
+				? this.findings.lint.filter((item) => item.owner !== "tool")
+				: this.findings.tests.filter(
+						(item) =>
+							["failed", "error"].includes(item.status) &&
+							item.owner !== "tool",
+					);
+		const seen = new Set();
+		let emitted = 0;
+		for (const item of findings) {
+			const key = JSON.stringify([
+				item.check.source.sha,
+				item.check.check.project,
+				item.source,
+				item.rule,
+				item.name,
+				item.file,
+				item.line,
+				item.message,
+			]);
+			if (seen.has(key)) continue;
+			seen.add(key);
+			if (emitted >= 50) continue;
+			const properties = {
+				title: String(item.rule || item.name || item.check.check.name).slice(
+					0,
+					250,
+				),
+			};
+			if (item.file && item.check.source.sha === this.context.sha) {
+				properties.file = item.file;
+				if (Number.isSafeInteger(item.line) && item.line > 0)
+					properties.startLine = item.line;
 				if (
-					!external_node_fs_namespaceObject.lstatSync(input).isFile() ||
-					real !== input ||
-					!real.startsWith(`${project}${external_node_path_namespaceObject.sep}`)
+					Number.isSafeInteger(item.column) &&
+					item.column > 0 &&
+					properties.startLine
+				)
+					properties.startColumn = item.column;
+			}
+			const message = String(
+				item.message || "See the native report for details.",
+			).slice(0, 4000);
+			if (item.severity === "warning") this.core.warning(message, properties);
+			else if (item.severity === "info") this.core.notice(message, properties);
+			else this.core.error(message, properties);
+			emitted++;
+		}
+		return Reporters.receipt({
+			dataset,
+			reporter: "annotations",
+			status: "published",
+			message: `${emitted} annotations emitted; ${seen.size - emitted} additional diagnostics retained in the summary and artifacts. Tool-owned annotations were not repeated.`,
+		});
+	}
+
+	async codeScanning() {
+		const dataset = Reporters.subject(this.collection, "lint");
+		const receipt = (status, message) =>
+			Reporters.receipt({
+				dataset,
+				reporter: "code-scanning",
+				status,
+				message,
+			});
+		try {
+			const owned = this.collection.checks.filter((check) =>
+				check.check.reports.some(
+					(report) => report.kind === "lint" && report.owner !== "tool",
+				),
+			);
+			const findings = this.findings.lint.filter(
+				(item) => item.owner !== "tool",
+			);
+			if (findings.length > 5000)
+				throw new Error(
+					"Code scanning publication exceeds 5000 findings. Full native reports are retained.",
+				);
+			for (const sha of new Set(owned.map((check) => check.source.sha))) {
+				const checks = owned.filter((check) => check.source.sha === sha);
+				const items = findings.filter((item) => item.check.source.sha === sha);
+				if (items.some((item) => !item.file))
+					throw new Error(
+						"Code scanning requires a verified repository path for every finding.",
+					);
+				const sarif = {
+					version: "2.1.0",
+					runs: [
+						{
+							tool: { driver: { name: "Hoverkraft CI lint" } },
+							automationDetails: {
+								id: `${this.collection.identity.workflow}/lint/`,
+							},
+							results: items.map((item) => ({
+								ruleId: String(item.rule || item.source || "lint"),
+								level:
+									item.severity === "error"
+										? "error"
+										: item.severity === "warning"
+											? "warning"
+											: "note",
+								message: { text: String(item.message) },
+								locations: [
+									{
+										physicalLocation: {
+											artifactLocation: {
+												uri: item.file
+													.split("/")
+													.map(encodeURIComponent)
+													.join("/"),
+												uriBaseId: "%SRCROOT%",
+											},
+											...(Number.isSafeInteger(item.line) && item.line > 0
+												? { region: { startLine: item.line } }
+												: {}),
+										},
+									},
+								],
+							})),
+						},
+					],
+				};
+				const ref =
+					checks[0].source.kind === "pr-head"
+						? `refs/pull/${this.context.payload.pull_request.number}/head`
+						: this.context.ref;
+				const { data } = await this.github.rest.codeScanning.uploadSarif({
+					...this.context.repo,
+					commit_sha: sha,
+					ref,
+					sarif: (0,external_node_zlib_namespaceObject.gzipSync)(JSON.stringify(sarif)).toString("base64"),
+					request: { timeout: 20000 },
+				});
+				if (!data.id)
+					throw new Error("GitHub did not acknowledge SARIF submission.");
+				let complete = false;
+				for (let attempt = 0; attempt < 24; attempt++) {
+					await this.sleep(5000);
+					const response = await this.github.rest.codeScanning.getSarif({
+						...this.context.repo,
+						sarif_id: data.id,
+						request: { timeout: 20000 },
+					});
+					if (response.data.processing_status === "complete") {
+						complete = true;
+						break;
+					}
+					if (response.data.processing_status !== "pending")
+						throw new Error("GitHub rejected SARIF processing.");
+				}
+				if (!complete)
+					throw new Error("Timed out waiting for SARIF processing.");
+			}
+			return receipt(
+				"published",
+				owned.length
+					? "GitHub confirmed code scanning processing."
+					: "All lint diagnostics are published by their owning tools; no duplicate upload.",
+			);
+		} catch (error) {
+			return receipt("failed", error.message);
+		}
+	}
+}
+
+;// CONCATENATED MODULE: ./src/ExecutionIdentity.js
+/** Bind reports to actual executions, including copied successful jobs in reruns. */
+class ExecutionIdentity {
+	constructor({
+		github,
+		context,
+		attempt,
+		runnerName,
+		sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+	}) {
+		this.github = github;
+		this.context = context;
+		this.attempt = Number(attempt);
+		this.runnerName = runnerName;
+		this.sleep = sleep;
+	}
+
+	async jobs(attempt = this.attempt) {
+		return this.github.paginate(
+			this.github.rest.actions.listJobsForWorkflowRunAttempt,
+			{
+				...this.context.repo,
+				run_id: this.context.runId,
+				attempt_number: attempt,
+				per_page: 100,
+			},
+		);
+	}
+
+	static sameExecution(left, right) {
+		return (
+			left.name === right.name &&
+			left.runner_id === right.runner_id &&
+			left.runner_name === right.runner_name &&
+			left.started_at === right.started_at
+		);
+	}
+
+	async current() {
+		if (
+			!this.runnerName ||
+			!Number.isSafeInteger(this.attempt) ||
+			this.attempt < 1
+		)
+			throw new Error(
+				"Recording requires the GitHub runner name and run attempt.",
+			);
+		for (const delay of [0, 1000, 2000, 4000]) {
+			if (delay) await this.sleep(delay);
+			const candidates = (await this.jobs()).filter(
+				(job) =>
+					job.status === "in_progress" && job.runner_name === this.runnerName,
+			);
+			if (candidates.length > 1)
+				throw new Error(
+					"Ambiguous runner execution; refusing to associate reports by display name.",
+				);
+			if (candidates.length === 1) {
+				const job = candidates[0];
+				if (!job.runner_id || !job.started_at)
+					throw new Error("GitHub omitted runner execution metadata.");
+				return {
+					repository: `${this.context.repo.owner}/${this.context.repo.repo}`,
+					repositoryId: String(this.context.payload.repository.id),
+					runId: String(this.context.runId),
+					attempt: this.attempt,
+					job: {
+						id: job.id,
+						name: job.name,
+						runner_id: job.runner_id,
+						runner_name: job.runner_name,
+						started_at: job.started_at,
+						html_url: job.html_url,
+					},
+				};
+			}
+		}
+		throw new Error(
+			"Could not identify the active GitHub job. Check actions: read permission and runner metadata.",
+		);
+	}
+
+	async select(registrations) {
+		const latest = await this.jobs();
+		const originals = new Map();
+		for (const attempt of new Set(
+			registrations.map((record) => record.execution.attempt),
+		)) {
+			if (
+				!Number.isSafeInteger(attempt) ||
+				attempt < 1 ||
+				attempt > this.attempt
+			)
+				throw new Error("Invalid recording attempt.");
+			originals.set(attempt, await this.jobs(attempt));
+		}
+		for (const record of registrations) {
+			const original = originals
+				.get(record.execution.attempt)
+				.find((job) => job.id === record.execution.job.id);
+			if (
+				!original ||
+				!ExecutionIdentity.sameExecution(original, record.execution.job)
+			)
+				throw new Error(
+					"Recording execution disagrees with GitHub's original job.",
+				);
+		}
+		const names = new Set(
+			registrations.map((record) => record.execution.job.name),
+		);
+		const selected = [];
+		const errors = [];
+		for (const job of latest.filter((item) => names.has(item.name))) {
+			if (job.status !== "completed")
+				throw new Error(
+					"A registered producer is still active. ci-reports must wait for every producer.",
+				);
+			const matches = registrations.filter((record) =>
+				ExecutionIdentity.sameExecution(record.execution.job, job),
+			);
+			if (!matches.length) {
+				errors.push(
+					`${job.name}: execution changed without a new registration. Rerun this producer.`,
+				);
+				continue;
+			}
+			if (
+				latest.filter((other) => ExecutionIdentity.sameExecution(other, job))
+					.length !== 1
+			)
+				throw new Error("Ambiguous execution metadata in the current attempt.");
+			for (const registration of matches) selected.push({ registration, job });
+		}
+		for (const name of names)
+			if (!latest.some((job) => job.name === name))
+				errors.push(`${name}: producer is absent from the current attempt.`);
+		return { selected, errors };
+	}
+}
+
+;// CONCATENATED MODULE: ./src/GitHubCoverage.js
+
+
+
+
+/** Temporary outcome adapter for the official uploader's existing API contract. */
+class GitHubCoverage {
+	constructor({
+		github,
+		context,
+		sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+		now = Date.now,
+	}) {
+		Object.assign(this, { github, context, sleep, now });
+	}
+
+	async capability() {
+		try {
+			const response = await this.github.request(
+				"GET /repos/{owner}/{repo}/code-quality/findings",
+				{ ...this.context.repo, per_page: 1, request: { timeout: 20000 } },
+			);
+			if (!Array.isArray(response.data))
+				throw new Error("Malformed Code Quality capability response.");
+			return { available: true };
+		} catch (error) {
+			if (
+				error.status === 403 &&
+				error.response?.data?.message ===
+					"Code quality is not enabled for this repository. Please enable code quality in the repository settings."
+			)
+				return {
+					available: false,
+					reason: "GitHub Code Quality is disabled for this repository.",
+				};
+			throw error;
+		}
+	}
+
+	async target(dataset) {
+		const pr = this.context.payload.pull_request;
+		if (this.context.eventName === "merge_group")
+			return {
+				unavailable: "Native coverage is not available for merge-group events.",
+			};
+		if (pr) {
+			if (
+				pr.head.repo.full_name !==
+				`${this.context.repo.owner}/${this.context.repo.repo}`
+			)
+				return {
+					unavailable:
+						"Native coverage is not available to this fork workflow.",
+				};
+			if (
+				dataset.source.kind !== "pr-head" ||
+				dataset.source.sha !== pr.head.sha
+			)
+				return {
+					unavailable:
+						"Coverage measured the PR merge result, not its head commit.",
+				};
+			const { data: current } = await this.github.rest.pulls.get({
+				...this.context.repo,
+				pull_number: pr.number,
+			});
+			if (current.state !== "open" || current.head.sha !== dataset.source.sha)
+				return {
+					superseded: "The PR changed after this coverage was measured.",
+				};
+			return { pull_request_number: pr.number };
+		}
+		const branch = this.context.payload.repository.default_branch;
+		if (this.context.ref !== `refs/heads/${branch}`)
+			return {
+				unavailable:
+					"This run is neither a pull request nor a default-branch measurement.",
+			};
+		if (dataset.source.sha !== this.context.sha)
+			throw new Error("Coverage source differs from the workflow commit.");
+		return { ref: this.context.ref };
+	}
+
+	async publish({ dataset, file, auto, explicit }) {
+		const receipt = (status, message, extra = {}) => ({
+			...Reporters.receipt({
+				dataset,
+				reporter: "github",
+				status,
+				message,
+				...extra,
+			}),
+			...extra,
+		});
+		try {
+			if (dataset.errors.length)
+				return receipt("failed", dataset.errors.join(" "));
+			const target = await this.target(dataset);
+			if (target.superseded) return receipt("superseded", target.superseded);
+			const capability = target.unavailable
+				? { available: false, reason: target.unavailable }
+				: await this.capability();
+			if (!capability.available)
+				return receipt(explicit ? "failed" : "unavailable", capability.reason, {
+					...(auto
+						? {
+								fallback: this.context.payload.pull_request
+									? "comment"
+									: "summary",
+							}
+						: {}),
+				});
+			// FIXME: Replace with a pinned released action once outcome, report-id and
+			// skip-reason are available and processing success can be required.
+			// https://github.com/actions/upload-code-coverage/issues/36
+			// https://github.com/actions/upload-code-coverage/pull/37
+			const reportFile = typeof file === "function" ? await file() : file;
+			const response = await this.github.request(
+				"PUT /repos/{owner}/{repo}/code-coverage/report",
+				{
+					...this.context.repo,
+					...target,
+					commit_oid: dataset.source.sha,
+					language_name: dataset.language,
+					label: dataset.label,
+					coverage_report: (0,external_node_zlib_namespaceObject.gzipSync)(external_node_fs_namespaceObject.readFileSync(reportFile)).toString(
+						"base64",
+					),
+					request: { timeout: 20000 },
+				},
+			);
+			const id = response.data?.id;
+			if (typeof id !== "string" || !id)
+				return receipt(
+					"failed",
+					`GitHub did not accept this coverage report: ${response.data?.message || "missing report ID"}`,
+				);
+			const deadline = this.now() + 160000;
+			while (this.now() < deadline) {
+				await this.sleep(Math.min(5000, deadline - this.now()));
+				const { data } = await this.github.request(
+					"GET /repos/{owner}/{repo}/code-coverage/reports/{report_id}",
+					{ ...this.context.repo, report_id: id, request: { timeout: 20000 } },
+				);
+				if (data.processing_status === "succeeded")
+					return receipt(
+						"published",
+						"GitHub confirmed successful processing.",
+						{ id },
+					);
+				if (data.processing_status === "failed")
+					return receipt(
+						"failed",
+						`GitHub processing failed: ${(data.errors || []).join("; ")}`,
+						{ id },
+					);
+				if (!["pending", "processing"].includes(data.processing_status))
+					return receipt("failed", "Malformed coverage processing response.", {
+						id,
+					});
+			}
+			return receipt(
+				"failed",
+				"Timed out waiting for GitHub coverage processing.",
+				{ id },
+			);
+		} catch (error) {
+			return receipt(
+				"failed",
+				`GitHub coverage publication failed: ${error.message}`,
+			);
+		}
+	}
+}
+
+;// CONCATENATED MODULE: ./src/ReportArtifacts.js
+
+
+
+
+
+/** Typed, immutable artifacts scoped to this run and collection attempt. */
+class ReportArtifacts {
+	constructor({ github, context, client, core, token, temporaryDirectory }) {
+		Object.assign(this, {
+			github,
+			context,
+			client,
+			core,
+			token,
+			temporaryDirectory,
+		});
+		this.attempt = Number(process.env.GITHUB_RUN_ATTEMPT);
+	}
+
+	async upload(name, directory) {
+		const files = [...external_node_fs_namespaceObject.globSync("**/*", { cwd: directory })]
+			.filter((file) => external_node_fs_namespaceObject.lstatSync(external_node_path_namespaceObject.join(directory, file)).isFile())
+			.map((file) => Protocol.file(directory, file));
+		const result = await this.client.uploadArtifact(name, files, directory, {
+			retentionDays: 7,
+		});
+		if (!result.id)
+			throw new Error("Report artifact upload returned no artifact ID.");
+		return result.id;
+	}
+
+	async download(ids, destination, mergeMultiple = true) {
+		if (!/^\d+(,\d+)*$/.test(String(ids)))
+			throw new Error("Invalid report artifact IDs.");
+		await new ArtifactDownload({
+			client: this.client,
+			core: this.core,
+		}).download({
+			artifactIds: String(ids),
+			destination,
+			mergeMultiple,
+			skipDecompress: false,
+			findBy: {
+				token: this.token,
+				repositoryOwner: this.context.repo.owner,
+				repositoryName: this.context.repo.repo,
+				workflowRunId: this.context.runId,
+			},
+		});
+	}
+
+	async collection(id) {
+		const directory = external_node_fs_namespaceObject.mkdtempSync(
+			external_node_path_namespaceObject.join(this.temporaryDirectory, "ci-publication-"),
+		);
+		try {
+			await this.download(id, directory);
+			const collection = Protocol.read(directory, "collection.json");
+			if (
+				collection.version !== Protocol.version ||
+				collection.identity.repository !==
+					`${this.context.repo.owner}/${this.context.repo.repo}` ||
+				collection.identity.runId !== String(this.context.runId) ||
+				collection.identity.attempt !== this.attempt ||
+				collection.identity.sha !== this.context.sha
+			)
+				throw new Error("Collection does not belong to this run attempt.");
+			return { directory, collection };
+		} catch (error) {
+			external_node_fs_namespaceObject.rmSync(directory, { recursive: true, force: true });
+			throw error;
+		}
+	}
+
+	async receipt(receipt) {
+		if (
+			!/^[a-z-]+$/.test(receipt.reporter) ||
+			!/^[a-z0-9-]+$/.test(receipt.dataset)
+		)
+			throw new Error("Invalid receipt identity.");
+		const directory = external_node_fs_namespaceObject.mkdtempSync(
+			external_node_path_namespaceObject.join(this.temporaryDirectory, "ci-receipt-"),
+		);
+		try {
+			Protocol.write(directory, "receipt.json", {
+				...receipt,
+				runId: String(this.context.runId),
+				attempt: this.attempt,
+			});
+			return await this.upload(
+				`${Protocol.prefix}receipt-${this.attempt}-${receipt.reporter}-${receipt.dataset}`,
+				directory,
+			);
+		} finally {
+			external_node_fs_namespaceObject.rmSync(directory, { recursive: true, force: true });
+		}
+	}
+
+	async receipts() {
+		const artifacts = await this.github.paginate(
+			this.github.rest.actions.listWorkflowRunArtifacts,
+			{ ...this.context.repo, run_id: this.context.runId, per_page: 100 },
+		);
+		const prefix = `${Protocol.prefix}receipt-${this.attempt}-`;
+		const selected = artifacts.filter((artifact) =>
+			artifact.name.startsWith(prefix),
+		);
+		if (
+			selected.some((artifact) => artifact.expired) ||
+			selected.length > 512 ||
+			selected.reduce((sum, artifact) => sum + artifact.size_in_bytes, 0) >
+				8 * 1024 * 1024 ||
+			new Set(selected.map((artifact) => artifact.name)).size !==
+				selected.length
+		)
+			throw new Error("Missing, duplicate or oversized publication receipts.");
+		if (!selected.length) return [];
+		const directory = external_node_fs_namespaceObject.mkdtempSync(
+			external_node_path_namespaceObject.join(this.temporaryDirectory, "ci-receipts-"),
+		);
+		try {
+			await this.download(
+				selected.map((artifact) => artifact.id).join(","),
+				directory,
+				false,
+			);
+			return selected.map((artifact) => {
+				const receipt = Protocol.read(
+					selected.length === 1
+						? directory
+						: external_node_path_namespaceObject.join(directory, artifact.name),
+					"receipt.json",
+				);
+				if (
+					artifact.name !== `${prefix}${receipt.reporter}-${receipt.dataset}` ||
+					receipt.runId !== String(this.context.runId) ||
+					receipt.attempt !== this.attempt ||
+					![
+						"published",
+						"submitted",
+						"unavailable",
+						"superseded",
+						"failed",
+					].includes(receipt.status)
+				)
+					throw new Error("Invalid publication receipt provenance.");
+				return receipt;
+			});
+		} finally {
+			external_node_fs_namespaceObject.rmSync(directory, { recursive: true, force: true });
+		}
+	}
+}
+
+;// CONCATENATED MODULE: ./src/ReportComment.js
+
+
+
+/** A serialized update of one exact bot-owned marker, guarded against stale runs. */
+class ReportComment {
+	constructor({ github, context, collection }) {
+		Object.assign(this, { github, context, collection });
+	}
+
+	async publish(body, { fallbackOnly = false } = {}) {
+		const dataset = Reporters.subject(this.collection);
+		const receipt = (status, message, extra = {}) =>
+			Reporters.receipt({
+				dataset,
+				reporter: "comment",
+				status,
+				message,
+				...extra,
+			});
+		const pr = this.context.payload.pull_request;
+		if (!pr)
+			return receipt(
+				"unavailable",
+				"This event has no pull request. Read the Actions summary.",
+			);
+		if (
+			pr.head.repo.full_name !==
+			`${this.context.repo.owner}/${this.context.repo.repo}`
+		)
+			return receipt(
+				fallbackOnly ? "unavailable" : "failed",
+				"This fork run cannot write a PR comment. Read the Actions summary.",
+			);
+		try {
+			const { data: current } = await this.github.rest.pulls.get({
+				...this.context.repo,
+				pull_number: pr.number,
+			});
+			if (current.state !== "open" || current.head.sha !== pr.head.sha)
+				return receipt(
+					"superseded",
+					"PR head changed; this run will not overwrite its report.",
+				);
+			const key = Protocol.digest(
+				`${this.collection.identity.repository}:${this.collection.identity.workflow}:${pr.number}`,
+			);
+			const marker = `<!-- hoverkraft-ci-reports:v2:${key} -->`;
+			const comments = await this.github.paginate(
+				this.github.rest.issues.listComments,
+				{ ...this.context.repo, issue_number: pr.number, per_page: 100 },
+			);
+			const matching = comments.filter(
+				(comment) =>
+					comment.user?.type === "Bot" &&
+					comment.user.login === "github-actions[bot]" &&
+					comment.body?.startsWith(`${marker}\n`),
+			);
+			if (matching.length > 1)
+				throw new Error(
+					"Multiple owned report comments exist. Refusing to update an ambiguous comment.",
+				);
+			const existing = matching[0];
+			const { data: run } = await this.github.rest.actions.getWorkflowRun({
+				...this.context.repo,
+				run_id: this.context.runId,
+			});
+			const freshness = {
+				created: run.created_at,
+				run: String(this.context.runId),
+				attempt: this.collection.identity.attempt,
+			};
+			if (!freshness.created)
+				throw new Error("GitHub omitted run freshness metadata.");
+			if (existing) {
+				const metadata = existing.body
+					.split("\n")[1]
+					?.match(/^<!-- freshness:(.+) -->$/);
+				if (!metadata)
+					throw new Error("Owned comment has no valid freshness metadata.");
+				const previous = JSON.parse(metadata[1]);
+				if (
+					previous.created > freshness.created ||
+					(previous.created === freshness.created &&
+						(BigInt(previous.run) > BigInt(freshness.run) ||
+							(previous.run === freshness.run &&
+								previous.attempt > freshness.attempt)))
+				)
+					return receipt(
+						"superseded",
+						"A newer report already owns the PR comment.",
+					);
+			}
+			// Recheck immediately before the write, after pagination and metadata reads.
+			const latest = await this.github.rest.pulls.get({
+				...this.context.repo,
+				pull_number: pr.number,
+			});
+			if (latest.data.state !== "open" || latest.data.head.sha !== pr.head.sha)
+				return receipt("superseded", "PR changed before the comment update.");
+			const content = `${marker}\n<!-- freshness:${JSON.stringify(freshness)} -->\n${body}`;
+			const { data } = existing
+				? await this.github.rest.issues.updateComment({
+						...this.context.repo,
+						comment_id: existing.id,
+						body: content,
+					})
+				: await this.github.rest.issues.createComment({
+						...this.context.repo,
+						issue_number: pr.number,
+						body: content,
+					});
+			if (!data.id)
+				throw new Error("GitHub did not acknowledge the comment write.");
+			return receipt("published", "Consolidated PR comment updated.", {
+				id: String(data.id),
+				url: data.html_url,
+			});
+		} catch (error) {
+			return receipt("failed", error.message);
+		}
+	}
+}
+
+;// CONCATENATED MODULE: ./src/Runtime.js
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/** Entrypoints used by metadata; publication operations remain workflow-internal. */
+class Runtime {
+	constructor({ core, github, context, actionPath, token, client }) {
+		Object.assign(this, { core, github, context, actionPath });
+		this.temporaryDirectory = process.env.RUNNER_TEMP;
+		this.client = client;
+		this.execution = new ExecutionIdentity({
+			github,
+			context,
+			attempt: process.env.GITHUB_RUN_ATTEMPT,
+			runnerName: process.env.RUNNER_NAME,
+		});
+		this.store = new ReportArtifacts({
+			github,
+			context,
+			client: this.client,
+			core,
+			token,
+			temporaryDirectory: this.temporaryDirectory,
+		});
+	}
+
+	outputs(values) {
+		for (const [key, value] of Object.entries(values))
+			this.core.setOutput(key, value);
+	}
+
+	async producer(operation, input) {
+		const recording = new Recording({
+			execution: this.execution,
+			artifacts: this.client,
+			context: this.context,
+			workspace: process.env.GITHUB_WORKSPACE,
+			temporaryDirectory: this.temporaryDirectory,
+		});
+		let result;
+		if (operation === "prepare") {
+			if (
+				!input.definition ||
+				input.recording ||
+				input.outcome ||
+				input.exitCode
+			)
+				throw new Error("prepare requires only definition.");
+			result = await recording.prepare(JSON.parse(input.definition));
+		} else if (operation === "finalize") {
+			if (!input.recording || !input.outcome || input.definition)
+				throw new Error(
+					"finalize requires recording and outcome, without definition.",
+				);
+			result = await recording.finalize({
+				recording: input.recording,
+				outcome: input.outcome,
+				...(input.exitCode === "" ? {} : { exitCode: Number(input.exitCode) }),
+			});
+		} else if (operation === "run-check")
+			result = await new CheckRunner({ recording }).run(input);
+		else throw new Error("operation must be prepare or finalize.");
+		this.outputs(result);
+		if (
+			result.complete === false ||
+			(result.outcome && result.outcome !== "success")
+		)
+			this.core.setFailed(
+				`Check ${result.outcome}. ${result.errors.join(" ")}`,
+			);
+	}
+
+	render(collection, receipts, jobs, includeComment) {
+		const errors = Reporters.complete(collection, receipts, jobs, {
+			includeComment,
+		});
+		return {
+			errors,
+			renderer: new ReportRenderer({
+				collection,
+				receipts,
+				errors,
+				runUrl: `${this.context.serverUrl}/${collection.identity.repository}/actions/runs/${this.context.runId}/attempts/${collection.identity.attempt}`,
+				sourceUrl: `${this.context.serverUrl}/${collection.identity.repository}/blob`,
+			}),
+		};
+	}
+
+	async collect(input) {
+		const collector = new Collector({
+			execution: this.execution,
+			github: this.github,
+			context: this.context,
+			artifacts: this.client,
+			core: this.core,
+			temporaryDirectory: this.temporaryDirectory,
+			token: input.token,
+		});
+		const { collection, directory } = await collector.collect({
+			jobs: JSON.parse(input.jobs),
+			reporters: JSON.parse(input.reporters),
+		});
+		try {
+			const id = await this.store.upload(
+				`${Protocol.prefix}collection-${collection.identity.attempt}`,
+				directory,
+			);
+			const datasets = collection.datasets
+				.filter((item) => item.role === "primary")
+				.map((item) => ({ id: item.id, label: item.label }));
+			this.outputs({
+				"artifact-id": id,
+				datasets,
+				reporters: collection.reporters,
+				annotations: ["test", "lint"].some(
+					(kind) =>
+						collection.reporters[kind].includes("annotations") &&
+						collection.checks.some((check) =>
+							check.check.reports.some((report) => report.kind === kind),
+						),
+				),
+				"code-scanning":
+					collection.reporters.lint.includes("code-scanning") &&
+					collection.checks.some((check) =>
+						check.check.reports.some((report) => report.kind === "lint"),
+					),
+			});
+		} finally {
+			external_node_fs_namespaceObject.rmSync(directory, { recursive: true, force: true });
+		}
+	}
+
+	async saveReceipt(receipt) {
+		await this.store.receipt(receipt);
+		if (["failed", "superseded"].includes(receipt.status))
+			this.core.setFailed(receipt.message);
+	}
+
+	async publisher(operation, input, collection, directory) {
+		const dataset = collection.datasets.find(
+			(item) => item.id === input.dataset,
+		);
+		const publication = new CoveragePublication({
+			directory,
+			actionPath: this.actionPath,
+			temporaryDirectory: this.temporaryDirectory,
+		});
+		if (operation === "github") {
+			if (!dataset) throw new Error("Unknown coverage dataset.");
+			return this.saveReceipt(
+				await new GitHubCoverage(this).publish({
+					dataset,
+					file: () => publication.prepare(dataset, "github").file,
+					auto: collection.reporters.coverage.includes("auto"),
+					explicit: collection.reporters.coverage.includes("github"),
+				}),
+			);
+		}
+		if (operation === "annotations" || operation === "code-scanning") {
+			const diagnostics = new Diagnostics({ ...this, collection });
+			if (operation === "code-scanning")
+				return this.saveReceipt(await diagnostics.codeScanning());
+			for (const kind of ["test", "lint"])
+				if (
+					collection.reporters[kind].includes("annotations") &&
+					collection.checks.some((check) =>
+						check.check.reports.some((report) => report.kind === kind),
+					)
+				)
+					await this.saveReceipt(diagnostics.annotations(kind));
+			return;
+		}
+		if (operation === "prepare-external") {
+			if (!dataset || !["codecov", "coveralls"].includes(input.reporter))
+				throw new Error("Unknown coverage destination.");
+			if (
+				input.reporter === "coveralls" &&
+				new Set(
+					collection.datasets
+						.filter((item) => item.role === "primary")
+						.map((item) => item.source.sha),
+				).size !== 1
+			)
+				throw new Error("One Coveralls build requires one tested commit.");
+			const pr = this.context.payload.pull_request;
+			if (pr) {
+				if (pr.head.repo.full_name !== collection.identity.repository)
+					throw new Error(
+						"Explicit external publication is unavailable to this fork run.",
+					);
+				const { data: current } = await this.github.rest.pulls.get({
+					...this.context.repo,
+					pull_number: pr.number,
+				});
+				if (current.state !== "open" || current.head.sha !== pr.head.sha)
+					throw new Error(
+						"Coverage publication was superseded by a newer PR head.",
+					);
+			}
+			const { file, format } = publication.prepare(dataset, input.reporter);
+			// Official uploader inputs are shell-sensitive. Generated paths and IDs
+			// are the only values forwarded; never forward report labels as flags.
+			if (!/^[a-zA-Z0-9_./-]+$/.test(file))
+				throw new Error(
+					"Uploader staging path contains unsupported characters.",
+				);
+			this.outputs({ file, format, sha: dataset.source.sha, directory });
+			return;
+		}
+		if (operation === "external-receipt") {
+			if (!dataset || !["codecov", "coveralls"].includes(input.reporter))
+				throw new Error("Unknown external receipt.");
+			return this.saveReceipt(
+				Reporters.receipt({
+					dataset,
+					reporter: input.reporter,
+					status: input.outcome === "success" ? "submitted" : "failed",
+					message:
+						input.outcome === "success"
+							? "Pinned official uploader completed strict submission. Provider processing is not confirmed."
+							: `Official uploader did not submit coverage (${input.outcome || "missing outcome"}).`,
+				}),
+			);
+		}
+		if (operation === "check-coveralls") {
+			const receipts = await this.store.receipts();
+			const expected = collection.datasets.filter(
+				(item) => item.role === "primary",
+			);
+			if (new Set(expected.map((item) => item.source.sha)).size !== 1)
+				throw new Error("One Coveralls build requires one tested commit.");
+			for (const item of expected)
+				if (
+					receipts.filter(
+						(receipt) =>
+							receipt.reporter === "coveralls" &&
+							receipt.dataset === item.id &&
+							receipt.digest === item.digest &&
+							receipt.source === item.source.sha &&
+							receipt.status === "submitted",
+					).length !== 1
 				)
 					throw new Error(
-						"Report file is outside the project or is not a regular file.",
+						"Coveralls completion requires every expected dataset submission.",
 					);
-				if (external_node_fs_namespaceObject.statSync(real).size > 64 * 1024 * 1024)
-					throw new Error("Report file exceeds 64 MiB.");
-				if (coverageFiles.has(real)) continue;
-				const file = `reports/${index}/${external_node_path_namespaceObject.basename(real)}`;
-				external_node_fs_namespaceObject.mkdirSync(external_node_path_namespaceObject.dirname(external_node_path_namespaceObject.join(stage, file)), { recursive: true });
-				const content = external_node_fs_namespaceObject.readFileSync(real);
-				external_node_fs_namespaceObject.writeFileSync(external_node_path_namespaceObject.join(stage, file), content);
-				const type =
-					categories.find((item) => item.file === input)?.type || producer.type;
-				records.push({
-					file,
-					sha256: CoverageReports.digest(content),
-					type:
-						summaryFile && real === external_node_path_namespaceObject.resolve(project, summaryFile)
-							? "summary"
-							: type === "coverage" && producer.coverage.length
-								? "attachment"
-								: type,
-				});
-			} catch (error) {
-				errors.push(`${input}: ${error.message}`);
-			}
+			this.outputs({ sha: expected[0].source.sha });
+			return;
 		}
-		if (!records.length)
-			errors.push(
-				`No ${producer.type} reports were produced for ${producer.label}. Configure a native report in the tool command.`,
+		if (operation === "finish-coveralls")
+			return this.saveReceipt(
+				Reporters.receipt({
+					dataset: Reporters.subject(collection),
+					reporter: "coveralls-finish",
+					status: input.outcome === "success" ? "submitted" : "failed",
+					message:
+						input.outcome === "success"
+							? "Complete build submitted without carryforward."
+							: "Coveralls build completion failed or was skipped.",
+				}),
 			);
-		if (producer.coverage.length) {
-			let prepared;
-			try {
-				prepared = this.coverage.prepare({
-					directory: project,
-					workspace,
-					reports: producer.coverage,
-					group: "coverage",
-					sourceSha,
-					sourcePrefix,
-				});
-				external_node_fs_namespaceObject.renameSync(prepared.directory, external_node_path_namespaceObject.join(stage, "coverage"));
-				for (const report of prepared.reports)
-					records.push({
-						file: `coverage/${report.file}`,
-						sha256: report.sha256,
-						type: "coverage",
-					});
-			} catch (error) {
-				errors.push(error.message);
-			}
-		}
-		const manifest = {
-			version: 1,
-			identity: this.planIdentity,
-			sha: actualSha,
-			plan,
-			files: records,
-			errors,
-			summaries,
-			metadata,
-		};
-		external_node_fs_namespaceObject.writeFileSync(
-			external_node_path_namespaceObject.join(stage, "ci-report.json"),
-			JSON.stringify(manifest),
-		);
-		return {
-			directory: stage,
-			name: `ci-reports-${this.identity.attempt}-${plan.group}-${producer.key}`,
-			complete: errors.length === 0,
-			errors,
-			plan,
-		};
+		throw new Error(`Unknown publication operation: ${operation}`);
 	}
 
-	read(directory, expected) {
-		const manifest = ReportBundle.readJson(directory, "ci-report.json");
-		if (manifest.version !== 1 || !(0,external_node_util_namespaceObject.isDeepStrictEqual)(manifest.plan, expected))
-			throw new Error("Report bundle does not match its expected plan.");
-		if (
-			Object.entries(this.planIdentity).some(
-				([key, value]) => manifest.identity?.[key] !== value,
-			)
-		)
-			throw new Error("Stale report bundle repository, run or attempt.");
-		if (manifest.sha !== "" && !/^[a-f0-9]{40}$/.test(manifest.sha))
-			throw new Error("Report bundle has no valid source commit.");
-		if (!Array.isArray(manifest.files) || !Array.isArray(manifest.errors))
-			throw new Error("Invalid report bundle metadata.");
-		for (const record of manifest.files) {
-			const file = ReportBundle.file(directory, record.file);
-			if (CoverageReports.digest(external_node_fs_namespaceObject.readFileSync(file)) !== record.sha256)
-				throw new Error("Report artifact checksum mismatch.");
-		}
-		return manifest;
-	}
-
-	discover({ jobs }) {
-		const plans = this.plans.fromJobs(jobs);
-		if (!Object.keys(jobs).length)
-			throw new Error("job-results must not be empty.");
-		const names = [...plans.keys()].map(
-			(id) => `ci-reports-${this.identity.attempt}-${id}`,
-		);
-		return {
-			pattern:
-				names.length > 1
-					? `{${names.join(",")}}`
-					: names[0] || "ci-reports-no-producers",
-			count: plans.size,
-		};
-	}
-
-	collect({ directory, jobs, provider = "none" }) {
-		if (!["none", "github", "codecov"].includes(provider))
-			throw new Error("coverage must be none, github or codecov.");
-		const plans = this.plans.fromJobs(jobs);
-		const errors = [];
-		for (const [job, value] of Object.entries(jobs)) {
-			if (value.result !== "success")
-				errors.push(
-					`${job}: ${value.result}. Required producer jobs must succeed.`,
-				);
-			if (
-				!value.outputs?.["report-plan"] &&
-				![...plans.values()].some((entry) => entry.producer.job === job)
-			)
-				errors.push(
-					`${job}: no report-plan output. Use an updated producer workflow, or forward the recording action's report-plan output. For an outer matrix, forward its complete configuration plan.`,
-				);
-		}
-		const root = external_node_fs_namespaceObject.realpathSync(directory);
-		const flat = external_node_fs_namespaceObject.existsSync(external_node_path_namespaceObject.join(root, "ci-report.json"));
-		const stage = external_node_fs_namespaceObject.mkdtempSync(
-			external_node_path_namespaceObject.join(this.temporaryDirectory, "ci-report-collection-"),
-		);
-		const coverageIncoming = external_node_path_namespaceObject.join(stage, "coverage-incoming");
-		external_node_fs_namespaceObject.mkdirSync(coverageIncoming);
-		const reportFiles = [],
-			summaries = [],
-			expectedCoverage = [];
-		const statuses = [];
-		for (const [id, expected] of plans) {
-			const artifact =
-				flat && plans.size === 1
-					? root
-					: external_node_path_namespaceObject.join(root, `ci-reports-${this.identity.attempt}-${id}`);
-			const producer = expected.producer;
-			try {
-				const manifest = this.read(artifact, expected.plan);
-				errors.push(
-					...manifest.errors.map(
-						(error) => `${producer.label} (${producer.key}): ${error}`,
-					),
-				);
-				const prefix = `${producer.label} (${producer.key})`;
-				statuses.push({
-					label: producer.label,
-					key: producer.key,
-					job: expected.job,
-					reports: manifest.files.length,
-					sha: manifest.sha,
-					metadata: manifest.metadata || {},
-				});
-				for (const record of manifest.files) {
-					const relative = `reports/${producer.label}/${producer.key}/${record.file}`;
-					const destination = external_node_path_namespaceObject.join(stage, relative);
-					if (external_node_fs_namespaceObject.existsSync(destination))
-						throw new Error(
-							`Duplicate logical report ${producer.label} (${producer.key}). Give independent producers distinct labels.`,
-						);
-					external_node_fs_namespaceObject.mkdirSync(external_node_path_namespaceObject.dirname(destination), { recursive: true });
-					external_node_fs_namespaceObject.copyFileSync(
-						ReportBundle.file(artifact, record.file),
-						destination,
-					);
-					if (record.type === "summary")
-						summaries.push({ label: prefix, file: relative });
-					else if (record.type !== "attachment") reportFiles.push(relative);
-				}
-				if (producer.coverage.length) {
-					const reports = this.coverage.read(external_node_path_namespaceObject.join(artifact, "coverage"));
-					if (
-						JSON.stringify(
-							reports.map(({ label, language }) => ({ label, language })),
-						) !==
-						JSON.stringify(
-							producer.coverage.map(({ label, language }) => ({
-								label,
-								language,
-							})),
-						)
-					)
-						throw new Error(
-							"Coverage components differ from the declared plan.",
-						);
-					external_node_fs_namespaceObject.cpSync(
-						external_node_path_namespaceObject.join(artifact, "coverage"),
-						external_node_path_namespaceObject.join(coverageIncoming, id),
-						{ recursive: true },
-					);
-					for (const report of producer.coverage)
-						expectedCoverage.push({ job: "coverage", label: report.label });
-				}
-			} catch (error) {
-				errors.push(
-					`${producer.label} (${producer.key}): ${error.code === "ENOENT" ? "Reports unavailable. Rerun all producer jobs for this attempt." : error.message}`,
-				);
-			}
-		}
-		let coverageReports = [];
-		if (!errors.length && expectedCoverage.length) {
-			try {
-				const collection = this.coverage.collect({
-					directory: coverageIncoming,
-					expected: expectedCoverage,
-					jobs: { coverage: { result: "success" } },
-				});
-				external_node_fs_namespaceObject.renameSync(collection.directory, external_node_path_namespaceObject.join(stage, "coverage"));
-				coverageReports = collection.reports.map(
-					({ file, language, label }) => ({ file, language, label }),
-				);
-			} catch (error) {
-				errors.push(error.message);
-			}
-		}
-		if (provider !== "none" && !expectedCoverage.length)
-			errors.push(
-				"Coverage publication requires coverage-producing tests in the report plan.",
-			);
-		external_node_fs_namespaceObject.rmSync(coverageIncoming, { recursive: true, force: true });
-		const result = {
-			version: 1,
-			identity: this.identity,
+	async feedback(operation, input, collection) {
+		const receipts = await this.store.receipts();
+		const jobs = JSON.parse(input.publisherJobs || "{}");
+		const { renderer, errors } = this.render(
+			collection,
+			receipts,
 			jobs,
-			statuses,
-			errors,
-			summaries,
-			reportFiles,
-			coverageReports,
-			provider,
-			complete: errors.length === 0,
-		};
-		external_node_fs_namespaceObject.writeFileSync(
-			external_node_path_namespaceObject.join(stage, "collection.json"),
-			JSON.stringify(result),
+			operation === "complete",
 		);
-		return {
-			directory: stage,
-			name: `ci-report-collection-${this.identity.attempt}-${external_node_path_namespaceObject.basename(stage)}`,
-			complete: result.complete,
-			reports: coverageReports,
-			"report-paths": reportFiles
-				.map((file) => external_node_path_namespaceObject.join(stage, file))
-				.join("\n"),
-			collection: result,
-		};
+		if (operation === "comment") {
+			const body = renderer.render({ comment: true });
+			if (body)
+				await this.saveReceipt(
+					await new ReportComment({ ...this, collection }).publish(body, {
+						fallbackOnly: !Object.values(collection.reporters).some((values) =>
+							values.includes("comment"),
+						),
+					}),
+				);
+			return;
+		}
+		const markdown = renderer.render();
+		await this.core.summary.addRaw(markdown).write();
+		this.outputs({ markdown });
+		if (errors.length) this.core.setFailed(errors.join(" "));
+	}
+
+	async failCompletion(message) {
+		const runUrl = `${this.context.serverUrl}/${this.context.repo.owner}/${this.context.repo.repo}/actions/runs/${this.context.runId}/attempts/${process.env.GITHUB_RUN_ATTEMPT}`;
+		await this.core.summary
+			.addRaw(
+				`## ❌ CI reports incomplete\n\n${ReportRenderer.text(message)}\n\nNo missing publication was inferred successful. [Open collection and producer jobs](${runUrl}).\n\nWorkflow revision: ${this.context.sha}.\n`,
+			)
+			.write();
+		this.core.setFailed(message);
+	}
+
+	async internal(operation, input) {
+		try {
+			return await this.performInternal(operation, input);
+		} catch (error) {
+			if (operation !== "complete") throw error;
+			return this.failCompletion(error.message);
+		}
+	}
+
+	async performInternal(operation, input) {
+		if (operation === "collect") return this.collect(input);
+		if (!input.artifactId) {
+			if (operation !== "complete")
+				throw new Error("Validated collection artifact is missing.");
+			return this.failCompletion(
+				"Collection failed or producers were cancelled. Report completion was not established.",
+			);
+		}
+		let cleanupDirectory;
+		if (input.cleanupDirectory) {
+			cleanupDirectory = external_node_fs_namespaceObject.realpathSync(input.cleanupDirectory);
+			if (
+				external_node_path_namespaceObject.dirname(cleanupDirectory) !==
+					external_node_fs_namespaceObject.realpathSync(this.temporaryDirectory) ||
+				!external_node_path_namespaceObject.basename(cleanupDirectory).startsWith("ci-publication-")
+			)
+				throw new Error("Invalid publication cleanup path.");
+		}
+		const { collection, directory } = await this.store.collection(
+			input.artifactId,
+		);
+		let keep = false;
+		try {
+			if (["comment", "complete"].includes(operation))
+				await this.feedback(operation, input, collection);
+			else await this.publisher(operation, input, collection, directory);
+			keep = operation === "prepare-external";
+		} finally {
+			if (!keep) external_node_fs_namespaceObject.rmSync(directory, { recursive: true, force: true });
+			external_node_fs_namespaceObject.rmSync(external_node_path_namespaceObject.join(this.temporaryDirectory, "ci-coverage-converter"), {
+				recursive: true,
+				force: true,
+			});
+			if (cleanupDirectory)
+				external_node_fs_namespaceObject.rmSync(cleanupDirectory, { recursive: true, force: true });
+		}
 	}
 }
 
@@ -9432,7 +20816,9 @@ class ReportBundle {
 
 
 
-var __webpack_exports__CoverageReports = __webpack_exports__.gi;
-var __webpack_exports__ReportBundle = __webpack_exports__.zC;
-var __webpack_exports__ReportPlan = __webpack_exports__.OU;
-export { __webpack_exports__CoverageReports as CoverageReports, __webpack_exports__ReportBundle as ReportBundle, __webpack_exports__ReportPlan as ReportPlan };
+
+var __webpack_exports__Collector = __webpack_exports__.gR;
+var __webpack_exports__Recording = __webpack_exports__.K4;
+var __webpack_exports__Reporters = __webpack_exports__.Tr;
+var __webpack_exports__Runtime = __webpack_exports__.vY;
+export { __webpack_exports__Collector as Collector, __webpack_exports__Recording as Recording, __webpack_exports__Reporters as Reporters, __webpack_exports__Runtime as Runtime };

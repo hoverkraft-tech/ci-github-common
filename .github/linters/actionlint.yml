@@ -19,12 +19,6 @@ paths:
   .github/workflows/__shared-ci.yml:
     ignore:
       - ^unknown permission scope "code-quality"\.
-  .github/workflows/__test-action-record-ci-reports.yml:
-    ignore:
-      - ^unknown permission scope "code-quality"\.
-  .github/workflows/__test-workflow-ci-reports.yml:
-    ignore:
-      - ^unknown permission scope "code-quality"\.
   .github/workflows/ci-reports.yml:
     ignore:
       - ^unknown permission scope "code-quality"\.

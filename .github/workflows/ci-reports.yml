@@ -1,240 +1,309 @@
-# Consolidate lint, test and coverage results after producer jobs.
+# One reporting boundary for the whole originating workflow run.
+# Put every participating producer (including reusable matrix jobs) in needs and
+# use if: always(). Forward only job-results: toJSON(needs); no report inventory.
 #
-# Call once with producer jobs in needs, if: always(), and job-results: toJSON(needs).
-# Updated producer workflows supply their expected report plans automatically.
-# Standalone jobs forward the recording action's report-plan output. A custom
-# outer matrix forwards its complete plan from configuration, with producer.job
-# naming the matrix job; never use its last successful invocation as the inventory.
-#
-# Collection, previews and uploads run independently. Only PR comment updates are
-# serialized. There is no caller concurrency group or repeated coverage inventory.
-#
-# Select `coverage: github` for native Code Quality, `codecov` for Codecov, or `none`
-# (default) for summaries only. Producers must generate Cobertura for publication.
-# GitHub Code Quality must already be enabled. Use PR head coverage and also run on
-# default-branch pushes for a baseline. Frameworks merge shards before recording.
-# Required missing reports, failed producers and publication errors fail the
-# stable completion check. Partial reruns require rerunning all producer jobs.
-#
-# Example, after lint and tests:
-#
-# ```yaml
-# reports:
-#   needs: [lint, tests]
-#   if: ${{ always() }}
-#   uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@<commit-sha>
-#   permissions:
-#     contents: read
-#     pull-requests: write
-#     code-quality: write
-#     id-token: write
-#   with:
-#     job-results: ${{ toJSON(needs) }}
-#     coverage: github
-# ```
-#
-# Grant the union of the workflow's declared permissions at the calling job;
-# only the corresponding internal job receives each write permission.
-# Publishers execute no project scripts. Forks keep diagnostics without comments
-# or uploads. Native coverage also skips merge groups and upstream unsupported
-# contexts; a skipped upload does not establish native coverage enforcement.
+# Defaults: lint and test results use annotations. Coverage uses GitHub Code
+# Quality when positively available, with a PR comment fallback otherwise.
+# Select newline-separated reporters, or an empty string to disable publication.
+# Evidence validation and the final CI reports complete check remain required.
+# See docs/usage/ci-reports.md for permissions, examples and the report contract.
 name: CI reports
 on:
   workflow_call:
     inputs:
       job-results:
-        description: JSON needs context containing completed producer jobs and their automatic report-plan outputs.
+        description: JSON needs context for every completed producer in the originating workflow.
         type: string
         required: true
-      coverage:
-        description: External coverage destination, `none` (summaries only), `github` (native Code Quality) or `codecov`. Requires planned Cobertura reports when enabled.
+      lint-reporters:
+        description: Newline-separated annotations, comment, code-scanning. Empty disables publication.
         type: string
-        default: none
-      comment:
-        description: Update one persistent CI comment on same-repository pull requests. Summaries remain available when false.
-        type: boolean
-        default: true
+        default: annotations
+      test-results-reporters:
+        description: Newline-separated annotations, comment. Empty disables publication.
+        type: string
+        default: annotations
+      test-coverage-reporters:
+        description: Newline-separated `auto`, `github`, `codecov`, `coveralls`, `comment`. Auto uses GitHub when available, then comment or summary. Explicit `github` is required.
+        type: string
+        default: auto
+    secrets:
+      codecov-token:
+        description: Optional Codecov token. Without it, Codecov uses GitHub OIDC.
     outputs:
       markdown:
-        description: Consolidated CI feedback with producer outcomes and report availability.
-        value: ${{ jobs.collect.outputs.markdown }}
+        description: Final summary after all publication attempts, including comment delivery.
+        value: ${{ jobs.complete.outputs.markdown }}
       artifact-id:
-        description: Validated collection and diagnostics artifact ID.
+        description: Validated report collection artifact ID.
         value: ${{ jobs.collect.outputs.artifact-id }}
 permissions: {}
 jobs:
   collect:
     name: Collect CI reports
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions: {}
-    outputs:
-      artifact-id: ${{ steps.collect.outputs.artifact-id }}
-      reports: ${{ steps.collect.outputs.reports }}
-      complete: ${{ steps.collect.outputs.complete }}
-      markdown: ${{ steps.collect.outputs.markdown }}
-    steps:
-      - id: discover
-        uses: $/actions/quality/record-ci-reports
-        with:
-          operation: discover
-          job-results: ${{ inputs.job-results }}
-      - name: Download planned reports
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          pattern: ${{ steps.discover.outputs.pattern }}
-          path: ${{ runner.temp }}/ci-report-input
-      - name: Ensure empty collections are diagnosed
-        if: ${{ !cancelled() && steps.discover.outcome == 'success' }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          REPORT_DIRECTORY: ${{ runner.temp }}/ci-report-input
-        with:
-          script: await io.mkdirP(process.env.REPORT_DIRECTORY);
-      - id: collect
-        if: ${{ !cancelled() && steps.discover.outcome == 'success' }}
-        uses: $/actions/quality/record-ci-reports
-        with:
-          operation: collect
-          working-directory: ${{ runner.temp }}/ci-report-input
-          job-results: ${{ inputs.job-results }}
-          provider: ${{ inputs.coverage }}
-      - name: Clean downloaded inputs
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          REPORT_DIRECTORY: ${{ runner.temp }}/ci-report-input
-        with:
-          script: await io.rmRF(process.env.REPORT_DIRECTORY);
-  github-coverage:
-    name: GitHub coverage (${{ matrix.report.label }})
-    needs: collect
-    if: >-
-      ${{ inputs.coverage == 'github' && needs.collect.outputs.complete == 'true' &&
-          github.event_name != 'merge_group' &&
-          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ !cancelled() && !contains(fromJSON(inputs.job-results).*.result, 'cancelled') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      actions: read
+    outputs:
+      artifact-id: ${{ steps.collect.outputs.artifact-id }}
+      datasets: ${{ steps.collect.outputs.datasets }}
+      reporters: ${{ steps.collect.outputs.reporters }}
+      annotations: ${{ steps.collect.outputs.annotations }}
+      code-scanning: ${{ steps.collect.outputs.code-scanning }}
+    steps:
+      - id: collect
+        uses: $/.github/actions/ci-reports
+        with:
+          operation: collect
+          job-results: ${{ inputs.job-results }}
+          reporters: ${{ format('{{"lint":{0},"test":{1},"coverage":{2}}}', toJSON(inputs.lint-reporters), toJSON(inputs.test-results-reporters), toJSON(inputs.test-coverage-reporters)) }}
+
+  annotations:
+    name: Publish annotations
+    needs: collect
+    if: ${{ !cancelled() && needs.collect.result == 'success' && needs.collect.outputs.annotations == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    steps:
+      - uses: $/.github/actions/ci-reports
+        with:
+          operation: annotations
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+
+  code-scanning:
+    name: Publish lint to code scanning
+    needs: collect
+    if: ${{ !cancelled() && needs.collect.result == 'success' && needs.collect.outputs.code-scanning == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      security-events: write
+    steps:
+      - uses: $/.github/actions/ci-reports
+        with:
+          operation: code-scanning
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+
+  github-coverage:
+    name: Publish GitHub coverage (${{ matrix.dataset.label }})
+    needs: collect
+    if: >-
+      ${{ !cancelled() && needs.collect.result == 'success' && needs.collect.outputs.datasets != '[]' &&
+          (contains(fromJSON(needs.collect.outputs.reporters).coverage, 'auto') || contains(fromJSON(needs.collect.outputs.reporters).coverage, 'github')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      pull-requests: read
       code-quality: write
+    strategy:
+      fail-fast: false
+      matrix:
+        dataset: ${{ fromJSON(needs.collect.outputs.datasets || '[]') }}
+    steps:
+      - uses: $/.github/actions/ci-reports
+        with:
+          operation: github
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          dataset: ${{ matrix.dataset.id }}
+
+  codecov:
+    name: Submit Codecov coverage (${{ matrix.dataset.label }})
+    needs: collect
+    if: >-
+      ${{ !cancelled() && needs.collect.result == 'success' && needs.collect.outputs.datasets != '[]' &&
+          contains(fromJSON(needs.collect.outputs.reporters).coverage, 'codecov') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        dataset: ${{ fromJSON(needs.collect.outputs.datasets || '[]') }}
+    steps:
+      - id: prepare
+        uses: $/.github/actions/ci-reports
+        with:
+          operation: prepare-external
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          dataset: ${{ matrix.dataset.id }}
+          reporter: codecov
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.prepare.outputs.sha }}
+          persist-credentials: false
+      - id: upload
+        env:
+          CODECOV_TOKEN: ${{ secrets.codecov-token }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          version: v11.3.2
+          files: ${{ steps.prepare.outputs.file }}
+          flags: ${{ matrix.dataset.id }}
+          override_commit: ${{ steps.prepare.outputs.sha }}
+          disable_search: true
+          disable_file_fixes: true
+          disable_safe_directory: true
+          handle_no_reports_found: false
+          fail_ci_if_error: true
+          plugins: noop
+          cleanup: true
+          use_oidc: ${{ env.CODECOV_TOKEN == '' }}
+          token: ${{ env.CODECOV_TOKEN }}
+      - name: Retain submission outcome
+        if: ${{ !cancelled() }}
+        uses: $/.github/actions/ci-reports
+        with:
+          operation: external-receipt
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          dataset: ${{ matrix.dataset.id }}
+          reporter: codecov
+          outcome: ${{ steps.upload.outcome }}
+          cleanup-directory: ${{ steps.prepare.outputs.directory }}
+
+  coveralls:
+    name: Submit Coveralls coverage (${{ matrix.dataset.label }})
+    needs: collect
+    if: >-
+      ${{ !cancelled() && needs.collect.result == 'success' && needs.collect.outputs.datasets != '[]' &&
+          contains(fromJSON(needs.collect.outputs.reporters).coverage, 'coveralls') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
       pull-requests: read
     strategy:
       fail-fast: false
       matrix:
-        report: ${{ fromJSON(needs.collect.outputs.reports || '[]') }}
+        dataset: ${{ fromJSON(needs.collect.outputs.datasets || '[]') }}
     steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - id: prepare
+        uses: $/.github/actions/ci-reports
         with:
-          artifact-ids: ${{ needs.collect.outputs.artifact-id }}
-          path: ${{ runner.temp }}/ci-report-publication
-          merge-multiple: true
-      - id: verify
-        uses: $/actions/quality/record-ci-reports
-        with:
-          operation: verify
-          working-directory: ${{ runner.temp }}/ci-report-publication
-          reports: ${{ format('[{0}]', toJSON(matrix.report)) }}
-      - uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1.4.4
-        with:
-          file: ${{ steps.verify.outputs.file }}
-          language: ${{ matrix.report.language }}
-          label: ${{ matrix.report.label }}
-          fail-on-error: true
-          wait-for-processing-timeout: 160
-  codecov:
-    name: Codecov coverage
-    needs: collect
-    if: >-
-      ${{ inputs.coverage == 'codecov' && needs.collect.outputs.complete == 'true' &&
-          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      id-token: write
-    steps:
+          operation: prepare-external
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          dataset: ${{ matrix.dataset.id }}
+          reporter: coveralls
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ steps.prepare.outputs.sha }}
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - id: upload
+        uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2.3.8
         with:
-          artifact-ids: ${{ needs.collect.outputs.artifact-id }}
-          path: ${{ runner.temp }}/ci-report-publication
-          merge-multiple: true
-      - id: verify
-        uses: $/actions/quality/record-ci-reports
+          coverage-reporter-version: v0.6.22
+          file: ${{ steps.prepare.outputs.file }}
+          format: ${{ steps.prepare.outputs.format }}
+          flag-name: ${{ matrix.dataset.id }}
+          git-commit: ${{ steps.prepare.outputs.sha }}
+          build-number: ${{ github.run_id }}-${{ github.run_attempt }}
+          parallel: true
+          allow-empty: false
+          fail-on-error: true
+      - name: Retain submission outcome
+        if: ${{ !cancelled() }}
+        uses: $/.github/actions/ci-reports
         with:
-          operation: verify
-          working-directory: ${{ runner.temp }}/ci-report-publication
-      - uses: $/actions/quality/codecov
-        with:
-          working-directory: ${{ github.workspace }}
-          files: ${{ steps.verify.outputs.files }}
-          fail-ci-if-error: "true"
-  comment:
-    name: Update CI comment
-    needs: [collect, github-coverage, codecov]
+          operation: external-receipt
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          dataset: ${{ matrix.dataset.id }}
+          reporter: coveralls
+          outcome: ${{ steps.upload.outcome }}
+          cleanup-directory: ${{ steps.prepare.outputs.directory }}
+
+  coveralls-finish:
+    name: Complete Coveralls build
+    needs: [collect, coveralls]
     if: >-
-      ${{ always() && inputs.comment && needs.collect.outputs.artifact-id != '' &&
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository }}
+      ${{ !cancelled() && needs.collect.result == 'success' && needs.collect.outputs.datasets != '[]' &&
+          contains(fromJSON(needs.collect.outputs.reporters).coverage, 'coveralls') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      actions: read
+    steps:
+      - id: verify
+        uses: $/.github/actions/ci-reports
+        with:
+          operation: check-coveralls
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+      - id: finish
+        uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2.3.8
+        with:
+          coverage-reporter-version: v0.6.22
+          parallel-finished: true
+          build-number: ${{ github.run_id }}-${{ github.run_attempt }}
+          git-commit: ${{ steps.verify.outputs.sha }}
+          fail-on-error: true
+      - if: ${{ !cancelled() }}
+        uses: $/.github/actions/ci-reports
+        with:
+          operation: finish-coveralls
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          outcome: ${{ steps.finish.outcome }}
+
+  comment:
+    name: Update CI comment
+    needs:
+      [
+        collect,
+        annotations,
+        code-scanning,
+        github-coverage,
+        codecov,
+        coveralls,
+        coveralls-finish,
+      ]
+    if: ${{ !cancelled() && needs.collect.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
       pull-requests: write
     concurrency:
-      group: ci-report-comment-${{ github.workflow }}-${{ github.event.pull_request.number }}
+      group: ci-reports-comment-${{ github.repository }}-${{ github.workflow_ref }}-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: false
     steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - uses: $/.github/actions/ci-reports
         with:
-          artifact-ids: ${{ needs.collect.outputs.artifact-id }}
-          path: ${{ runner.temp }}/ci-report-comment
-          merge-multiple: true
-      - id: body
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          DIRECTORY: ${{ runner.temp }}/ci-report-comment
-          PROVIDER: ${{ inputs.coverage }}
-          GITHUB_COVERAGE_RESULT: ${{ needs.github-coverage.result }}
-          CODECOV_RESULT: ${{ needs.codecov.result }}
-        with:
-          script: |
-            const fs = require('node:fs');
-            const path = require('node:path');
-            const pr = context.payload.pull_request;
-            const {data: current} = await github.rest.pulls.get({...context.repo, pull_number:pr.number});
-            if (current.state !== 'open' || current.head.sha !== pr.head.sha) return;
-            const publication = process.env.PROVIDER === 'none' ? 'disabled' : process.env.PROVIDER === 'github' ? process.env.GITHUB_COVERAGE_RESULT : process.env.CODECOV_RESULT;
-            const notice = process.env.PROVIDER === 'github' ? 'The official uploader can skip unsupported contexts or outdated commits; successful execution alone does not prove an upload occurred.' : '';
-            core.setOutput('markdown', fs.readFileSync(path.join(process.env.DIRECTORY,'summary.md'),'utf8') + '\n\n**Coverage publication:** ' + publication + '. ' + notice);
-      - if: steps.body.outputs.markdown != ''
-        uses: $/actions/create-or-update-comment
-        with:
-          title: "${{ github.workflow }} - CI report"
-          token: ${{ github.token }}
-          body: ${{ steps.body.outputs.markdown }}
+          operation: comment
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          publisher-jobs: ${{ toJSON(needs) }}
+
   complete:
     name: CI reports complete
-    needs: [collect, github-coverage, codecov, comment]
+    needs:
+      [
+        collect,
+        annotations,
+        code-scanning,
+        github-coverage,
+        codecov,
+        coveralls,
+        coveralls-finish,
+        comment,
+      ]
     if: always()
     runs-on: ubuntu-latest
-    permissions: {}
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      markdown: ${{ steps.complete.outputs.markdown }}
     steps:
-      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          RESULTS: ${{ toJSON(needs) }}
-          PROVIDER: ${{ inputs.coverage }}
-          FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+      - id: complete
+        uses: $/.github/actions/ci-reports
         with:
-          script: |
-            const jobs = JSON.parse(process.env.RESULTS);
-            const errors = [];
-            if (jobs.collect.result !== 'success' || jobs.collect.outputs.complete !== 'true') errors.push('Required producer executions or report collection did not complete.');
-            const publisher = process.env.PROVIDER === 'github' ? 'github-coverage' : process.env.PROVIDER === 'codecov' ? 'codecov' : '';
-            const unsupported = process.env.FORK === 'true' || (publisher === 'github-coverage' && context.eventName === 'merge_group');
-            if (publisher && !unsupported && jobs[publisher].result !== 'success') errors.push('Requested coverage publication did not complete.');
-            if (['failure','cancelled'].includes(jobs.comment.result)) errors.push('CI comment publication failed.');
-            if (unsupported && publisher) await core.summary.addRaw('Coverage publication was skipped for this event. Diagnostic reports remain available.').write();
-            if (errors.length) core.setFailed(errors.join(' '));
+          operation: complete
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          publisher-jobs: ${{ toJSON(needs) }}

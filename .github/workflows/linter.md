@@ -34,7 +34,7 @@ with no commits (such as creating a tag on an existing commit).
 Explicit `linter-env` validator settings take precedence.
 
 Include this workflow job in the common ci-reports workflow dependencies.
-Its report-plan output identifies the native Super-Linter summary automatically,
+Its registration identifies the native Super-Linter summary automatically,
 regardless of the calling job name. Failed lint runs still retain diagnostics.
 CodeQL findings stay in code scanning; Ratchet diagnostics stay in workflow logs.
 
@@ -100,7 +100,7 @@ on:
 permissions: {}
 jobs:
   linter:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@fd204f923a549ec621468c03cc898c54706fa294 # feat/native-github-coverage
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@beab1278f3b6e89f3c2e91e774071efb82073a6c # feat/native-github-coverage
     permissions:
       actions: read
       contents: read
@@ -201,13 +201,6 @@ jobs:
 <!-- secrets:end -->
 
 <!-- outputs:start -->
-
-## Outputs
-
-| **Output**        | **Description**                                                  |
-| ----------------- | ---------------------------------------------------------------- |
-| **`report-plan`** | Complete lint report plan, consumed automatically by ci-reports. |
-
 <!-- outputs:end -->
 
 <!-- jscpd:ignore-start -->

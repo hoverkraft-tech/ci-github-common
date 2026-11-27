@@ -1,6 +1,22 @@
-import { describe, it, suite, test } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it, suite, test } from "node:test";
 import { CoberturaParser } from "./CoberturaParser.js";
+
+test("aggregate coverage uses native counts, never a synthetic denominator", () => {
+	const parser = new CoberturaParser();
+	const declared = parser.parse(
+		'<coverage line-rate="0.5" lines-valid="6" lines-covered="3"/>',
+	);
+	assert.equal(declared.coverage.lines.total, 6);
+	assert.equal(declared.coverage.lines.covered, 3);
+	const rateOnly = parser.parse('<coverage line-rate="0.5" branch-rate="1"/>');
+	assert.equal(rateOnly.coverage.lines.total, 0);
+	assert.equal(rateOnly.coverage.branches.total, 0);
+	assert.throws(
+		() => parser.parse('<coverage lines-valid="2" lines-covered="3"/>'),
+		/counts/,
+	);
+});
 
 suite("Cobertura auto-detection", () => {
 	for (const file of ["cobertura.xml", ".reports/cobertura.xml"]) {

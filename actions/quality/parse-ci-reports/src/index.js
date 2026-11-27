@@ -1,9 +1,10 @@
 import { FileSystemService } from "./FileSystemService.js";
 import { LoggerService } from "./LoggerService.js";
+import { NativeGlob } from "./NativeGlob.js";
 import { ReportParserCore } from "./ReportParserCore.js";
 import { ReportPathResolver } from "./ReportPathResolver.js";
 
-export async function run({ core, glob: globModule, inputs }) {
+export async function run({ core, glob: globModule = NativeGlob, inputs }) {
 	try {
 		const fileSystemService = new FileSystemService(inputs.workingDirectory);
 		const logger = new LoggerService(core);

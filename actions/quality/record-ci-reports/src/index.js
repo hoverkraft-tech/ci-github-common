@@ -1,3 +1,4 @@
-export { CoverageReports } from "./CoverageReports.js";
-export { ReportBundle } from "./ReportBundle.js";
-export { ReportPlan } from "./ReportPlan.js";
+export { Collector } from "./Collector.js";
+export { Recording } from "./Recording.js";
+export { Reporters } from "./Reporters.js";
+export { Runtime } from "./Runtime.js";

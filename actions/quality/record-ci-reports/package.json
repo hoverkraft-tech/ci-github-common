@@ -2,7 +2,7 @@
 	"name": "record-ci-reports",
 	"version": "1.0.0",
 	"private": true,
-	"description": "Plan, record and validate CI report bundles for consolidated publication",
+	"description": "Register and validate native CI evidence for consolidated reporting",
 	"type": "module",
 	"scripts": {
 		"test": "node --test src/*.test.js",
@@ -10,7 +10,7 @@
 		"pretest:ci": "node -e \"require('node:fs').mkdirSync('coverage', {recursive:true})\"",
 		"build": "node -e \"require('node:fs').rmSync('dist', {recursive:true,force:true})\" && ncc build src/index.js --out dist --target es2022 --no-cache --license licenses.txt",
 		"check:dist": "npm run build && git diff --exit-code -- dist && test -z \"$(git ls-files --others --exclude-standard -- dist)\"",
-		"test:distribution": "node --test src/CoverageReports.test.js src/ReportBundle.test.js"
+		"test:distribution": "node --test src/Recording.test.js src/Collector.test.js"
 	},
 	"engines": {
 		"node": ">=24.0.0"

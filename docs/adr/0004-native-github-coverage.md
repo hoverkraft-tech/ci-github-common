@@ -1,6 +1,6 @@
 # ADR 0004: Unify CI reporting across the Hoverkraft actions
 
-- Status: accepted, implementation validation in progress
+- Status: superseded by [ADR 0005](0005-ci-reporting-contract.md)
 - Date: 2026-11-26
 - Scope: common reporting, language CI and container test producers
 

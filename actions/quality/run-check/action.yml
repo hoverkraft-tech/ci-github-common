@@ -1,0 +1,56 @@
+# Run a custom check with validated native reports and automatic retention.
+# Write only fresh outputs under $CI_REPORTS_DIR. Patterns are relative to it.
+# A command failure retains diagnostics and fails the action; no continue-on-error
+# is needed. Requires Linux, Bash, contents: read and actions: read.
+name: Run check
+description: Run a custom check and retain its promised test, coverage and lint reports.
+author: hoverkraft
+branding:
+  icon: play-circle
+  color: blue
+inputs:
+  command:
+    description: Bash command. Write native reports under the fresh CI_REPORTS_DIR environment variable.
+    required: true
+  name:
+    description: Human-readable check name.
+    default: Custom check
+  working-directory:
+    description: Repository-relative project directory.
+    default: .
+  test-results:
+    description: Newline-separated native test report patterns, relative to CI_REPORTS_DIR.
+  test-coverage:
+    description: Newline-separated native coverage patterns, relative to CI_REPORTS_DIR. One measurement per project.
+  lint-results:
+    description: Newline-separated native lint report patterns, relative to CI_REPORTS_DIR.
+outputs:
+  artifact-id:
+    description: Native result artifact ID for diagnostics. ci-reports discovers it automatically.
+    value: ${{ steps.check.outputs.artifact-id }}
+runs:
+  using: composite
+  steps:
+    - id: check
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        TOKEN: ${{ github.token }}
+        COMMAND: ${{ inputs.command }}
+        CHECK_NAME: ${{ inputs.name }}
+        PROJECT: ${{ inputs.working-directory }}
+        TEST_RESULTS: ${{ inputs.test-results }}
+        TEST_COVERAGE: ${{ inputs.test-coverage }}
+        LINT_RESULTS: ${{ inputs.lint-results }}
+      with:
+        script: |
+          if (process.platform !== 'linux') throw new Error('run-check requires Linux and Bash.');
+          const path = require('node:path');
+          const { pathToFileURL } = require('node:url');
+          const actionPath = path.resolve(process.env.ACTION_PATH, '../record-ci-reports');
+          const { createArtifactClient } = await import(pathToFileURL(path.resolve(actionPath, '../../download-artifact/dist/index.js')));
+          const { Runtime } = await import(pathToFileURL(path.join(actionPath, 'dist/index.js')));
+          await new Runtime({ core, github, context, actionPath, token: process.env.TOKEN, client: createArtifactClient() }).producer('run-check', {
+            command: process.env.COMMAND, name: process.env.CHECK_NAME, project: process.env.PROJECT,
+            testResults: process.env.TEST_RESULTS, testCoverage: process.env.TEST_COVERAGE, lintResults: process.env.LINT_RESULTS,
+          });

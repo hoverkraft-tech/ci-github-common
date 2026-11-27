@@ -1,53 +1,47 @@
 name: Internal - Tests for CI reports workflow
 on:
-  workflow_call: null
+  workflow_call:
+    inputs:
+      artifact-id:
+        description: Collection produced by the single outer reporting workflow.
+        type: string
+        required: true
+      markdown:
+        description: Final completion summary.
+        type: string
+        required: true
 permissions: {}
 jobs:
-  any-lint-job-name:
+  verify:
     runs-on: ubuntu-latest
-    permissions: {}
-    outputs:
-      report-plan: ${{ steps.reports.outputs.report-plan }}
-    steps:
-      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: require('node:fs').writeFileSync('super-linter-summary.md','| Linter | Status |\n| --- | --- |\n| Fixture linter | Passed |\n');
-      - id: reports
-        uses: $/actions/quality/record-ci-reports
-        with:
-          type: lint
-          summary-file: super-linter-summary.md
-      - name: Upload an unrelated artifact to exercise exact discovery
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ci-reports-${{ github.run_attempt }}-unrelated
-          path: super-linter-summary.md
-          retention-days: 1
-  reports:
-    needs: any-lint-job-name
-    uses: $/.github/workflows/ci-reports.yml
     permissions:
-      contents: read
-      pull-requests: write
-      code-quality: write
-      id-token: write
-    with:
-      comment: false
-      job-results: ${{ toJSON(needs) }}
-  assert:
-    needs: reports
-    runs-on: ubuntu-latest
-    permissions: {}
+      actions: read
     steps:
+      - uses: $/actions/download-artifact
+        with:
+          artifact-ids: ${{ inputs.artifact-id }}
+          path: ${{ runner.temp }}/ci-report-verification
+          merge-multiple: "true"
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          MARKDOWN: ${{ needs.reports.outputs.markdown }}
+          MARKDOWN: ${{ inputs.markdown }}
         with:
-          script: |-
+          script: |
             const assert = require('node:assert/strict');
-            const body=process.env.MARKDOWN;
-            assert.match(body,/Fixture linter/);
-            assert.match(body,/any-lint-job-name/);
-            assert.match(body,/1 success/);
-            assert.doesNotMatch(body,/unrelated|Reporting incomplete/);
-            assert.equal((body.match(/<details>/g)||[]).length,(body.match(/<\/details>/g)||[]).length);
+            const fs = require('node:fs');
+            const directory = process.env.RUNNER_TEMP + '/ci-report-verification';
+            try {
+              const collection = JSON.parse(fs.readFileSync(directory + '/collection.json', 'utf8'));
+              assert.equal(collection.version, 2);
+              assert.equal(collection.checks.filter(check => check.check.name === 'Lifecycle fixture').length, 2);
+              assert.ok(collection.checks.some(check => check.check.name === 'First custom check'));
+              assert.ok(collection.checks.some(check => check.check.name === 'Second custom check'));
+              assert.ok(collection.datasets.length > 0);
+              const body = process.env.MARKDOWN;
+              assert.match(body, /CI checks passed/);
+              assert.match(body, /Publication:/);
+              assert.match(body, /Report provenance/);
+              assert.equal((body.match(/<details>/g) || []).length, (body.match(/<\/details>/g) || []).length);
+            } finally {
+              fs.rmSync(directory, { recursive: true, force: true });
+            }

@@ -16,53 +16,24 @@
 
 ## Overview
 
-Consolidate lint, test and coverage results after producer jobs.
+One reporting boundary for the whole originating workflow run.
+Put every participating producer (including reusable matrix jobs) in needs and
+use if: always(). Forward only job-results: toJSON(needs); no report inventory.
 
-Call once with producer jobs in needs, if: always(), and job-results: toJSON(needs).
-Updated producer workflows supply their expected report plans automatically.
-Standalone jobs forward the recording action's report-plan output. A custom
-outer matrix forwards its complete plan from configuration, with producer.job
-naming the matrix job; never use its last successful invocation as the inventory.
-
-Collection, previews and uploads run independently. Only PR comment updates are
-serialized. There is no caller concurrency group or repeated coverage inventory.
-
-Select `coverage: github` for native Code Quality, `codecov` for Codecov, or `none`
-(default) for summaries only. Producers must generate Cobertura for publication.
-GitHub Code Quality must already be enabled. Use PR head coverage and also run on
-default-branch pushes for a baseline. Frameworks merge shards before recording.
-Required missing reports, failed producers and publication errors fail the
-stable completion check. Partial reruns require rerunning all producer jobs.
-
-Example, after lint and tests:
-
-```yaml
-reports:
-  needs: [lint, tests]
-  if: ${{ always() }}
-  uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@<commit-sha>
-  permissions:
-    contents: read
-    pull-requests: write
-    code-quality: write
-    id-token: write
-  with:
-    job-results: ${{ toJSON(needs) }}
-    coverage: github
-```
-
-Grant the union of the workflow's declared permissions at the calling job;
-only the corresponding internal job receives each write permission.
-Publishers execute no project scripts. Forks keep diagnostics without comments
-or uploads. Native coverage also skips merge groups and upstream unsupported
-contexts; a skipped upload does not establish native coverage enforcement.
+Defaults: lint and test results use annotations. Coverage uses GitHub Code
+Quality when positively available, with a PR comment fallback otherwise.
+Select newline-separated reporters, or an empty string to disable publication.
+Evidence validation and the final CI reports complete check remain required.
+See docs/usage/ci-reports.md for permissions, examples and the report contract.
 
 ### Permissions
 
+- **`actions`**: `read`
 - **`code-quality`**: `write`
 - **`contents`**: `read`
 - **`id-token`**: `write`
 - **`pull-requests`**: `write`
+- **`security-events`**: `write`
 
 <!-- overview:end -->
 <!-- usage:start -->
@@ -78,24 +49,33 @@ on:
 permissions: {}
 jobs:
   ci-reports:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@fd204f923a549ec621468c03cc898c54706fa294 # feat/native-github-coverage
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@beab1278f3b6e89f3c2e91e774071efb82073a6c # feat/native-github-coverage
     permissions:
+      actions: read
       code-quality: write
       contents: read
       id-token: write
       pull-requests: write
+      security-events: write
+    secrets:
+      # Optional Codecov token. Without it, Codecov uses GitHub OIDC.
+      codecov-token: ""
     with:
-      # JSON needs context containing completed producer jobs and their automatic report-plan outputs.
+      # JSON needs context for every completed producer in the originating workflow.
       # This input is required.
       job-results: ""
 
-      # External coverage destination, `none` (summaries only), `github` (native Code Quality) or `codecov`. Requires planned Cobertura reports when enabled.
-      # Default: `none`
-      coverage: none
+      # Newline-separated annotations, comment, code-scanning. Empty disables publication.
+      # Default: `annotations`
+      lint-reporters: annotations
 
-      # Update one persistent CI comment on same-repository pull requests. Summaries remain available when false.
-      # Default: `true`
-      comment: true
+      # Newline-separated annotations, comment. Empty disables publication.
+      # Default: `annotations`
+      test-results-reporters: annotations
+
+      # Newline-separated `auto`, `github`, `codecov`, `coveralls`, `comment`. Auto uses GitHub when available, then comment or summary. Explicit `github` is required.
+      # Default: `auto`
+      test-coverage-reporters: auto
 ```
 
 <!-- usage:end -->
@@ -105,11 +85,12 @@ jobs:
 
 ### Workflow Call Inputs
 
-| **Input**         | **Description**                                                                                                                                       | **Required** | **Type**    | **Default** |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- | ----------- |
-| **`job-results`** | JSON needs context containing completed producer jobs and their automatic report-plan outputs.                                                        | **true**     | **string**  | -           |
-| **`coverage`**    | External coverage destination, `none` (summaries only), `github` (native Code Quality) or `codecov`. Requires planned Cobertura reports when enabled. | **false**    | **string**  | `none`      |
-| **`comment`**     | Update one persistent CI comment on same-repository pull requests. Summaries remain available when false.                                             | **false**    | **boolean** | `true`      |
+| **Input**                     | **Description**                                                                                                                                                 | **Required** | **Type**   | **Default**   |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------- | ------------- |
+| **`job-results`**             | JSON needs context for every completed producer in the originating workflow.                                                                                    | **true**     | **string** | -             |
+| **`lint-reporters`**          | Newline-separated annotations, comment, code-scanning. Empty disables publication.                                                                              | **false**    | **string** | `annotations` |
+| **`test-results-reporters`**  | Newline-separated annotations, comment. Empty disables publication.                                                                                             | **false**    | **string** | `annotations` |
+| **`test-coverage-reporters`** | Newline-separated `auto`, `github`, `codecov`, `coveralls`, `comment`. Auto uses GitHub when available, then comment or summary. Explicit `github` is required. | **false**    | **string** | `auto`        |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -118,10 +99,10 @@ jobs:
 
 ## Outputs
 
-| **Output**        | **Description**                                                          |
-| ----------------- | ------------------------------------------------------------------------ |
-| **`markdown`**    | Consolidated CI feedback with producer outcomes and report availability. |
-| **`artifact-id`** | Validated collection and diagnostics artifact ID.                        |
+| **Output**        | **Description**                                                           |
+| ----------------- | ------------------------------------------------------------------------- |
+| **`markdown`**    | Final summary after all publication attempts, including comment delivery. |
+| **`artifact-id`** | Validated report collection artifact ID.                                  |
 
 <!-- outputs:end -->
 <!-- examples:start -->

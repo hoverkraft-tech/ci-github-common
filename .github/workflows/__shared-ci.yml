@@ -140,138 +140,60 @@ jobs:
       contents: read
     uses: $/.github/workflows/__test-action-working-directory.yml
 
-  test-workflow-ci-reports:
+  test-action-record-ci-reports:
     needs: lint
-    uses: $/.github/workflows/__test-workflow-ci-reports.yml
+    uses: $/.github/workflows/__test-action-record-ci-reports.yml
     permissions:
+      actions: read
       contents: read
-      pull-requests: write
-      code-quality: write
-      id-token: write
 
-  # FIXME: Remove the import jobs and forward the released Node.js report-plan
-  # outputs once https://github.com/hoverkraft-tech/ci-github-nodejs/pull/624 is released.
-  # Keep local lint/report workflows exercised while Node.js still emits native artifacts.
-  prepare-nodejs-reports:
-    needs:
-      - test-action-distributions
-      - test-action-test-action-distribution
-      - test-action-lint-pull-request-title
-      - test-action-create-and-merge-pull-request
-      - test-action-parse-ci-reports
-      - test-action-record-ci-reports
-      - test-action-need-fix-to-issue
-      - test-action-download-artifact
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    permissions: {}
-    outputs:
-      matrix: ${{ steps.components.outputs.matrix }}
-      report-plan: ${{ steps.plan.outputs.report-plan }}
-      selections: ${{ steps.plan.outputs.selections }}
-    steps:
-      - id: components
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          JOB_RESULTS: ${{ toJSON(needs) }}
-        with:
-          script: |
-            const include = Object.entries(JSON.parse(process.env.JOB_RESULTS))
-              .map(([job, {result}]) => ({job, result}));
-            core.setOutput('matrix', {include});
-            core.setOutput('producers', include.map(({job}) => ({
-              key: job, job: 'import-nodejs-reports', type: 'test',
-              directory: '.ci-nodejs-reports/' + job, label: job,
-            })));
-      - id: plan
-        uses: $/actions/quality/record-ci-reports
-        with:
-          operation: plan
-          producers: ${{ steps.components.outputs.producers }}
+  test-action-run-check:
+    needs: lint
+    uses: $/.github/workflows/__test-action-run-check.yml
+    permissions:
+      actions: read
+      contents: read
 
-  import-nodejs-reports:
-    needs: prepare-nodejs-reports
-    if: ${{ !cancelled() && needs.prepare-nodejs-reports.result == 'success' }}
-    runs-on: ubuntu-latest
-    permissions: {}
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.prepare-nodejs-reports.outputs.matrix) }}
-    steps:
-      - name: Download this attempt's native action reports
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          pattern: ci-reports-${{ github.run_attempt }}-${{ matrix.job }}-*
-          path: .ci-nodejs-reports/${{ matrix.job }}
-      - name: Require one complete native artifact per action
-        id: native
-        if: ${{ !cancelled() }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          REPORT_DIRECTORY: .ci-nodejs-reports/${{ matrix.job }}
-        with:
-          script: |
-            const fs = require('node:fs');
-            const path = require('node:path');
-            const directory = process.env.REPORT_DIRECTORY;
-            fs.mkdirSync(directory, {recursive: true});
-            const artifacts = fs.readdirSync(directory, {withFileTypes: true});
-            const reports = ['junit.xml', 'lcov.info'];
-            // download-artifact extracts a single matching artifact directly.
-            const flat = artifacts.length === reports.length && artifacts.every(file =>
-              file.isFile() && reports.includes(file.name));
-            const nested = artifacts.length === 1 && artifacts[0].isDirectory();
-            if (!flat && !nested) {
-              core.setFailed('Expected one native report artifact for this action in the current attempt. Rerun all producer jobs.');
-              return;
-            }
-            core.setOutput('report-paths', reports
-              .map(file => path.join(flat ? '' : artifacts[0].name, file)).join('\n'));
-      - name: Record native diagnostics using the local report contract
-        if: ${{ !cancelled() }}
-        uses: $/actions/quality/record-ci-reports
-        with:
-          working-directory: .ci-nodejs-reports/${{ matrix.job }}
-          report-plan: ${{ toJSON(fromJSON(needs.prepare-nodejs-reports.outputs.selections)[matrix.job]) }}
-          report-paths: ${{ steps.native.outputs.report-paths }}
-          # Released Node.js tests the PR merge revision. LCOV stays diagnostic;
-          # it is never relabeled as PR head coverage or passed to an uploader.
-          source-sha: ${{ github.sha }}
-          metadata: ${{ toJSON(matrix) }}
-      - name: Preserve the original test workflow result
-        if: ${{ !cancelled() }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          SOURCE_JOB: ${{ matrix.job }}
-          SOURCE_RESULT: ${{ matrix.result }}
-        with:
-          script: |
-            if (process.env.SOURCE_RESULT !== 'success') {
-              core.setFailed(`${process.env.SOURCE_JOB}: ${process.env.SOURCE_RESULT}. Original producer failures remain fatal.`);
-            }
-
+  # Released Node.js workflows remain status-only until their producer adapter
+  # is released after common. This keeps release dependencies acyclic.
   reports:
     needs:
+      - test-bundled-actions
+      - test-action-distributions
+      - test-action-test-action-distribution
       - lint
-      - prepare-nodejs-reports
-      - import-nodejs-reports
+      - test-action-matrix-outputs
+      - test-action-create-and-merge-pull-request
+      - test-action-lint-pull-request-title
+      - test-action-checkout
+      - test-action-checkout-issue-comment
+      - test-action-get-github-actions-bot-user
+      - test-action-get-issue-number
+      - test-action-parse-ci-reports
+      - test-action-need-fix-to-issue
+      - test-action-repository-owner-is-organization
+      - test-action-slugify
+      - test-action-download-artifact
+      - test-action-working-directory
+      - test-action-record-ci-reports
+      - test-action-run-check
     if: always()
     uses: $/.github/workflows/ci-reports.yml
     permissions:
+      actions: read
       contents: read
       pull-requests: write
       code-quality: write
       id-token: write
+      security-events: write
     with:
       job-results: ${{ toJSON(needs) }}
 
-  test-action-record-ci-reports:
-    needs: lint
+  test-workflow-ci-reports:
+    needs: reports
+    uses: $/.github/workflows/__test-workflow-ci-reports.yml
     permissions:
-      contents: read
-      id-token: write
-      packages: read
-      pull-requests: write
-      security-events: write
-      code-quality: write
-    uses: $/.github/workflows/__test-action-record-ci-reports.yml
+      actions: read
+    with:
+      artifact-id: ${{ needs.reports.outputs.artifact-id }}
+      markdown: ${{ needs.reports.outputs.markdown }}

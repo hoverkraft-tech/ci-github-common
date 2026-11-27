@@ -1,6 +1,10 @@
 import { DefaultArtifactClient } from "@actions/artifact";
 import { ArtifactDownload } from "./ArtifactDownload.js";
 
+export function createArtifactClient() {
+	return new DefaultArtifactClient();
+}
+
 export async function run({
 	core,
 	artifactIds,
@@ -10,7 +14,7 @@ export async function run({
 	githubToken = "",
 	repository = process.env.GITHUB_REPOSITORY,
 	runId = process.env.GITHUB_RUN_ID,
-	client = new DefaultArtifactClient(),
+	client = createArtifactClient(),
 	sleep,
 }) {
 	if (

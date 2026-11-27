@@ -132,6 +132,37 @@ class LoggerService {
 	}
 }
 
+;// CONCATENATED MODULE: ./src/NativeGlob.js
+
+
+
+/** Node 24 supplies globbing without a separate matcher dependency. */
+const NativeGlob = {
+	async create(patterns) {
+		const entries = patterns.split(/\r?\n/).filter(Boolean);
+		const include = entries.filter((pattern) => !pattern.startsWith("!"));
+		const exclude = entries
+			.filter((pattern) => pattern.startsWith("!"))
+			.map((pattern) => pattern.slice(1));
+		if (
+			entries.length > 512 ||
+			entries.some((pattern) => pattern.length > 2048)
+		)
+			throw new Error("Report discovery patterns exceed their resource limit.");
+		return {
+			async *globGenerator() {
+				for (const filename of external_node_fs_namespaceObject.globSync(include, { exclude })) {
+					if (
+						external_node_fs_namespaceObject.lstatSync(filename).isFile() &&
+						external_node_fs_namespaceObject.realpathSync(filename) === external_node_path_namespaceObject.resolve(filename)
+					)
+						yield filename;
+				}
+			},
+		};
+	},
+};
+
 ;// CONCATENATED MODULE: ./src/formatters/BaseFormatter.js
 /**
  * Base formatter with common (non-markdown) utilities
@@ -8661,9 +8692,6 @@ class CoberturaParser extends BaseParser {
 				throw new Error("Invalid Cobertura format: missing coverage element");
 			}
 
-			const lineRate = parseFloat(coverage["@_line-rate"] || 0);
-			const branchRate = parseFloat(coverage["@_branch-rate"] || 0);
-
 			// Calculate totals from packages if available
 			let totalLines = 0;
 			let coveredLines = 0;
@@ -8684,16 +8712,23 @@ class CoberturaParser extends BaseParser {
 				}
 			}
 
-			// Fallback to rates if totals not calculated
-			if (totalLines === 0 && lineRate > 0) {
-				totalLines = 100;
-				coveredLines = Math.round(lineRate * 100);
-			}
-
-			if (totalBranches === 0 && branchRate > 0) {
-				totalBranches = 100;
-				coveredBranches = Math.round(branchRate * 100);
-			}
+			// Aggregate attributes are actual counts. A percentage alone must
+			// never manufacture a denominator of 100 lines or branches.
+			const counts = (metric) => {
+				const total = Number(coverage[`@_${metric}-valid`] || 0);
+				const covered = Number(coverage[`@_${metric}-covered`] || 0);
+				if (
+					!Number.isSafeInteger(total) ||
+					!Number.isSafeInteger(covered) ||
+					covered < 0 ||
+					covered > total
+				)
+					throw new Error("Invalid aggregate coverage counts.");
+				return [total, covered];
+			};
+			if (totalLines === 0) [totalLines, coveredLines] = counts("lines");
+			if (totalBranches === 0)
+				[totalBranches, coveredBranches] = counts("branches");
 
 			reportData.setCoverage(
 				new Coverage({
@@ -9934,7 +9969,8 @@ class ReportPathResolver {
 
 
 
-async function run({ core, glob: globModule, inputs }) {
+
+async function run({ core, glob: globModule = NativeGlob, inputs }) {
 	try {
 		const fileSystemService = new FileSystemService(inputs.workingDirectory);
 		const logger = new LoggerService(core);

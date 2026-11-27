@@ -1,242 +1,59 @@
+# Register expected native reports before a check, then validate and retain them.
+# Providers use prepare/finalize internally. For custom commands, use run-check.
+# Requires contents: read and actions: read. Never forward outputs to ci-reports.
 name: Record CI reports
-description: |
-  Retain native test, lint and Cobertura reports in one checked artifact.
-  Language actions normally call this action automatically. It posts no PR comments.
-  Forward its `report-plan` output from a standalone job to the common CI reports
-  workflow. Reusable producer workflows expose their complete plan automatically.
-
-  Plans identify expected executions before tools run. A custom matrix creates one
-  complete plan from its matrix configuration and passes each selection to its
-  producer. Forward the complete plan from the configuration job, because matrix
-  workflow outputs retain only one invocation.
-
-  The plan, discover, collect and verify operations support reusable workflow
-  orchestration. Ordinary producers use record. Required reports remain required
-  after failed commands; available diagnostics are uploaded before failure.
-  Coverage is Cobertura XML with stable component labels. Frameworks merge shards
-  first. Coverage must describe the PR head or current push revision.
+description: Register a check before execution and retain validated native evidence afterward.
 author: hoverkraft
 branding:
-  icon: file-text
+  icon: check-square
   color: blue
 inputs:
   operation:
-    description: Internal orchestration operation, plan, discover, collect or verify. Ordinary producers use record.
-    default: record
-  working-directory:
-    description: Project directory for record, downloaded artifact directory for collect or verify.
-    default: .
-  report-plan:
-    description: JSON plan supplied by the producer workflow. Empty creates a standalone plan.
-    default: ""
-  producers:
-    description: JSON array of producer definitions for plan, with key, type, directory and coverage descriptions.
-    default: "[]"
-  type:
-    description: Standalone producer type, test or lint.
-    default: test
-  report-paths:
-    description: Native report paths or auto selectors. Empty discovers the producer type and adds planned coverage paths.
-    default: ""
-  summary-file:
-    description: Native Super-Linter summary relative to working-directory, instead of parsed lint diagnostics.
-    default: ""
-  coverage:
-    description: JSON array of Cobertura file, language and optional label for a standalone producer.
-    default: "[]"
-  path-mapping:
-    description: Source mappings forwarded to the native report parser.
-    default: ""
-  job-results:
-    description: JSON needs context for discover and collect, including report-plan outputs.
-    default: "{}"
-  provider:
-    description: Internal collector publication selection, `none`, `github` or `codecov`.
-    default: none
-  reports:
-    description: Validated coverage descriptors for verify. Empty verifies the entire validated collection.
-    default: "[]"
-  metadata:
-    description: Optional JSON context retained with diagnostics, such as tested image identity, engine and platform. It does not establish successful validation.
-    default: "{}"
-  source-sha:
-    description: Tested commit for a prebuilt container without Git metadata.
-    default: ""
-  source-prefix:
-    description: Repository-relative project directory for a prebuilt container without Git metadata.
-    default: ""
+    description: Lifecycle operation, prepare or finalize.
+    required: true
+  definition:
+    description: Prepare only. JSON check name, project, variant and typed report selectors. See docs/usage/ci-reports.md.
+  recording:
+    description: Finalize only. Opaque handle from prepare in the same job.
+  outcome:
+    description: Finalize only. Actual command outcome, success, failure or cancelled.
+  exit-code:
+    description: Finalize only. Optional original command exit code.
 outputs:
-  report-plan:
-    description: Expected producer plan. Forward this from standalone jobs.
-    value: ${{ steps.prepare.outputs.plan }}
-  selections:
-    description: Plans indexed by producer key, for internal matrix orchestration.
-    value: ${{ steps.prepare.outputs.selections }}
-  pattern:
-    description: Exact artifact pattern for the plans in job-results.
-    value: ${{ steps.prepare.outputs.pattern }}
+  recording:
+    description: Local recording handle, used only in the same job.
+    value: ${{ steps.record.outputs.recording }}
+  report-directory:
+    description: Fresh private output directory for this check.
+    value: ${{ steps.record.outputs.report-directory }}
+  registration-id:
+    description: Immutable check registration ID for diagnostics.
+    value: ${{ steps.record.outputs.registration-id }}
   artifact-id:
-    description: Uploaded report or validated collection artifact ID.
-    value: ${{ steps.upload.outputs.artifact-id }}
-  complete:
-    description: Whether the required report collection is complete.
-    value: ${{ steps.compose.outputs.complete || steps.process.outputs.complete }}
-  reports:
-    description: Validated coverage descriptors used by internal publication jobs.
-    value: ${{ steps.process.outputs.reports }}
-  markdown:
-    description: Consolidated CI feedback.
-    value: ${{ steps.compose.outputs.markdown }}
-  file:
-    description: Verified Cobertura file for an official uploader.
-    value: ${{ steps.process.outputs.file }}
-  files:
-    description: Comma-separated verified Cobertura files for Codecov.
-    value: ${{ steps.process.outputs.files }}
+    description: Retained native result artifact ID for diagnostics.
+    value: ${{ steps.record.outputs.artifact-id }}
 runs:
   using: composite
   steps:
-    - id: prepare
+    - id: record
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
         ACTION_PATH: ${{ github.action_path }}
+        TOKEN: ${{ github.token }}
         OPERATION: ${{ inputs.operation }}
-        PLAN: ${{ inputs.report-plan }}
-        PRODUCERS: ${{ inputs.producers }}
-        TYPE: ${{ inputs.type }}
-        DIRECTORY: ${{ inputs.working-directory }}
-        SOURCE_PREFIX: ${{ inputs.source-prefix }}
-        COVERAGE: ${{ inputs.coverage }}
-        REPORT_PATHS: ${{ inputs.report-paths }}
-        JOB_RESULTS: ${{ inputs.job-results }}
-        SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        DEFINITION: ${{ inputs.definition }}
+        RECORDING: ${{ inputs.recording }}
+        OUTCOME: ${{ inputs.outcome }}
+        EXIT_CODE: ${{ inputs.exit-code }}
       with:
         script: |
           const path = require('node:path');
-          const {pathToFileURL} = require('node:url');
-          const {ReportBundle} = await import(pathToFileURL(path.join(process.env.ACTION_PATH, 'dist/index.js')));
-          const identity = {repository:process.env.GITHUB_REPOSITORY, sha:process.env.SOURCE_COMMIT, runId:process.env.GITHUB_RUN_ID, attempt:process.env.GITHUB_RUN_ATTEMPT};
-          const bundle = new ReportBundle({identity, temporaryDirectory:process.env.RUNNER_TEMP});
-          core.setOutput('identity', identity);
-          const operation = process.env.OPERATION;
-          if (!['plan','record','discover','collect','verify'].includes(operation)) throw new Error('Unsupported reporting operation.');
-          if (operation === 'discover') {
-            const result = bundle.discover({jobs:JSON.parse(process.env.JOB_RESULTS)});
-            for (const [key,value] of Object.entries(result)) core.setOutput(key,value);
-          } else if (['plan','record'].includes(operation)) {
-            const directory = process.env.SOURCE_PREFIX || path.relative(process.env.GITHUB_WORKSPACE, path.resolve(process.env.DIRECTORY)).split(path.sep).join('/') || '.';
-            const producers = operation === 'plan' ? JSON.parse(process.env.PRODUCERS) : [{key:process.env.TYPE, type:process.env.TYPE, directory, coverage:JSON.parse(process.env.COVERAGE)}];
-            const {plan, selections} = bundle.plan({producers, plan:process.env.PLAN});
-            core.setOutput('plan', plan);
-            core.setOutput('selections', selections);
-            if (operation === 'record') {
-              if (plan.producers.length !== 1) throw new Error('Record exactly one planned execution.');
-              const producer = plan.producers[0];
-              core.setOutput('report-paths', [process.env.REPORT_PATHS || ('auto:' + producer.type), ...producer.coverage.map(report => report.file)].join('\n'));
-            }
-          }
-    - id: parse
-      if: ${{ !cancelled() && steps.prepare.outcome == 'success' && inputs.operation == 'record' && inputs.summary-file == '' }}
-      uses: $/actions/quality/parse-ci-reports
-      with:
-        working-directory: ${{ inputs.working-directory }}
-        report-paths: ${{ steps.prepare.outputs.report-paths }}
-        path-mapping: ${{ inputs.path-mapping }}
-        output-format: summary,annotations,markdown
-        fail-on-error: "true"
-    - id: process
-      if: ${{ !cancelled() && steps.prepare.outcome == 'success' && inputs.operation != 'plan' && inputs.operation != 'discover' }}
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-      env:
-        ACTION_PATH: ${{ github.action_path }}
-        OPERATION: ${{ inputs.operation }}
-        IDENTITY: ${{ steps.prepare.outputs.identity }}
-        PLAN: ${{ steps.prepare.outputs.plan }}
-        DIRECTORY: ${{ inputs.working-directory }}
-        FILES: ${{ steps.parse.outputs.parsed-files || '[]' }}
-        CATEGORIES: ${{ steps.parse.outputs.parsed-reports || '[]' }}
-        TEST_COUNT: ${{ steps.parse.outputs.executed-tests || '0' }}
-        SUMMARY_FILE: ${{ inputs.summary-file }}
-        PARSE_OUTCOME: ${{ steps.parse.outcome }}
-        JOB_RESULTS: ${{ inputs.job-results }}
-        PROVIDER: ${{ inputs.provider }}
-        REPORTS: ${{ inputs.reports }}
-        SOURCE_SHA: ${{ inputs.source-sha }}
-        METADATA: ${{ inputs.metadata }}
-        SOURCE_PREFIX: ${{ inputs.source-prefix }}
-      with:
-        script: |
-          const path = require('node:path');
-          const {pathToFileURL} = require('node:url');
-          const {ReportBundle, CoverageReports} = await import(pathToFileURL(path.join(process.env.ACTION_PATH, 'dist/index.js')));
-          const identity = JSON.parse(process.env.IDENTITY);
-          const options = {identity, temporaryDirectory:process.env.RUNNER_TEMP};
-          const bundle = new ReportBundle(options);
-          const directory = path.resolve(process.env.DIRECTORY);
-          let result;
-          if (process.env.OPERATION === 'record') {
-            result = bundle.record({directory, workspace:process.env.GITHUB_WORKSPACE, plan:process.env.PLAN,
-              files:process.env.FILES, categories:process.env.CATEGORIES, testCount:process.env.TEST_COUNT, summaryFile:process.env.SUMMARY_FILE, parseOutcome:process.env.PARSE_OUTCOME,
-              sourceSha:process.env.SOURCE_SHA, sourcePrefix:process.env.SOURCE_PREFIX, metadata:process.env.METADATA});
-          } else if (process.env.OPERATION === 'collect') {
-            result = bundle.collect({directory, jobs:JSON.parse(process.env.JOB_RESULTS), provider:process.env.PROVIDER});
-          } else {
-            const coverage = new CoverageReports(options);
-            const coverageDirectory = path.join(directory,'coverage');
-            const requested = JSON.parse(process.env.REPORTS);
-            const reports = requested.length ? requested : coverage.read(coverageDirectory);
-            if (!reports.length) throw new Error('No validated coverage reports.');
-            const verified = reports.map(report => coverage.verify({directory:coverageDirectory,reports:[report]}));
-            result = {...(verified.length === 1 ? verified[0] : {}), files:verified.map(report => report.file).join(',')};
-          }
-          for (const [key,value] of Object.entries(result)) if (key !== 'collection') core.setOutput(key,value);
-    - id: parse-collection
-      if: ${{ !cancelled() && inputs.operation == 'collect' && steps.process.outputs.report-paths != '' }}
-      uses: $/actions/quality/parse-ci-reports
-      with:
-        working-directory: ${{ steps.process.outputs.directory }}
-        report-paths: ${{ steps.process.outputs.report-paths }}
-        output-format: markdown
-    - id: compose
-      if: ${{ !cancelled() && inputs.operation == 'collect' && steps.process.outputs.directory != '' }}
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-      env:
-        ACTION_PATH: ${{ github.action_path }}
-        DIRECTORY: ${{ steps.process.outputs.directory }}
-        TESTS: ${{ steps.parse-collection.outputs.test-markdown }}
-        LINT: ${{ steps.parse-collection.outputs.lint-markdown }}
-        COVERAGE: ${{ steps.parse-collection.outputs.coverage-markdown }}
-        PARSE_OUTCOME: ${{ steps.parse-collection.outcome }}
-      with:
-        script: |
-          const path = require('node:path');
-          const {pathToFileURL} = require('node:url');
-          const {ReportBundle} = await import(pathToFileURL(path.join(process.env.ACTION_PATH,'dist/index.js')));
-          const result = ReportBundle.compose({directory:process.env.DIRECTORY, runUrl:`${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/attempts/${process.env.GITHUB_RUN_ATTEMPT}`,
-            tests:process.env.TESTS, lint:process.env.LINT, coverage:process.env.COVERAGE, parseOutcome:process.env.PARSE_OUTCOME});
-          core.setOutput('markdown',result.markdown);
-          core.setOutput('complete',result.complete);
-          await core.summary.addRaw(result.markdown).write();
-    - id: upload
-      if: ${{ !cancelled() && steps.process.outputs.directory != '' }}
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-      with:
-        name: ${{ steps.process.outputs.name }}
-        path: ${{ steps.process.outputs.directory }}/
-        if-no-files-found: error
-        include-hidden-files: true
-        retention-days: 7
-    - name: Clean temporary report files
-      if: always() && steps.process.outputs.directory != ''
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-      env:
-        REPORT_DIRECTORY: ${{ steps.process.outputs.directory }}
-      with:
-        script: await io.rmRF(process.env.REPORT_DIRECTORY);
-    - name: Enforce producer report contract
-      if: ${{ !cancelled() && inputs.operation == 'record' && steps.process.outputs.complete != 'true' }}
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-      env:
-        REPORT_ERRORS: ${{ steps.process.outputs.errors }}
-      with:
-        script: core.setFailed('Required CI reports are incomplete. ' + (JSON.parse(process.env.REPORT_ERRORS || '[]')).join(' '));
+          const { pathToFileURL } = require('node:url');
+          const actionPath = process.env.ACTION_PATH;
+          const { createArtifactClient } = await import(pathToFileURL(path.resolve(actionPath, '../../download-artifact/dist/index.js')));
+          const { Runtime } = await import(pathToFileURL(path.join(process.env.ACTION_PATH, 'dist/index.js')));
+          const runtime = new Runtime({ core, github, context, actionPath, token: process.env.TOKEN, client: createArtifactClient() });
+          await runtime.producer(process.env.OPERATION, {
+            definition: process.env.DEFINITION, recording: process.env.RECORDING,
+            outcome: process.env.OUTCOME, exitCode: process.env.EXIT_CODE,
+          });

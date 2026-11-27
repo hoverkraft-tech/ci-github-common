@@ -15,16 +15,19 @@ checkout; coverage output is not committed.
 Follow `parse-ci-reports` for each JavaScript action: call the released Node.js
 `continuous-integration` workflow with the action's working directory and explicit
 job permissions. Disable its build and lint jobs; keep CodeQL with the repository
-config, dependency review and GitHub coverage enabled. Set `test.comment` to false
+config and dependency review enabled. Set `test.comment` to false
 and `test.report-group` to the calling job ID in `__shared-ci.yml`. Source tests
-run through the package-owned `test:ci` script. The temporary import jobs in
-`__shared-ci.yml` require each action's JUnit and LCOV files from the current
-attempt, preserve source failures and record separate diagnostics through the
-local recorder. The local linter and `ci-reports` workflows publish one combined
-CI comment, exercising the current implementation.
+run through the package-owned `test:ci` script. These released workflows remain
+status-only in the new collector until their producer adapter is released.
+The recorder's dedicated test workflow uses `run-check` to exercise the current
+protocol, with dependencies installed for both the recorder and shared parser.
+Every participating job feeds one outer `ci-reports` workflow.
 
-Keep local workflow self-references. The [release order in ADR 0004](../adr/0004-native-github-coverage.md#release-order)
-describes when to update the released Node.js producer and remove the importer.
+Keep local workflow self-references. Follow the
+[release order in ADR 0005](../adr/0005-ci-reporting-contract.md#consequences-and-rollout).
+The recorder reuses the parser's native-format classes and the download action's
+bundled artifact client. Rebuild these bundles when changing shared code; do not
+install project dependencies in publisher jobs.
 
 Each action's integration workflow exercises its public entrypoint. Actions with
 runtime dependencies bundle them with their licenses; dependency-free helpers

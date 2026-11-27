@@ -1,0 +1,2 @@
+# Used only when GitHub publication needs conversion of validated native LCOV.
+lcov-cobertura==2.1.1 --hash=sha256:92f8107297f6d1d7a7a0a88c6071c1ea04f862f2fe918c6ecce271573c37d8aa
