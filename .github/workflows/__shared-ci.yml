@@ -216,12 +216,17 @@ jobs:
             const directory = process.env.REPORT_DIRECTORY;
             fs.mkdirSync(directory, {recursive: true});
             const artifacts = fs.readdirSync(directory, {withFileTypes: true});
-            if (artifacts.length !== 1 || !artifacts[0].isDirectory()) {
+            const reports = ['junit.xml', 'lcov.info'];
+            // download-artifact extracts a single matching artifact directly.
+            const flat = artifacts.length === reports.length && artifacts.every(file =>
+              file.isFile() && reports.includes(file.name));
+            const nested = artifacts.length === 1 && artifacts[0].isDirectory();
+            if (!flat && !nested) {
               core.setFailed('Expected one native report artifact for this action in the current attempt. Rerun all producer jobs.');
               return;
             }
-            core.setOutput('report-paths', ['junit.xml', 'lcov.info']
-              .map(file => path.join(artifacts[0].name, file)).join('\n'));
+            core.setOutput('report-paths', reports
+              .map(file => path.join(flat ? '' : artifacts[0].name, file)).join('\n'));
       - name: Record native diagnostics using the local report contract
         if: ${{ !cancelled() }}
         uses: $/actions/quality/record-ci-reports
