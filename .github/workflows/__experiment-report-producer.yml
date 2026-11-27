@@ -1,0 +1,53 @@
+name: Experiment reusable report producer
+on:
+  workflow_call:
+    inputs:
+      project:
+        type: string
+        required: true
+permissions:
+  actions: read
+  contents: read
+jobs:
+  produce:
+    name: Shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - name: Simulate a rerun failing before report production
+        if: inputs.project == 'alpha' && matrix.shard == 2 && github.run_attempt == '2'
+        run: exit 1
+      - name: Record execution identity
+        env:
+          PROJECT: ${{ inputs.project }}
+          SHARD: ${{ matrix.shard }}
+          RUNNER_LABEL: ${{ runner.name }}
+          GH_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import json, os, pathlib, subprocess, uuid
+          fields = ('GITHUB_JOB', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT',
+                    'GITHUB_SHA', 'GITHUB_REF', 'GITHUB_WORKFLOW_REF',
+                    'GITHUB_WORKFLOW_SHA', 'PROJECT', 'SHARD', 'RUNNER_LABEL')
+          identity = {key: os.environ.get(key) for key in fields}
+          job_data = subprocess.check_output(['gh', 'api',
+              f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}/jobs?filter=latest&per_page=100"])
+          identity['jobs_at_recording'] = json.loads(job_data)
+          pathlib.Path('evidence').mkdir()
+          pathlib.Path('evidence/report.json').write_text(json.dumps(identity, indent=2))
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write(f'EXPERIMENT_ID={uuid.uuid4()}\n')
+      - name: Upload evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: experiment-report-${{ github.run_attempt }}-${{ env.EXPERIMENT_ID }}
+          path: evidence/report.json
+          retention-days: 1
+          if-no-files-found: error
+      - name: Simulate an initial test failure after report production
+        if: inputs.project == 'alpha' && matrix.shard == 2 && github.run_attempt == '1'
+        run: exit 1

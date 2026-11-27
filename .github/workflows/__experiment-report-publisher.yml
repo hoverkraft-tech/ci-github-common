@@ -1,0 +1,23 @@
+name: Experiment reusable report publisher
+on:
+  workflow_call:
+    inputs:
+      native:
+        type: boolean
+        default: false
+permissions: {}
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - run: echo 'Summary reached the runner.'
+  native:
+    if: inputs.native
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      code-quality: write
+    steps:
+      - run: echo 'Native publisher reached the runner.'

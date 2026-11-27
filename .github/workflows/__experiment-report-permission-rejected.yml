@@ -1,0 +1,11 @@
+# Deliberately insufficient caller permissions, an expected parser rejection.
+name: Experiment report permission rejection
+on:
+  push:
+    branches: [test/ci-reporting-feasibility-20261127]
+permissions: {}
+jobs:
+  reports:
+    uses: ./.github/workflows/__experiment-report-publisher.yml
+    with:
+      native: false
