@@ -1127,15 +1127,930 @@ const XMLValidator = {
   validate: validate
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/util.js
+;// CONCATENATED MODULE: external "module"
+const external_module_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("module");
+;// CONCATENATED MODULE: ../parse-ci-reports/dist/index.js
+
+/******/ // The require scope
+/******/ var __nccwpck_require2_ = {};
+/******/ 
+/************************************************************************/
+/******/ /* webpack/runtime/define property getters */
+/******/ (() => {
+/******/ 	// define getter functions for harmony exports
+/******/ 	__nccwpck_require2_.d = (exports, definition) => {
+/******/ 		for(var key in definition) {
+/******/ 			if(__nccwpck_require2_.o(definition, key) && !__nccwpck_require2_.o(exports, key)) {
+/******/ 				Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 			}
+/******/ 		}
+/******/ 	};
+/******/ })();
+/******/ 
+/******/ /* webpack/runtime/hasOwnProperty shorthand */
+/******/ (() => {
+/******/ 	__nccwpck_require2_.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ })();
+/******/ 
+/************************************************************************/
+var __nested_webpack_exports__ = {};
+
+// EXPORTS
+__nccwpck_require2_.d(__nested_webpack_exports__, {
+  O6: () => (/* reexport */ ParserFactory),
+  wb: () => (/* reexport */ ReportRenderer),
+  eF: () => (/* binding */ run)
+});
+
+;// CONCATENATED MODULE: external "node:fs"
+const dist_external_node_fs_namespaceObject = (0,external_module_namespaceObject.createRequire)(import.meta.url)("node:fs");
+;// CONCATENATED MODULE: external "node:path"
+const dist_external_node_path_namespaceObject = (0,external_module_namespaceObject.createRequire)(import.meta.url)("node:path");
+;// CONCATENATED MODULE: ./src/FileSystemService.js
 
 
-const util_nameStartChar = ':A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD';
-const util_nameChar = util_nameStartChar + '\\-.\\d\\u00B7\\u0300-\\u036F\\u203F-\\u2040';
-const util_nameRegexp = '[' + util_nameStartChar + '][' + util_nameChar + ']*';
-const util_regexName = new RegExp('^' + util_nameRegexp + '$');
 
-function util_getAllMatches(string, regex) {
+class FileSystemService {
+	constructor(workingDirectory) {
+		this.workingDirectory = this._resolveWorkingDirectory(workingDirectory);
+		this._assertDirectory(this.workingDirectory);
+	}
+
+	normalizeFilePath(pattern) {
+		if (!pattern) {
+			return pattern;
+		}
+
+		if (dist_external_node_path_namespaceObject.isAbsolute(pattern)) {
+			return dist_external_node_path_namespaceObject.normalize(pattern);
+		}
+
+		return dist_external_node_path_namespaceObject.join(this.workingDirectory, pattern);
+	}
+
+	resolveFilePath(file) {
+		const normalizedFile = this.normalizeFilePath(file);
+		if (!normalizedFile) {
+			throw new Error(`Cannot resolve empty file path: ${file}`);
+		}
+
+		return dist_external_node_path_namespaceObject.resolve(normalizedFile);
+	}
+
+	readFile(filePath, encoding = "utf-8") {
+		const resolvedPath = this.resolveFilePath(filePath);
+		this._assertFile(resolvedPath);
+
+		return dist_external_node_fs_namespaceObject.readFileSync(resolvedPath, encoding);
+	}
+
+	_resolveWorkingDirectory(workingDirectory) {
+		const fallbackWorkspace = process.cwd();
+
+		if (!workingDirectory || workingDirectory === ".") {
+			return fallbackWorkspace;
+		}
+
+		if (dist_external_node_path_namespaceObject.isAbsolute(workingDirectory)) {
+			return dist_external_node_path_namespaceObject.resolve(workingDirectory);
+		}
+
+		return dist_external_node_path_namespaceObject.resolve(fallbackWorkspace, workingDirectory);
+	}
+
+	_assertFile(filePath) {
+		try {
+			const stats = dist_external_node_fs_namespaceObject.statSync(filePath);
+			if (!stats.isFile()) {
+				throw new Error(`Path is not a file: ${filePath}`);
+			}
+		} catch (error) {
+			if (error.code === "ENOENT") {
+				throw new Error(`File does not exist: ${filePath}`);
+			}
+			throw error;
+		}
+	}
+
+	_assertDirectory(directoryPath) {
+		try {
+			const stats = dist_external_node_fs_namespaceObject.statSync(directoryPath);
+			if (!stats.isDirectory()) {
+				throw new Error(`Path is not a directory: ${directoryPath}`);
+			}
+		} catch (error) {
+			if (error.code === "ENOENT") {
+				throw new Error(`Directory does not exist: ${directoryPath}`);
+			}
+			throw error;
+		}
+	}
+}
+
+;// CONCATENATED MODULE: ./src/LoggerService.js
+class LoggerService {
+	constructor(core) {
+		this.core = core;
+	}
+
+	info(message) {
+		this.core.info(message);
+	}
+
+	warning(message) {
+		this.core.warning(message);
+	}
+
+	error(message) {
+		this.core.error(message);
+	}
+}
+
+;// CONCATENATED MODULE: ./src/NativeGlob.js
+
+
+
+/** Node 24 supplies globbing without a separate matcher dependency. */
+const NativeGlob = {
+	async create(patterns) {
+		const entries = patterns.split(/\r?\n/).filter(Boolean);
+		const include = entries.filter((pattern) => !pattern.startsWith("!"));
+		const exclude = entries
+			.filter((pattern) => pattern.startsWith("!"))
+			.map((pattern) => pattern.slice(1));
+		if (
+			entries.length > 512 ||
+			entries.some((pattern) => pattern.length > 2048)
+		)
+			throw new Error("Report discovery patterns exceed their resource limit.");
+		return {
+			async *globGenerator() {
+				for (const filename of dist_external_node_fs_namespaceObject.globSync(include, { exclude })) {
+					if (
+						dist_external_node_fs_namespaceObject.lstatSync(filename).isFile() &&
+						dist_external_node_fs_namespaceObject.realpathSync(filename) === dist_external_node_path_namespaceObject.resolve(filename)
+					)
+						yield filename;
+				}
+			},
+		};
+	},
+};
+
+;// CONCATENATED MODULE: ./src/formatters/BaseFormatter.js
+/**
+ * Base formatter with common (non-markdown) utilities
+ */
+class BaseFormatter {
+	format(reportData, reportName) {
+		const sections = this.buildSections(reportData);
+		return this.composeReport(reportName, sections);
+	}
+
+	buildSections(reportData) {
+		const sections = [];
+
+		if (this._shouldIncludeTests(reportData)) {
+			sections.push(
+				this._formatTestResults(reportData, ...this._getTestFormatterArgs()),
+			);
+		}
+
+		if (this._shouldIncludeLint(reportData)) {
+			sections.push(this._formatLintIssues(reportData));
+		}
+
+		if (reportData.coverageReports?.length > 1) {
+			for (const report of reportData.coverageReports) {
+				sections.push(
+					`#### ${this._escapeMarkdown(report.name)}\n\n${this._formatCoverage(report.coverage)}`,
+				);
+			}
+		} else if (this._shouldIncludeCoverage(reportData)) {
+			sections.push(this._formatCoverage(reportData.coverage));
+		}
+
+		return sections;
+	}
+
+	composeReport(_reportName, sections) {
+		return sections.join("\n");
+	}
+
+	_shouldIncludeTests(reportData) {
+		return reportData.getTotalTests() > 0;
+	}
+
+	_shouldIncludeLint(reportData) {
+		return reportData.lintReportCount > 0 || reportData.lintIssues.length > 0;
+	}
+
+	_shouldIncludeCoverage(reportData) {
+		return Boolean(reportData.coverage);
+	}
+
+	_getTestFormatterArgs() {
+		return [];
+	}
+
+	_truncate(text, maxLength) {
+		if (!text || text.length <= maxLength) {
+			return text;
+		}
+		return `${text.slice(0, maxLength)}...`;
+	}
+
+	_formatPercentage(percentage) {
+		return `${percentage.toFixed(2)}%`;
+	}
+
+	_buildCoverageRows(coverage) {
+		const rows = [];
+
+		if (coverage.lines.total > 0) {
+			rows.push(this._formatCoverageRow("Lines", coverage.lines));
+		}
+
+		if (coverage.branches.total > 0) {
+			rows.push(this._formatCoverageRow("Branches", coverage.branches));
+		}
+
+		if (coverage.functions.total > 0) {
+			rows.push(this._formatCoverageRow("Functions", coverage.functions));
+		}
+
+		if (coverage.statements && coverage.statements.total > 0) {
+			rows.push(this._formatCoverageRow("Statements", coverage.statements));
+		}
+
+		return rows.length > 0 ? `${rows.join("\n")}\n` : "";
+	}
+
+	_formatCoverageRow(label, metric) {
+		return `| ${label} | ${metric.covered} | ${
+			metric.total
+		} | ${this._formatPercentage(metric.percentage)} |`;
+	}
+}
+
+;// CONCATENATED MODULE: ./src/formatters/MarkdownFormatter.js
+
+
+/**
+ * Formatter for markdown output suitable for PR/issue comments
+ * Generates a rich report similar to the summary formatter
+ */
+class MarkdownFormatter extends BaseFormatter {
+	/**
+	 * Compose the markdown structure with a report heading
+	 */
+	composeReport(reportName, sections) {
+		return [`## ${reportName}\n`, ...sections].join("\n");
+	}
+
+	_formatTestResults(reportData) {
+		const total = reportData.getTotalTests();
+		const passed = reportData.getPassedCount();
+		const failed = reportData.getFailedCount();
+		const passRate = total === 0 ? 0 : (passed / total) * 100;
+		const statusEmoji =
+			failed > 0 ? "❌" : reportData.getSkippedCount() === total ? "⏭️" : "✅";
+
+		let output = "### Test Results\n\n";
+		output += this._buildTestSummaryTable(reportData);
+		output += "\n";
+		output += this._buildSuiteTable(reportData);
+
+		output += `> ${statusEmoji} **Pass Rate:** ${passRate.toFixed(1)}%\n\n`;
+
+		if (failed > 0) {
+			output += "<details>\n<summary>Failed Tests</summary>\n\n";
+
+			const failedTests = reportData.getFailedTests();
+			for (const test of failedTests.slice(0, 5)) {
+				output += `- **${this._escapeMarkdown(test.name)}**`;
+				if (test.suite) {
+					output += ` _(suite: ${this._escapeMarkdown(test.suite)})_`;
+				}
+				output += "\n";
+
+				if (test.file) {
+					output += `  - File: \`${test.file}\`\n`;
+				}
+
+				if (test.message) {
+					output += `  - Error: ${this._escapeMarkdown(
+						this._truncate(test.message, 200),
+					)}\n`;
+				}
+			}
+
+			if (failedTests.length > 5) {
+				output += `\n_... and ${failedTests.length - 5} more failures_\n`;
+			}
+
+			output += "\n</details>\n\n";
+		}
+
+		return output;
+	}
+
+	_formatLintIssues(reportData) {
+		let output = "### Lint Checks\n\n";
+		output += this._buildLintSummaryTable(reportData);
+		output += "\n";
+
+		const errors = reportData.getErrors();
+		const warnings = reportData.getWarnings();
+
+		if (errors.length > 0) {
+			output += this._renderIssueDetails("Errors", errors, 5);
+		}
+
+		if (warnings.length > 0) {
+			output += this._renderIssueDetails("Warnings", warnings, 5);
+		}
+
+		return output;
+	}
+
+	_formatCoverage(coverage) {
+		let output = "### Coverage\n\n";
+
+		output += "| Metric | Covered | Total | Percentage |\n";
+		output += "|--------|---------|-------|------------|\n";
+		output += this._buildCoverageRows(coverage);
+
+		const overall = coverage.getOverallPercentage();
+		output += "\n";
+		output += `**Overall:** ${this._formatPercentage(
+			overall,
+		)} ${this._getCoverageEmoji(overall)}\n`;
+		output += `${this._getCoverageBar(overall)}\n\n`;
+
+		return output;
+	}
+
+	_getCoverageEmoji(percentage) {
+		if (percentage >= 80) return "🟢";
+		if (percentage >= 60) return "🟡";
+		return "🔴";
+	}
+
+	_renderIssueDetails(title, issues, limit) {
+		let output = `<details>\n<summary>${title}</summary>\n\n`;
+
+		for (const issue of issues.slice(0, limit)) {
+			const location = `\`${issue.file}:${issue.line}:${issue.column}\``;
+			output += `- ${location} - ${this._escapeMarkdown(issue.message)}\n`;
+			output += `  - Rule: \`${issue.rule}\`\n`;
+		}
+
+		if (issues.length > limit) {
+			output += `\n_... and ${
+				issues.length - limit
+			} more ${title.toLowerCase()}_\n`;
+		}
+
+		output += "\n</details>\n\n";
+		return output;
+	}
+
+	_escapeMarkdown(text) {
+		return text
+			.replace(/[\r\n]+/g, " ")
+			.replace(/[\\`*_{}[\]()#+\-.!|<>]/g, "\\$&");
+	}
+
+	_buildSuiteTable(reportData) {
+		const suites = Map.groupBy(
+			reportData.tests,
+			(test) => test.suite || "Unnamed suite",
+		);
+		if (suites.size < 2) return "";
+		const rows = [...suites]
+			.map(([name, tests]) => ({
+				name,
+				passed: tests.filter((test) => test.isPassed()).length,
+				failed: tests.filter((test) => test.isFailed()).length,
+				skipped: tests.filter((test) => test.isSkipped()).length,
+			}))
+			.sort(
+				(left, right) =>
+					right.failed - left.failed || left.name.localeCompare(right.name),
+			);
+		return [
+			"| Suite | Passed | Failed | Skipped |",
+			"| --- | --- | --- | --- |",
+			...rows
+				.slice(0, 50)
+				.map(
+					(row) =>
+						`| ${this._escapeMarkdown(row.name)} | ${row.passed} | ${row.failed} | ${row.skipped} |`,
+				),
+			rows.length > 50
+				? `\n${rows.length - 50} additional suites are available in the native reports.`
+				: "",
+			"\n",
+		].join("\n");
+	}
+
+	_buildTestSummaryTable(reportData) {
+		const total = reportData.getTotalTests();
+		const passed = reportData.getPassedCount();
+		const failed = reportData.getFailedCount();
+		const skipped = reportData.getSkippedCount();
+
+		const lines = [
+			"| Status | Count |",
+			"|--------|-------|",
+			`| ✅ Passed | ${passed} |`,
+			`| ❌ Failed | ${failed} |`,
+			`| ⏭️ Skipped | ${skipped} |`,
+			`| **Total** | **${total}** |`,
+			"",
+		];
+
+		return lines.join("\n");
+	}
+
+	_buildLintSummaryTable(reportData) {
+		const errors = reportData.getErrors();
+		const warnings = reportData.getWarnings();
+
+		const lines = [
+			"| Severity | Count |",
+			"|----------|-------|",
+			`| ❌ Errors | ${errors.length} |`,
+			`| ⚠️ Warnings | ${warnings.length} |`,
+			`| **Total** | **${reportData.lintIssues.length}** |`,
+			"",
+		];
+
+		return lines.join("\n");
+	}
+
+	_getCoverageBar(percentage) {
+		const totalBlocks = 20;
+		const filled = Math.min(
+			Math.round((percentage / 100) * totalBlocks),
+			totalBlocks,
+		);
+		const empty = Math.max(totalBlocks - filled, 0);
+
+		if (percentage >= 80) {
+			return "🟩".repeat(filled) + "⬜".repeat(empty);
+		}
+		if (percentage >= 60) {
+			return "🟨".repeat(filled) + "⬜".repeat(empty);
+		}
+		return "🟥".repeat(filled) + "⬜".repeat(empty);
+	}
+}
+
+;// CONCATENATED MODULE: ./src/formatters/SummaryFormatter.js
+
+
+/**
+ * Formatter for GitHub Step Summary
+ * Generates markdown suitable for $GITHUB_STEP_SUMMARY
+ */
+class SummaryFormatter extends MarkdownFormatter {
+	/**
+	 * Format report data as GitHub Step Summary
+	 * @param {ReportData} reportData - The report data
+	 * @param {string} reportName - Name of the report
+	 * @param {boolean} includePassed - Whether to include passed tests
+	 * @returns {string} Formatted markdown
+	 */
+	format(reportData, reportName, includePassed = false) {
+		this._includePassed = includePassed;
+		try {
+			return super.format(reportData, reportName);
+		} finally {
+			this._includePassed = undefined;
+		}
+	}
+
+	_getTestFormatterArgs() {
+		return [this._includePassed ?? false];
+	}
+
+	_formatTestResults(reportData, includePassed = false) {
+		const failed = reportData.getFailedCount();
+		const passed = reportData.getPassedCount();
+
+		let output = "### Test Results\n\n";
+
+		// Summary table
+		output += this._buildTestSummaryTable(reportData);
+		output += "\n";
+
+		// Failed tests details
+		if (failed > 0) {
+			output += "#### Failed Tests\n\n";
+			const failedTests = reportData.getFailedTests();
+
+			for (const test of failedTests) {
+				output += `- **${test.name}**\n`;
+				if (test.suite) {
+					output += `  - Suite: ${test.suite}\n`;
+				}
+				if (test.message) {
+					output += `  - Error: ${this._escapeMarkdown(test.message)}\n`;
+				}
+				if (test.file) {
+					output += `  - File: \`${test.file}\`\n`;
+				}
+				output += "\n";
+			}
+		}
+
+		// Passed tests (if requested)
+		if (includePassed && passed > 0) {
+			output += "#### Passed Tests\n\n";
+			const passedTests = reportData.getPassedTests();
+
+			for (const test of passedTests) {
+				output += `- ✅ ${test.name}`;
+				if (test.suite) {
+					output += ` (${test.suite})`;
+				}
+				output += "\n";
+			}
+			output += "\n";
+		}
+
+		return output;
+	}
+
+	_formatLintIssues(reportData) {
+		let output = "### Lint Issues\n\n";
+
+		// Summary table
+		output += this._buildLintSummaryTable(reportData);
+		output += "\n";
+
+		const errors = reportData.getErrors();
+		const warnings = reportData.getWarnings();
+
+		// Error details
+		if (errors.length > 0) {
+			output += this._formatIssueList("Errors", errors, 10);
+		}
+
+		// Warning details (limited)
+		if (warnings.length > 0) {
+			output += this._formatIssueList("Warnings", warnings, 5);
+		}
+
+		return output;
+	}
+
+	_formatIssueList(title, issues, limit) {
+		let output = `#### ${title}\n\n`;
+
+		for (const issue of issues.slice(0, limit)) {
+			output += `- **\`${issue.file}:${issue.line}:${issue.column}\`**\n`;
+			output += `  - Rule: \`${issue.rule}\`\n`;
+			output += `  - ${this._escapeMarkdown(issue.message)}\n\n`;
+		}
+
+		if (issues.length > limit) {
+			output += `_... and ${
+				issues.length - limit
+			} more ${title.toLowerCase()}_\n\n`;
+		}
+
+		return output;
+	}
+
+	_formatCoverage(coverage) {
+		let output = "### Coverage Report\n\n";
+
+		output += "| Metric | Covered | Total | Percentage |\n";
+		output += "|--------|---------|-------|------------|\n";
+		output += this._buildCoverageRows(coverage);
+		output += "\n";
+
+		// Overall percentage with visual indicator
+		const overall = coverage.getOverallPercentage();
+		output += `**Overall Coverage: ${this._formatPercentage(overall)}**\n`;
+		output += `${this._getCoverageBar(overall)}\n`;
+
+		return output;
+	}
+}
+
+;// CONCATENATED MODULE: ./src/models/ReportData.js
+/**
+ * Represents a test result
+ */
+class TestResult {
+	constructor({
+		name,
+		status,
+		duration = 0,
+		message = "",
+		errorType = "",
+		stackTrace = "",
+		file = "",
+		suite = "",
+	}) {
+		this.name = name;
+		this.status = status; // 'passed', 'failed', 'skipped', 'error'
+		this.duration = duration;
+		this.message = message;
+		this.errorType = errorType;
+		this.stackTrace = stackTrace;
+		this.file = file;
+		this.suite = suite;
+	}
+
+	isPassed() {
+		return this.status === "passed";
+	}
+
+	isFailed() {
+		return this.status === "failed" || this.status === "error";
+	}
+
+	isSkipped() {
+		return this.status === "skipped";
+	}
+}
+
+/**
+ * Represents a lint/check issue
+ */
+class LintIssue {
+	constructor({ file, line, column, severity, rule, message, source = "" }) {
+		this.file = file;
+		this.line = line;
+		this.column = column;
+		this.severity = severity; // 'error', 'warning', 'info'
+		this.rule = rule;
+		this.message = message;
+		this.source = source;
+	}
+
+	isError() {
+		return this.severity === "error";
+	}
+
+	isWarning() {
+		return this.severity === "warning";
+	}
+}
+
+/**
+ * Represents coverage data
+ */
+class Coverage {
+	constructor({
+		lines = { total: 0, covered: 0, percentage: 0 },
+		branches = { total: 0, covered: 0, percentage: 0 },
+		functions = { total: 0, covered: 0, percentage: 0 },
+		statements = { total: 0, covered: 0, percentage: 0 },
+	}) {
+		this.lines = lines;
+		this.branches = branches;
+		this.functions = functions;
+		this.statements = statements;
+	}
+
+	getOverallPercentage() {
+		// Use line coverage as the primary metric
+		return this.lines.percentage;
+	}
+}
+
+/**
+ * Aggregated report data
+ */
+class ReportData {
+	constructor() {
+		this.tests = [];
+		this.lintIssues = [];
+		this.lintReportCount = 0;
+		this.coverage = null;
+		this.coverageReports = [];
+		this.reportType = "unknown"; // 'test', 'lint', 'coverage', 'mixed'
+	}
+
+	addTest(test) {
+		this.tests.push(test);
+	}
+
+	addLintIssue(issue) {
+		this.lintIssues.push(issue);
+	}
+
+	setCoverage(coverage) {
+		this.coverage = coverage;
+	}
+
+	getPassedTests() {
+		return this.tests.filter((t) => t.isPassed());
+	}
+
+	getFailedTests() {
+		return this.tests.filter((t) => t.isFailed());
+	}
+
+	getSkippedTests() {
+		return this.tests.filter((t) => t.isSkipped());
+	}
+
+	getErrors() {
+		return this.lintIssues.filter((i) => i.isError());
+	}
+
+	getWarnings() {
+		return this.lintIssues.filter((i) => i.isWarning());
+	}
+
+	hasErrors() {
+		return this.getFailedTests().length > 0 || this.getErrors().length > 0;
+	}
+
+	getTotalTests() {
+		return this.tests.length;
+	}
+
+	getPassedCount() {
+		return this.getPassedTests().length;
+	}
+
+	getFailedCount() {
+		return this.getFailedTests().length;
+	}
+
+	getSkippedCount() {
+		return this.getSkippedTests().length;
+	}
+}
+
+;// CONCATENATED MODULE: ./src/PathRewriter.js
+/**
+ * PathRewriter - Utility to rewrite file paths in reports
+ *
+ * This is useful when tests/lints run in a different directory or container,
+ * but the paths in reports need to match the actual repository structure
+ * for GitHub annotations and file references to work correctly.
+ */
+const SLASH_CHAR_CODE = "/".charCodeAt(0);
+
+const trimTrailingSlashes = (value) => {
+	if (!value) {
+		return value;
+	}
+
+	let end = value.length;
+	while (end > 0 && value.charCodeAt(end - 1) === SLASH_CHAR_CODE) {
+		end -= 1;
+	}
+
+	return value.slice(0, end);
+};
+
+const removeSingleLeadingSlash = (value) => {
+	if (!value || value.charCodeAt(0) !== SLASH_CHAR_CODE) {
+		return value;
+	}
+
+	return value.slice(1);
+};
+
+class PathRewriter {
+	/**
+	 * Create a path rewriter
+	 * @param {string|null} pathMapping - Path mapping(s) in format "from:to" or multiple mappings separated by newlines/commas
+	 */
+	constructor(pathMapping = null) {
+		this.mappings = [];
+
+		if (pathMapping && pathMapping.trim().length > 0) {
+			this._parsePathMappings(pathMapping);
+		}
+	}
+
+	/**
+	 * Parse path mapping string(s)
+	 * @param {string} pathMapping - Path mapping(s) in format "from:to", can be multiple separated by newlines or commas
+	 * @private
+	 */
+	_parsePathMappings(pathMapping) {
+		// Split by newlines or commas, filter empty strings
+		const lines = pathMapping
+			.split(/[\n,]/)
+			.map((line) => line.trim())
+			.filter((line) => line.length > 0);
+
+		for (const line of lines) {
+			const parts = line.split(":");
+			if (parts.length !== 2) {
+				throw new Error(
+					`Invalid path-mapping format: "${line}". Expected format: "from_path:to_path"`,
+				);
+			}
+
+			const fromPath = parts[0].trim();
+			const toPath = parts[1].trim();
+
+			if (fromPath.length === 0 || toPath.length === 0) {
+				throw new Error(
+					`Invalid path-mapping format: "${line}". Paths cannot be empty.`,
+				);
+			}
+
+			// Normalize paths - remove trailing slashes for consistency
+			this.mappings.push({
+				from: trimTrailingSlashes(fromPath),
+				to: trimTrailingSlashes(toPath),
+			});
+		}
+	}
+
+	/**
+	 * Check if path rewriting is enabled
+	 * @returns {boolean} True if path mapping is configured
+	 */
+	isEnabled() {
+		return this.mappings.length > 0;
+	}
+
+	/**
+	 * Rewrite a file path using the first matching mapping
+	 * @param {string} path - Original path from report
+	 * @returns {string} Rewritten path or original if no mapping matches
+	 */
+	rewritePath(path) {
+		if (!this.isEnabled() || !path) {
+			return path;
+		}
+
+		// Try each mapping in order until one matches
+		for (const mapping of this.mappings) {
+			const result = this._applyMapping(path, mapping);
+			if (result !== path) {
+				// Mapping was applied
+				return result;
+			}
+		}
+
+		// No mapping matched, return original
+		return path;
+	}
+
+	/**
+	 * Apply a single mapping to a path
+	 * @param {string} path - Original path
+	 * @param {Object} mapping - Mapping object with from and to properties
+	 * @returns {string} Rewritten path or original if mapping doesn't match
+	 * @private
+	 */
+	_applyMapping(path, mapping) {
+		// If path starts with fromPath, replace it
+		if (path.startsWith(mapping.from)) {
+			return mapping.to + path.substring(mapping.from.length);
+		}
+
+		if (mapping.from.startsWith("/")) {
+			const fromPathNoLeadingSlash = removeSingleLeadingSlash(mapping.from);
+			if (path.startsWith(fromPathNoLeadingSlash)) {
+				return mapping.to + path.substring(fromPathNoLeadingSlash.length);
+			}
+		}
+
+		return path;
+	}
+
+	/**
+	 * Get info about the path mapping configuration
+	 * @returns {Array|null} Array of mapping objects with from and to properties, or null if not enabled
+	 */
+	getMappings() {
+		if (!this.isEnabled()) {
+			return null;
+		}
+
+		return this.mappings.map((m) => ({
+			from: m.from,
+			to: m.to,
+		}));
+	}
+}
+
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/util.js
+
+
+const dist_nameStartChar = ':A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD';
+const dist_nameChar = dist_nameStartChar + '\\-.\\d\\u00B7\\u0300-\\u036F\\u203F-\\u2040';
+const dist_nameRegexp = '[' + dist_nameStartChar + '][' + dist_nameChar + ']*';
+const dist_regexName = new RegExp('^' + dist_nameRegexp + '$');
+
+function dist_getAllMatches(string, regex) {
   const matches = [];
   let match = regex.exec(string);
   while (match) {
@@ -1151,20 +2066,20 @@ function util_getAllMatches(string, regex) {
   return matches;
 }
 
-const util_isName = function (string) {
-  const match = util_regexName.exec(string);
+const dist_isName = function (string) {
+  const match = dist_regexName.exec(string);
   return !(match === null || typeof match === 'undefined');
 }
 
-function util_isExist(v) {
+function dist_isExist(v) {
   return typeof v !== 'undefined';
 }
 
-function util_isEmptyObject(obj) {
+function dist_isEmptyObject(obj) {
   return Object.keys(obj).length === 0;
 }
 
-function util_getValue(v) {
+function dist_getValue(v) {
   if (exports.isExist(v)) {
     return v;
   } else {
@@ -1175,7 +2090,7 @@ function util_getValue(v) {
 /**
  * Dangerous property names that could lead to prototype pollution or security issues
  */
-const util_DANGEROUS_PROPERTY_NAMES = [
+const dist_DANGEROUS_PROPERTY_NAMES = [
   // '__proto__',
   // 'constructor',
   // 'prototype',
@@ -1188,20 +2103,20 @@ const util_DANGEROUS_PROPERTY_NAMES = [
   '__lookupSetter__'
 ];
 
-const util_criticalProperties = ["__proto__", "constructor", "prototype"];
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js
+const dist_criticalProperties = ["__proto__", "constructor", "prototype"];
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js
 
 
 
 const defaultOnDangerousProperty = (name) => {
-  if (util_DANGEROUS_PROPERTY_NAMES.includes(name)) {
+  if (dist_DANGEROUS_PROPERTY_NAMES.includes(name)) {
     return "__" + name;
   }
   return name;
 };
 
 
-const OptionsBuilder_defaultOptions = {
+const dist_defaultOptions = {
   preserveOrder: false,
   attributeNamePrefix: '@_',
   attributesGroupName: false,
@@ -1262,13 +2177,13 @@ function validatePropertyName(propertyName, optionName) {
   }
 
   const normalized = propertyName.toLowerCase();
-  if (util_DANGEROUS_PROPERTY_NAMES.some(dangerous => normalized === dangerous.toLowerCase())) {
+  if (dist_DANGEROUS_PROPERTY_NAMES.some(dangerous => normalized === dangerous.toLowerCase())) {
     throw new Error(
       `[SECURITY] Invalid ${optionName}: "${propertyName}" is a reserved JavaScript keyword that could cause prototype pollution`
     );
   }
 
-  if (util_criticalProperties.some(dangerous => normalized === dangerous.toLowerCase())) {
+  if (dist_criticalProperties.some(dangerous => normalized === dangerous.toLowerCase())) {
     throw new Error(
       `[SECURITY] Invalid ${optionName}: "${propertyName}" is a reserved JavaScript keyword that could cause prototype pollution`
     );
@@ -1316,7 +2231,7 @@ function normalizeProcessEntities(value, htmlEntities) {
 }
 
 const buildOptions = function (options) {
-  const built = Object.assign({}, OptionsBuilder_defaultOptions, options);
+  const built = Object.assign({}, dist_defaultOptions, options);
 
   // Validate property names to prevent prototype pollution
   const propertyNameOptions = [
@@ -1354,7 +2269,7 @@ const buildOptions = function (options) {
   //console.debug(built.processEntities)
   return built;
 };
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/xmlparser/xmlNode.js
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/xmlNode.js
 
 
 let METADATA_SYMBOL;
@@ -1410,7 +2325,7 @@ class XmlNode {
   }
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/xml-naming/src/index.js
+;// CONCATENATED MODULE: ./node_modules/xml-naming/src/index.js
 /**
  * xml-naming
  * Validates XML Name productions as defined in the XML 1.0 and 1.1 specifications.
@@ -1637,7 +2552,7 @@ const nmTokens = (str, { xmlVersion = '1.0', asciiOnly = false } = {}) =>
 //   (e.g. between unrelated parse calls).
 // ---------------------------------------------------------------------------
 
-const PRODUCTIONS = (/* unused pure expression or super */ null && (['name', 'ncName', 'qName', 'nmToken', 'nmTokens']));
+const PRODUCTIONS = (/* unused pure expression or super */ (/* unused pure expression or super */ null && (null && (0))));
 
 /**
  * Returns a memoized boolean validator function for a single production,
@@ -1686,7 +2601,7 @@ const createValidator = (production, { xmlVersion = '1.0', asciiOnly = false, ma
  * @param {{ xmlVersion?: '1.0'|'1.1', asciiOnly?: boolean }} [opts]
  * @returns {{ valid: boolean, production: string, input: string, reason?: string, position?: number }}
  */
-const src_validate = (str, production, { xmlVersion = '1.0', asciiOnly = false } = {}) => {
+const dist_validate = (str, production, { xmlVersion = '1.0', asciiOnly = false } = {}) => {
   if (!PRODUCTIONS.includes(production)) {
     throw new TypeError(
       `Unknown production "${production}". Must be one of: ${PRODUCTIONS.join(', ')}`
@@ -1754,7 +2669,7 @@ const src_validate = (str, production, { xmlVersion = '1.0', asciiOnly = false }
  * @returns {Array<{ valid: boolean, production: string, input: string, reason?: string, position?: number }>}
  */
 const validateAll = (strings, production, opts = {}) =>
-  strings.map(str => src_validate(str, production, opts));
+  strings.map(str => dist_validate(str, production, opts));
 
 // ---------------------------------------------------------------------------
 // Sanitizer
@@ -1793,7 +2708,7 @@ const sanitize = (str, production = 'name', { replacement = '_', asciiOnly = fal
 
   return result || replacement;
 };
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/xmlparser/DocTypeReader.js
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/DocTypeReader.js
 
 
 class DocTypeReader {
@@ -2220,7 +3135,7 @@ function validateEntityName(name, xmlVersion) {
     else
         throw new Error(`Invalid entity name ${name}`);
 }
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/anynum/digitTable.js
+;// CONCATENATED MODULE: ./node_modules/anynum/digitTable.js
 /**
  * Flat lookup table: maps Unicode code point → ASCII digit (0-9).
  * Only decimal digit characters (Unicode category Nd) are included.
@@ -2338,7 +3253,7 @@ for (const zero of SCRIPT_ZEROS) {
 
 
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/anynum/anynum.js
+;// CONCATENATED MODULE: ./node_modules/anynum/anynum.js
 
 
 
@@ -2474,7 +3389,7 @@ function anynum(str) {
 
 
 /* harmony default export */ const anynum_anynum = (anynum);
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/strnum/strnum.js
+;// CONCATENATED MODULE: ./node_modules/strnum/strnum.js
 const hexRegex = /^[-+]?0x[a-fA-F0-9]+$/;
 const binRegex = /^0b[01]+$/;
 const octRegex = /^0o[0-7]+$/;
@@ -2652,7 +3567,7 @@ function handleInfinity(str, num, options) {
     }
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/ignoreAttributes.js
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/ignoreAttributes.js
 function getIgnoreAttributesFn(ignoreAttributes) {
     if (typeof ignoreAttributes === 'function') {
         return ignoreAttributes
@@ -2671,7 +3586,7 @@ function getIgnoreAttributesFn(ignoreAttributes) {
     }
     return () => false
 }
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/path-expression-matcher/src/Matcher.js
+;// CONCATENATED MODULE: ./node_modules/path-expression-matcher/src/Matcher.js
 
 
 /**
@@ -3336,7 +4251,7 @@ class Matcher {
   }
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/path-expression-matcher/src/Expression.js
+;// CONCATENATED MODULE: ./node_modules/path-expression-matcher/src/Expression.js
 /**
  * Expression - Parses and stores a tag pattern expression
  * 
@@ -3569,7 +4484,7 @@ class Expression {
     return this.pattern;
   }
 }
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/path-expression-matcher/src/ExpressionSet.js
+;// CONCATENATED MODULE: ./node_modules/path-expression-matcher/src/ExpressionSet.js
 /**
  * ExpressionSet - An indexed collection of Expressions for efficient bulk matching
  *
@@ -3796,7 +4711,7 @@ class ExpressionSet {
   }
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/@nodable/entities/src/entities.js
+;// CONCATENATED MODULE: ./node_modules/@nodable/entities/src/entities.js
 // ---------------------------------------------------------------------------
 // Complete HTML5 named entity reference
 // Organized by logical categories for easy maintenance and selective importing
@@ -4936,7 +5851,7 @@ const COMMON_HTML = {
 // Note: NUMERIC_ENTITIES (&#NNN; / &#xHH;) are handled by the scanner directly
 // via String.fromCodePoint() without any map lookup.
 // ---------------------------------------------------------------------------
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/@nodable/entities/src/EntityDecoder.js
+;// CONCATENATED MODULE: ./node_modules/@nodable/entities/src/EntityDecoder.js
 // ---------------------------------------------------------------------------
 // Built-in named entity map  (name → replacement string)
 // No regex, no {regex,val} objects — just flat key/value pairs.
@@ -5581,7 +6496,7 @@ class EntityDecoder {
     return this._applyNCRAction(effective, token, cp);
   }
 }
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/sql.js
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/sql.js
 /**
  * SQL context patterns — high-precision rules only.
  *
@@ -5678,7 +6593,7 @@ const SQL_PATTERNS = [
 
 /* harmony default export */ const sql = (SQL_PATTERNS);
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/sql-strict.js
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/sql-strict.js
 /**
  * SQL-STRICT context patterns.
  *
@@ -5727,7 +6642,7 @@ const SQL_STRICT_PATTERNS = [...sql, ...SQL_STRICT_EXTRA];
 
 /* harmony default export */ const sql_strict = (SQL_STRICT_PATTERNS);
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/util/decode-entities.js
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/util/decode-entities.js
 /**
  * Decode the HTML character references that matter for markup-context
  * detection.
@@ -5777,7 +6692,7 @@ function decodeEntities(input) {
   });
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/html.js
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/html.js
 /**
  * HTML context patterns.
  *
@@ -5881,7 +6796,7 @@ const HTML_PATTERNS = [
 
 /* harmony default export */ const html = (HTML_PATTERNS);
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/xml.js
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/xml.js
 /**
  * XML context patterns.
  *
@@ -5962,7 +6877,7 @@ const XML_PATTERNS = [
 
 /* harmony default export */ const xml = (XML_PATTERNS);
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/svg.js
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/svg.js
 /**
  * SVG context patterns.
  *
@@ -6045,7 +6960,7 @@ const SVG_PATTERNS = [
 
 /* harmony default export */ const svg = (SVG_PATTERNS);
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/shell.js
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/shell.js
 /**
  * SHELL context patterns.
  *
@@ -6152,7 +7067,7 @@ const SHELL_PATTERNS = [
 
 /* harmony default export */ const shell = (SHELL_PATTERNS);
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/redos.js
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/redos.js
 /**
  * REDOS context patterns.
  *
@@ -6214,7 +7129,7 @@ const REDOS_PATTERNS = [
 
 /* harmony default export */ const redos = (REDOS_PATTERNS);
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/nosql.js
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/nosql.js
 /**
  * NOSQL context patterns.
  *
@@ -6330,7 +7245,7 @@ const NOSQL_PATTERNS = [
 
 /* harmony default export */ const nosql = (NOSQL_PATTERNS);
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/contexts/log.js
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/contexts/log.js
 /**
  * LOG context patterns.
  *
@@ -6430,7 +7345,7 @@ const LOG_PATTERNS = [
 
 /* harmony default export */ const log = (LOG_PATTERNS);
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/is-unsafe/src/index.js
+;// CONCATENATED MODULE: ./node_modules/is-unsafe/src/index.js
 /**
  * is-unsafe v2
  *
@@ -6722,9 +7637,9 @@ function allUnsafe(value, context) {
 }
 
 
-/* harmony default export */ const src = ((/* unused pure expression or super */ null && (isUnsafe)));
+/* harmony default export */ const src = ((/* unused pure expression or super */ (/* unused pure expression or super */ null && (null && (0)))));
 
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/xmlparser/OrderedObjParser.js
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/OrderedObjParser.js
 
 ///@ts-check
 
@@ -6938,7 +7853,7 @@ function buildAttributesMap(attrStr, jPath, tagName, force = false) {
     // attrStr = attrStr.replace(/\r?\n/g, ' ');
     //attrStr = attrStr || attrStr.trim();
 
-    const matches = util_getAllMatches(attrStr, attrsRegx);
+    const matches = dist_getAllMatches(attrStr, attrsRegx);
     const len = matches.length; //don't make it inline
     const attrs = {};
 
@@ -7598,7 +8513,7 @@ function parseValue(val, shouldParse, options) {
     else if (newval === 'false') return false;
     else return toNumber(val, options);
   } else {
-    if (util_isExist(val)) {
+    if (dist_isExist(val)) {
       return val;
     } else {
       return '';
@@ -7631,14 +8546,14 @@ function transformTagName(fn, tagName, tagExp, options) {
 
 
 function sanitizeName(name, options) {
-  if (util_criticalProperties.includes(name)) {
+  if (dist_criticalProperties.includes(name)) {
     throw new Error(`[SECURITY] Invalid name: "${name}" is a reserved JavaScript keyword that could cause prototype pollution`);
-  } else if (util_DANGEROUS_PROPERTY_NAMES.includes(name)) {
+  } else if (dist_DANGEROUS_PROPERTY_NAMES.includes(name)) {
     return options.onDangerousProperty(name);
   }
   return name;
 }
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/xmlparser/node2json.js
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/node2json.js
 
 
 
@@ -7816,7 +8731,7 @@ function isLeafTag(obj, options) {
 
   return false;
 }
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/validator.js
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/validator.js
 
 
 
@@ -7848,7 +8763,7 @@ function validator_validate(xmlData, options) {
 
     if (xmlData[i] === '<' && xmlData[i + 1] === '?') {
       i += 2;
-      i = validator_readPI(xmlData, i);
+      i = dist_readPI(xmlData, i);
       if (i.err) return i;
     } else if (xmlData[i] === '<') {
       //starting of tag
@@ -7857,7 +8772,7 @@ function validator_validate(xmlData, options) {
       i++;
 
       if (xmlData[i] === '!') {
-        i = validator_readCommentAndCDATA(xmlData, i);
+        i = dist_readCommentAndCDATA(xmlData, i);
         continue;
       } else {
         let closingTag = false;
@@ -7886,19 +8801,19 @@ function validator_validate(xmlData, options) {
           //continue;
           i--;
         }
-        if (!validator_validateTagName(tagName)) {
+        if (!dist_validateTagName(tagName)) {
           let msg;
           if (tagName.trim().length === 0) {
             msg = "Invalid space after '<'.";
           } else {
             msg = "Tag '" + tagName + "' is an invalid name.";
           }
-          return validator_getErrorObject('InvalidTag', msg, validator_getLineNumberForPosition(xmlData, i));
+          return dist_getErrorObject('InvalidTag', msg, dist_getLineNumberForPosition(xmlData, i));
         }
 
-        const result = validator_readAttributeStr(xmlData, i);
+        const result = dist_readAttributeStr(xmlData, i);
         if (result === false) {
-          return validator_getErrorObject('InvalidAttr', "Attributes for '" + tagName + "' have open quote.", validator_getLineNumberForPosition(xmlData, i));
+          return dist_getErrorObject('InvalidAttr', "Attributes for '" + tagName + "' have open quote.", dist_getLineNumberForPosition(xmlData, i));
         }
         let attrStr = result.value;
         i = result.index;
@@ -7907,7 +8822,7 @@ function validator_validate(xmlData, options) {
           //self closing tag
           const attrStrStart = i - attrStr.length;
           attrStr = attrStr.substring(0, attrStr.length - 1);
-          const isValid = validator_validateAttributeString(attrStr, options);
+          const isValid = dist_validateAttributeString(attrStr, options);
           if (isValid === true) {
             tagFound = true;
             //continue; //text may presents after self closing tag
@@ -7915,22 +8830,22 @@ function validator_validate(xmlData, options) {
             //the result from the nested function returns the position of the error within the attribute
             //in order to get the 'true' error line, we need to calculate the position where the attribute begins (i - attrStr.length) and then add the position within the attribute
             //this gives us the absolute index in the entire xml, which we can use to find the line at last
-            return validator_getErrorObject(isValid.err.code, isValid.err.msg, validator_getLineNumberForPosition(xmlData, attrStrStart + isValid.err.line));
+            return dist_getErrorObject(isValid.err.code, isValid.err.msg, dist_getLineNumberForPosition(xmlData, attrStrStart + isValid.err.line));
           }
         } else if (closingTag) {
           if (!result.tagClosed) {
-            return validator_getErrorObject('InvalidTag', "Closing tag '" + tagName + "' doesn't have proper closing.", validator_getLineNumberForPosition(xmlData, i));
+            return dist_getErrorObject('InvalidTag', "Closing tag '" + tagName + "' doesn't have proper closing.", dist_getLineNumberForPosition(xmlData, i));
           } else if (attrStr.trim().length > 0) {
-            return validator_getErrorObject('InvalidTag', "Closing tag '" + tagName + "' can't have attributes or invalid starting.", validator_getLineNumberForPosition(xmlData, tagStartPos));
+            return dist_getErrorObject('InvalidTag', "Closing tag '" + tagName + "' can't have attributes or invalid starting.", dist_getLineNumberForPosition(xmlData, tagStartPos));
           } else if (tags.length === 0) {
-            return validator_getErrorObject('InvalidTag', "Closing tag '" + tagName + "' has not been opened.", validator_getLineNumberForPosition(xmlData, tagStartPos));
+            return dist_getErrorObject('InvalidTag', "Closing tag '" + tagName + "' has not been opened.", dist_getLineNumberForPosition(xmlData, tagStartPos));
           } else {
             const otg = tags.pop();
             if (tagName !== otg.tagName) {
-              let openPos = validator_getLineNumberForPosition(xmlData, otg.tagStartPos);
-              return validator_getErrorObject('InvalidTag',
+              let openPos = dist_getLineNumberForPosition(xmlData, otg.tagStartPos);
+              return dist_getErrorObject('InvalidTag',
                 "Expected closing tag '" + otg.tagName + "' (opened in line " + openPos.line + ", col " + openPos.col + ") instead of closing tag '" + tagName + "'.",
-                validator_getLineNumberForPosition(xmlData, tagStartPos));
+                dist_getLineNumberForPosition(xmlData, tagStartPos));
             }
 
             //when there are no more tags, we reached the root level.
@@ -7939,17 +8854,17 @@ function validator_validate(xmlData, options) {
             }
           }
         } else {
-          const isValid = validator_validateAttributeString(attrStr, options);
+          const isValid = dist_validateAttributeString(attrStr, options);
           if (isValid !== true) {
             //the result from the nested function returns the position of the error within the attribute
             //in order to get the 'true' error line, we need to calculate the position where the attribute begins (i - attrStr.length) and then add the position within the attribute
             //this gives us the absolute index in the entire xml, which we can use to find the line at last
-            return validator_getErrorObject(isValid.err.code, isValid.err.msg, validator_getLineNumberForPosition(xmlData, i - attrStr.length + isValid.err.line));
+            return dist_getErrorObject(isValid.err.code, isValid.err.msg, dist_getLineNumberForPosition(xmlData, i - attrStr.length + isValid.err.line));
           }
 
           //if the root level has been reached before ...
           if (reachedRoot === true) {
-            return validator_getErrorObject('InvalidXml', 'Multiple possible root nodes found.', validator_getLineNumberForPosition(xmlData, i));
+            return dist_getErrorObject('InvalidXml', 'Multiple possible root nodes found.', dist_getLineNumberForPosition(xmlData, i));
           } else if (options.unpairedTags.indexOf(tagName) !== -1) {
             //don't push into stack
           } else {
@@ -7965,22 +8880,22 @@ function validator_validate(xmlData, options) {
             if (xmlData[i + 1] === '!') {
               //comment or CADATA
               i++;
-              i = validator_readCommentAndCDATA(xmlData, i);
+              i = dist_readCommentAndCDATA(xmlData, i);
               continue;
             } else if (xmlData[i + 1] === '?') {
-              i = validator_readPI(xmlData, ++i);
+              i = dist_readPI(xmlData, ++i);
               if (i.err) return i;
             } else {
               break;
             }
           } else if (xmlData[i] === '&') {
-            const afterAmp = validator_validateAmpersand(xmlData, i);
+            const afterAmp = dist_validateAmpersand(xmlData, i);
             if (afterAmp == -1)
-              return validator_getErrorObject('InvalidChar', "char '&' is not expected.", validator_getLineNumberForPosition(xmlData, i));
+              return dist_getErrorObject('InvalidChar', "char '&' is not expected.", dist_getLineNumberForPosition(xmlData, i));
             i = afterAmp;
           } else {
-            if (reachedRoot === true && !validator_isWhiteSpace(xmlData[i])) {
-              return validator_getErrorObject('InvalidXml', "Extra text at the end", validator_getLineNumberForPosition(xmlData, i));
+            if (reachedRoot === true && !dist_isWhiteSpace(xmlData[i])) {
+              return dist_getErrorObject('InvalidXml', "Extra text at the end", dist_getLineNumberForPosition(xmlData, i));
             }
           }
         } //end of reading tag text value
@@ -7989,19 +8904,19 @@ function validator_validate(xmlData, options) {
         }
       }
     } else {
-      if (validator_isWhiteSpace(xmlData[i])) {
+      if (dist_isWhiteSpace(xmlData[i])) {
         continue;
       }
-      return validator_getErrorObject('InvalidChar', "char '" + xmlData[i] + "' is not expected.", validator_getLineNumberForPosition(xmlData, i));
+      return dist_getErrorObject('InvalidChar', "char '" + xmlData[i] + "' is not expected.", dist_getLineNumberForPosition(xmlData, i));
     }
   }
 
   if (!tagFound) {
-    return validator_getErrorObject('InvalidXml', 'Start tag expected.', 1);
+    return dist_getErrorObject('InvalidXml', 'Start tag expected.', 1);
   } else if (tags.length == 1) {
-    return validator_getErrorObject('InvalidTag', "Unclosed tag '" + tags[0].tagName + "'.", validator_getLineNumberForPosition(xmlData, tags[0].tagStartPos));
+    return dist_getErrorObject('InvalidTag', "Unclosed tag '" + tags[0].tagName + "'.", dist_getLineNumberForPosition(xmlData, tags[0].tagStartPos));
   } else if (tags.length > 0) {
-    return validator_getErrorObject('InvalidXml', "Invalid '" +
+    return dist_getErrorObject('InvalidXml', "Invalid '" +
       JSON.stringify(tags.map(t => t.tagName), null, 4).replace(/\r?\n/g, '') +
       "' found.", { line: 1, col: 1 });
   }
@@ -8009,7 +8924,7 @@ function validator_validate(xmlData, options) {
   return true;
 };
 
-function validator_isWhiteSpace(char) {
+function dist_isWhiteSpace(char) {
   return char === ' ' || char === '\t' || char === '\n' || char === '\r';
 }
 /**
@@ -8017,14 +8932,14 @@ function validator_isWhiteSpace(char) {
  * @param {*} xmlData
  * @param {*} i
  */
-function validator_readPI(xmlData, i) {
+function dist_readPI(xmlData, i) {
   const start = i;
   for (; i < xmlData.length; i++) {
     if (xmlData[i] == '?' || xmlData[i] == ' ') {
       //tagname
       const tagname = xmlData.substr(start, i - start);
       if (i > 5 && tagname === 'xml') {
-        return validator_getErrorObject('InvalidXml', 'XML declaration allowed only at the start of the document.', validator_getLineNumberForPosition(xmlData, i));
+        return dist_getErrorObject('InvalidXml', 'XML declaration allowed only at the start of the document.', dist_getLineNumberForPosition(xmlData, i));
       } else if (xmlData[i] == '?' && xmlData[i + 1] == '>') {
         //check if valid attribut string
         i++;
@@ -8037,7 +8952,7 @@ function validator_readPI(xmlData, i) {
   return i;
 }
 
-function validator_readCommentAndCDATA(xmlData, i) {
+function dist_readCommentAndCDATA(xmlData, i) {
   if (xmlData.length > i + 5 && xmlData[i + 1] === '-' && xmlData[i + 2] === '-') {
     //comment
     for (i += 3; i < xmlData.length; i++) {
@@ -8088,20 +9003,20 @@ function validator_readCommentAndCDATA(xmlData, i) {
   return i;
 }
 
-const validator_doubleQuote = '"';
-const validator_singleQuote = "'";
+const dist_doubleQuote = '"';
+const dist_singleQuote = "'";
 
 /**
  * Keep reading xmlData until '<' is found outside the attribute value.
  * @param {string} xmlData
  * @param {number} i
  */
-function validator_readAttributeStr(xmlData, i) {
+function dist_readAttributeStr(xmlData, i) {
   let attrStr = '';
   let startChar = '';
   let tagClosed = false;
   for (; i < xmlData.length; i++) {
-    if (xmlData[i] === validator_doubleQuote || xmlData[i] === validator_singleQuote) {
+    if (xmlData[i] === dist_doubleQuote || xmlData[i] === dist_singleQuote) {
       if (startChar === '') {
         startChar = xmlData[i];
       } else if (startChar !== xmlData[i]) {
@@ -8160,7 +9075,7 @@ function validator_readAttributeStr(xmlData, i) {
  * old regex produced by failing to match at that position and retrying at
  * the next one.
  */
-function validator_scanAttributeTokens(attrStr) {
+function dist_scanAttributeTokens(attrStr) {
   const tokens = [];
   const len = attrStr.length;
   let i = 0;
@@ -8169,7 +9084,7 @@ function validator_scanAttributeTokens(attrStr) {
     const tokenStart = i;
 
     // Leading whitespace before the name.
-    while (i < len && validator_isWhiteSpace(attrStr[i])) i++;
+    while (i < len && dist_isWhiteSpace(attrStr[i])) i++;
     if (i >= len) break; // trailing whitespace only — nothing left to read
 
     if (attrStr[i] === '=') {
@@ -8182,13 +9097,13 @@ function validator_scanAttributeTokens(attrStr) {
 
     // Attribute name — everything up to the next whitespace or '='.
     const nameStart = i;
-    while (i < len && !validator_isWhiteSpace(attrStr[i]) && attrStr[i] !== '=') i++;
+    while (i < len && !dist_isWhiteSpace(attrStr[i]) && attrStr[i] !== '=') i++;
     const name = attrStr.slice(nameStart, i);
 
     // Optional whitespace + '='.
     let equalsGroup; // whitespace + '=' text, or undefined if absent
     let j = i;
-    while (j < len && validator_isWhiteSpace(attrStr[j])) j++;
+    while (j < len && dist_isWhiteSpace(attrStr[j])) j++;
     if (j < len && attrStr[j] === '=') {
       equalsGroup = attrStr.slice(i, j + 1);
       i = j + 1;
@@ -8198,7 +9113,7 @@ function validator_scanAttributeTokens(attrStr) {
     let quoteChar;
     let value;
     let k = i;
-    while (k < len && validator_isWhiteSpace(attrStr[k])) k++;
+    while (k < len && dist_isWhiteSpace(attrStr[k])) k++;
     if (k < len && (attrStr[k] === '"' || attrStr[k] === "'")) {
       const valueStart = k + 1;
       const closeIdx = attrStr.indexOf(attrStr[k], valueStart);
@@ -8227,43 +9142,43 @@ function validator_scanAttributeTokens(attrStr) {
 
 //attr, ="sd", a="amit's", a="sd"b="saf", ab  cd=""
 
-function validator_validateAttributeString(attrStr, options) {
+function dist_validateAttributeString(attrStr, options) {
   //console.log("start:"+attrStr+":end");
 
   //if(attrStr.trim().length === 0) return true; //empty string
 
-  const matches = validator_scanAttributeTokens(attrStr);
+  const matches = dist_scanAttributeTokens(attrStr);
   const attrNames = {};
 
   for (let i = 0; i < matches.length; i++) {
     if (matches[i][1].length === 0) {
       //nospace before attribute name: a="sd"b="saf"
-      return validator_getErrorObject('InvalidAttr', "Attribute '" + matches[i][2] + "' has no space in starting.", validator_getPositionFromMatch(matches[i]))
+      return dist_getErrorObject('InvalidAttr', "Attribute '" + matches[i][2] + "' has no space in starting.", dist_getPositionFromMatch(matches[i]))
     } else if (matches[i][3] !== undefined && matches[i][4] === undefined) {
-      return validator_getErrorObject('InvalidAttr', "Attribute '" + matches[i][2] + "' is without value.", validator_getPositionFromMatch(matches[i]));
+      return dist_getErrorObject('InvalidAttr', "Attribute '" + matches[i][2] + "' is without value.", dist_getPositionFromMatch(matches[i]));
     } else if (matches[i][3] === undefined && !options.allowBooleanAttributes) {
       //independent attribute: ab
-      return validator_getErrorObject('InvalidAttr', "boolean attribute '" + matches[i][2] + "' is not allowed.", validator_getPositionFromMatch(matches[i]));
+      return dist_getErrorObject('InvalidAttr', "boolean attribute '" + matches[i][2] + "' is not allowed.", dist_getPositionFromMatch(matches[i]));
     }
     /* else if(matches[i][6] === undefined){//attribute without value: ab=
                     return { err: { code:"InvalidAttr",msg:"attribute " + matches[i][2] + " has no value assigned."}};
                 } */
     const attrName = matches[i][2];
-    if (!validator_validateAttrName(attrName)) {
-      return validator_getErrorObject('InvalidAttr', "Attribute '" + attrName + "' is an invalid name.", validator_getPositionFromMatch(matches[i]));
+    if (!dist_validateAttrName(attrName)) {
+      return dist_getErrorObject('InvalidAttr', "Attribute '" + attrName + "' is an invalid name.", dist_getPositionFromMatch(matches[i]));
     }
     if (!Object.prototype.hasOwnProperty.call(attrNames, attrName)) {
       //check for duplicate attribute.
       attrNames[attrName] = 1;
     } else {
-      return validator_getErrorObject('InvalidAttr', "Attribute '" + attrName + "' is repeated.", validator_getPositionFromMatch(matches[i]));
+      return dist_getErrorObject('InvalidAttr', "Attribute '" + attrName + "' is repeated.", dist_getPositionFromMatch(matches[i]));
     }
   }
 
   return true;
 }
 
-function validator_validateNumberAmpersand(xmlData, i) {
+function dist_validateNumberAmpersand(xmlData, i) {
   let re = /\d/;
   if (xmlData[i] === 'x') {
     i++;
@@ -8278,14 +9193,14 @@ function validator_validateNumberAmpersand(xmlData, i) {
   return -1;
 }
 
-function validator_validateAmpersand(xmlData, i) {
+function dist_validateAmpersand(xmlData, i) {
   // https://www.w3.org/TR/xml/#dt-charref
   i++;
   if (xmlData[i] === ';')
     return -1;
   if (xmlData[i] === '#') {
     i++;
-    return validator_validateNumberAmpersand(xmlData, i);
+    return dist_validateNumberAmpersand(xmlData, i);
   }
   let count = 0;
   for (; i < xmlData.length; i++, count++) {
@@ -8298,7 +9213,7 @@ function validator_validateAmpersand(xmlData, i) {
   return i;
 }
 
-function validator_getErrorObject(code, message, lineNumber) {
+function dist_getErrorObject(code, message, lineNumber) {
   return {
     err: {
       code: code,
@@ -8309,18 +9224,18 @@ function validator_getErrorObject(code, message, lineNumber) {
   };
 }
 
-function validator_validateAttrName(attrName) {
-  return util_isName(attrName);
+function dist_validateAttrName(attrName) {
+  return dist_isName(attrName);
 }
 
 // const startsWithXML = /^xml/i;
 
-function validator_validateTagName(tagname) {
-  return util_isName(tagname) /* && !tagname.match(startsWithXML) */;
+function dist_validateTagName(tagname) {
+  return dist_isName(tagname) /* && !tagname.match(startsWithXML) */;
 }
 
 //this function returns the line number for the character at the given index
-function validator_getLineNumberForPosition(xmlData, index) {
+function dist_getLineNumberForPosition(xmlData, index) {
   const lines = xmlData.substring(0, index).split(/\r?\n/);
   return {
     line: lines.length,
@@ -8331,10 +9246,10 @@ function validator_getLineNumberForPosition(xmlData, index) {
 }
 
 //this function returns the position of the first character of match within attrStr
-function validator_getPositionFromMatch(match) {
+function dist_getPositionFromMatch(match) {
   return match.startIndex + match[1].length;
 }
-;// CONCATENATED MODULE: ../parse-ci-reports/node_modules/fast-xml-parser/src/xmlparser/XMLParser.js
+;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/XMLParser.js
 /* global Uint8Array */
 
 
@@ -8412,156 +9327,7 @@ class XMLParser {
         return XmlNode.getMetaDataSymbol();
     }
 }
-;// CONCATENATED MODULE: ../parse-ci-reports/src/models/ReportData.js
-/**
- * Represents a test result
- */
-class TestResult {
-	constructor({
-		name,
-		status,
-		duration = 0,
-		message = "",
-		errorType = "",
-		stackTrace = "",
-		file = "",
-		suite = "",
-	}) {
-		this.name = name;
-		this.status = status; // 'passed', 'failed', 'skipped', 'error'
-		this.duration = duration;
-		this.message = message;
-		this.errorType = errorType;
-		this.stackTrace = stackTrace;
-		this.file = file;
-		this.suite = suite;
-	}
-
-	isPassed() {
-		return this.status === "passed";
-	}
-
-	isFailed() {
-		return this.status === "failed" || this.status === "error";
-	}
-
-	isSkipped() {
-		return this.status === "skipped";
-	}
-}
-
-/**
- * Represents a lint/check issue
- */
-class LintIssue {
-	constructor({ file, line, column, severity, rule, message, source = "" }) {
-		this.file = file;
-		this.line = line;
-		this.column = column;
-		this.severity = severity; // 'error', 'warning', 'info'
-		this.rule = rule;
-		this.message = message;
-		this.source = source;
-	}
-
-	isError() {
-		return this.severity === "error";
-	}
-
-	isWarning() {
-		return this.severity === "warning";
-	}
-}
-
-/**
- * Represents coverage data
- */
-class Coverage {
-	constructor({
-		lines = { total: 0, covered: 0, percentage: 0 },
-		branches = { total: 0, covered: 0, percentage: 0 },
-		functions = { total: 0, covered: 0, percentage: 0 },
-		statements = { total: 0, covered: 0, percentage: 0 },
-	}) {
-		this.lines = lines;
-		this.branches = branches;
-		this.functions = functions;
-		this.statements = statements;
-	}
-
-	getOverallPercentage() {
-		// Use line coverage as the primary metric
-		return this.lines.percentage;
-	}
-}
-
-/**
- * Aggregated report data
- */
-class ReportData {
-	constructor() {
-		this.tests = [];
-		this.lintIssues = [];
-		this.lintReportCount = 0;
-		this.coverage = null;
-		this.coverageReports = [];
-		this.reportType = "unknown"; // 'test', 'lint', 'coverage', 'mixed'
-	}
-
-	addTest(test) {
-		this.tests.push(test);
-	}
-
-	addLintIssue(issue) {
-		this.lintIssues.push(issue);
-	}
-
-	setCoverage(coverage) {
-		this.coverage = coverage;
-	}
-
-	getPassedTests() {
-		return this.tests.filter((t) => t.isPassed());
-	}
-
-	getFailedTests() {
-		return this.tests.filter((t) => t.isFailed());
-	}
-
-	getSkippedTests() {
-		return this.tests.filter((t) => t.isSkipped());
-	}
-
-	getErrors() {
-		return this.lintIssues.filter((i) => i.isError());
-	}
-
-	getWarnings() {
-		return this.lintIssues.filter((i) => i.isWarning());
-	}
-
-	hasErrors() {
-		return this.getFailedTests().length > 0 || this.getErrors().length > 0;
-	}
-
-	getTotalTests() {
-		return this.tests.length;
-	}
-
-	getPassedCount() {
-		return this.getPassedTests().length;
-	}
-
-	getFailedCount() {
-		return this.getFailedTests().length;
-	}
-
-	getSkippedCount() {
-		return this.getSkippedTests().length;
-	}
-}
-
-;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/BaseParser.js
+;// CONCATENATED MODULE: ./src/parsers/BaseParser.js
 /**
  * Report category constants
  */
@@ -8727,7 +9493,7 @@ class BaseParser {
 	}
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/JUnitParser.js
+;// CONCATENATED MODULE: ./src/parsers/JUnitParser.js
 
 
 
@@ -8875,7 +9641,7 @@ class JUnitParser extends BaseParser {
 	}
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/TAPParser.js
+;// CONCATENATED MODULE: ./src/parsers/TAPParser.js
 
 
 
@@ -8996,7 +9762,7 @@ class TAPParser extends BaseParser {
 	}
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/CoberturaParser.js
+;// CONCATENATED MODULE: ./src/parsers/CoberturaParser.js
 
 
 
@@ -9165,7 +9931,7 @@ class CoberturaParser extends BaseParser {
 	}
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/LCOVParser.js
+;// CONCATENATED MODULE: ./src/parsers/LCOVParser.js
 
 
 
@@ -9285,7 +10051,7 @@ class LCOVParser extends BaseParser {
 	}
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/ESLintParser.js
+;// CONCATENATED MODULE: ./src/parsers/ESLintParser.js
 
 
 
@@ -9387,7 +10153,7 @@ class ESLintParser extends BaseParser {
 	}
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/CheckStyleParser.js
+;// CONCATENATED MODULE: ./src/parsers/CheckStyleParser.js
 
 
 
@@ -9491,7 +10257,7 @@ class CheckStyleParser extends BaseParser {
 	}
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/PrettierParser.js
+;// CONCATENATED MODULE: ./src/parsers/PrettierParser.js
 
 
 
@@ -9617,7 +10383,7 @@ class PrettierParser extends BaseParser {
 	}
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/AstroCheckParser.js
+;// CONCATENATED MODULE: ./src/parsers/AstroCheckParser.js
 
 
 
@@ -9748,8 +10514,8 @@ class AstroCheckParser extends BaseParser {
 }
 
 ;// CONCATENATED MODULE: external "node:url"
-const external_node_url_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:url");
-;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/SarifParser.js
+const external_node_url_namespaceObject = (0,external_module_namespaceObject.createRequire)(import.meta.url)("node:url");
+;// CONCATENATED MODULE: ./src/parsers/SarifParser.js
 
 
 
@@ -9911,7 +10677,7 @@ class SarifParser extends BaseParser {
 	}
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/src/parsers/ParserFactory.js
+;// CONCATENATED MODULE: ./src/parsers/ParserFactory.js
 
 
 
@@ -10028,6 +10794,900 @@ class ParserFactory {
 	}
 }
 
+;// CONCATENATED MODULE: ./src/ReportParserCore.js
+
+
+
+
+
+
+
+/**
+ * Core report parsing logic shared between CLI and Action
+ */
+class ReportParserCore {
+	constructor(fileSystemService, logger, pathMapping = null) {
+		this.fileSystemService = fileSystemService;
+		this.logger = logger;
+		this.parserFactory = new ParserFactory(fileSystemService);
+		this.summaryFormatter = new SummaryFormatter();
+		this.markdownFormatter = new MarkdownFormatter();
+		this.pathRewriter = new PathRewriter(pathMapping);
+	}
+
+	/**
+	 * Parse all report files
+	 * @param {string[]} files - Array of file paths
+	 * @returns {ReportData} Aggregated report data
+	 */
+	parseReports(files) {
+		const aggregatedData = new ReportData();
+		aggregatedData.parseErrors = [];
+		aggregatedData.parsedReports = [];
+
+		// Log path rewriting configuration if enabled
+		if (this.pathRewriter.isEnabled()) {
+			const mappings = this.pathRewriter.getMappings();
+			this.logger.info(
+				`Path rewriting enabled with ${mappings.length} mapping(s):`,
+			);
+			for (const mapping of mappings) {
+				this.logger.info(`  "${mapping.from}" → "${mapping.to}"`);
+			}
+		}
+
+		for (const file of files) {
+			this.logger.info(`Parsing ${file}...`);
+			let reportData;
+			try {
+				reportData = this.parserFactory.parse(file);
+			} catch (error) {
+				aggregatedData.parseErrors.push(`${file}: ${error.message}`);
+				continue;
+			}
+
+			// Apply path rewriting to test results
+			aggregatedData.parsedReports.push({
+				file,
+				type: reportData.coverage ? "coverage" : reportData.reportType,
+			});
+			for (const test of reportData.tests) {
+				test.file = this.pathRewriter.rewritePath(test.file);
+			}
+
+			// Apply path rewriting to lint issues
+			for (const issue of reportData.lintIssues) {
+				issue.file = this.pathRewriter.rewritePath(issue.file);
+			}
+
+			// Merge data
+			aggregatedData.tests.push(...reportData.tests);
+			aggregatedData.lintIssues.push(...reportData.lintIssues);
+			if (reportData.reportType === "lint") aggregatedData.lintReportCount++;
+
+			if (reportData.coverage) {
+				aggregatedData.coverageReports.push({
+					name: dist_external_node_path_namespaceObject.relative(this.fileSystemService.workingDirectory, file),
+					coverage: reportData.coverage,
+				});
+			}
+		}
+		// A single report has an overall percentage; independent reports do not.
+		if (aggregatedData.coverageReports.length === 1) {
+			aggregatedData.setCoverage(aggregatedData.coverageReports[0].coverage);
+		}
+
+		return aggregatedData;
+	}
+
+	/**
+	 * Generate formatted output
+	 * @param {ReportData} reportData - The parsed report data
+	 * @param {string} reportName - Name of the report
+	 * @param {boolean} includePassed - Include passed tests
+	 * @param {string} outputFormat - Output format (comma-separated: summary, markdown, annotations, or "all")
+	 * @returns {Object} Object with markdown and summary strings
+	 */
+	generateOutput(reportData, reportName, includePassed, outputFormat) {
+		// Parse output formats
+		const formats = this.parseOutputFormats(outputFormat);
+
+		let markdown = "";
+		let summary = "";
+
+		if (formats.includes("markdown")) {
+			markdown = this.markdownFormatter.format(reportData, reportName);
+		}
+
+		if (formats.includes("summary")) {
+			summary = this.summaryFormatter.format(
+				reportData,
+				reportName,
+				includePassed,
+			);
+		}
+
+		const tests = new ReportData();
+		tests.tests = reportData.tests;
+		const coverage = new ReportData();
+		coverage.coverage = reportData.coverage;
+		coverage.coverageReports = reportData.coverageReports;
+		const lint = new ReportData();
+		lint.lintIssues = reportData.lintIssues;
+		lint.lintReportCount = reportData.lintReportCount;
+		return {
+			markdown,
+			summary,
+			testMarkdown: tests.tests.length
+				? this.formatComment(
+						tests,
+						"Test",
+						`${tests.getPassedCount()} passed · ${tests.getFailedCount()} failed · ${tests.getSkippedCount()} skipped`,
+					)
+				: "",
+			lintMarkdown:
+				lint.lintReportCount || lint.lintIssues.length
+					? this.formatComment(
+							lint,
+							"Lint",
+							`${lint.getErrors().length} errors · ${lint.getWarnings().length} warnings in ${lint.lintReportCount} diagnostic report(s)`,
+						)
+					: "",
+			coverageMarkdown:
+				coverage.coverage || coverage.coverageReports.length
+					? this.formatComment(
+							coverage,
+							"Coverage",
+							`${coverage.coverageReports.length || 1} source report(s); percentages remain separate`,
+						)
+					: "",
+		};
+	}
+
+	formatComment(data, title, summary) {
+		const details = this.markdownFormatter.format(data, `${title} results`);
+		return `**${title}:** ${summary}.\n\n<details>\n<summary>${title} details</summary>\n\n${details}\n\n</details>\n`;
+	}
+
+	/**
+	 * Parse output format string into array of formats
+	 * @param {string} outputFormat - Output format string (comma-separated or "all")
+	 * @returns {string[]} Array of output format values
+	 */
+	parseOutputFormats(outputFormat) {
+		if (outputFormat === "all") {
+			return ["summary", "markdown", "annotations"];
+		}
+
+		return outputFormat
+			.split(",")
+			.map((f) => f.trim())
+			.filter((f) => f.length > 0);
+	}
+}
+
+;// CONCATENATED MODULE: ./src/ReportPathResolver.js
+
+
+
+const AUTO_MODE_ALL = "all";
+
+/**
+ * Component responsible for resolving report file paths
+ */
+class ReportPathResolver {
+	constructor(fileSystemService, logger) {
+		this.fileSystemService = fileSystemService;
+		this.logger = logger;
+		this.parserFactory = new ParserFactory(fileSystemService);
+	}
+
+	/**
+	 * Get the auto patterns map from parsers
+	 * @returns {Object} Object with category keys and pattern arrays
+	 */
+	getAutoPatterns() {
+		return this.parserFactory.getAutoPatternsMap();
+	}
+
+	/**
+	 * Resolve report paths, handling auto-detection mode
+	 * @param {string} reportPaths - Raw report paths input
+	 * @returns {string[]} Array of glob patterns
+	 */
+	resolvePatterns(reportPaths) {
+		const segments = reportPaths
+			.split(/[,\n]/)
+			.map((p) => p.trim())
+			.filter((p) => p.length > 0);
+
+		const autoPatterns = this.getAutoPatterns();
+		const patternList = new Set();
+		for (const segment of segments) {
+			const isAuto = segment.startsWith("auto:");
+			if (!isAuto) {
+				patternList.add(segment);
+				continue;
+			}
+
+			const [, mode = ""] = segment.split(":");
+			const normalizedMode = mode.trim();
+			if (!normalizedMode) {
+				throw new Error("Auto-detection mode must be specified");
+			}
+
+			this.logger.info(`Auto-detection mode: ${normalizedMode}`);
+
+			if (normalizedMode === AUTO_MODE_ALL) {
+				for (const pattern of Object.values(autoPatterns).flat()) {
+					patternList.add(pattern);
+				}
+				continue;
+			}
+
+			if (autoPatterns[normalizedMode] !== undefined) {
+				for (const pattern of autoPatterns[normalizedMode]) {
+					patternList.add(pattern);
+				}
+				continue;
+			}
+
+			throw new Error(`Unknown auto-detection mode: ${normalizedMode}`);
+		}
+
+		const patternsArray = Array.from(patternList);
+		this.logger.info(`Using patterns: ${patternsArray.join(", ")}`);
+		return patternsArray;
+	}
+
+	/**
+	 * Find files matching the patterns
+	 * @param {string[]} patterns - Array of glob patterns
+	 * @param {Object} globModule - Glob module from GitHub Actions
+	 * @returns {Promise<string[]>} Array of file paths
+	 */
+	async findFiles(patterns, globModule) {
+		const normalizedPatterns = patterns.map((pattern) =>
+			pattern.startsWith("!")
+				? `!${this.fileSystemService.normalizeFilePath(pattern.slice(1))}`
+				: this.fileSystemService.normalizeFilePath(pattern),
+		);
+
+		// Add exclusion pattern for node_modules
+		normalizedPatterns.push("!**/node_modules/**");
+
+		const globber = await globModule.create(normalizedPatterns.join("\n"), {
+			followSymbolicLinks: false,
+			matchDirectories: false,
+		});
+
+		const files = new Set();
+
+		for await (const file of globber.globGenerator()) {
+			files.add(this.fileSystemService.resolveFilePath(file));
+		}
+
+		return Array.from(files);
+	}
+
+	/** Require explicit positive patterns to match after applying exclusions. */
+	async assertExplicitMatches(reportPaths, globModule) {
+		const segments = reportPaths
+			.split(/[,\n]/)
+			.map((pattern) => pattern.trim());
+		const exclusions = segments.filter((pattern) => pattern.startsWith("!"));
+		const explicit = new Set(
+			segments.filter(
+				(pattern) =>
+					pattern && !pattern.startsWith("auto:") && !pattern.startsWith("!"),
+			),
+		);
+		for (const pattern of explicit) {
+			const matches = await this.findFiles(
+				[pattern, ...exclusions],
+				globModule,
+			);
+			if (matches.length === 0) {
+				throw new Error(`No report files matched explicit pattern: ${pattern}`);
+			}
+		}
+	}
+}
+
+// Export ReportCategory for convenience
+
+
+;// CONCATENATED MODULE: ./src/formatters/CIReportFormatter.js
+/** One normalized model, a compact selected comment and a complete run summary. */
+class ReportRenderer {
+	constructor({ collection, receipts = [], errors = [], runUrl, sourceUrl }) {
+		Object.assign(this, { collection, receipts, errors, runUrl, sourceUrl });
+	}
+
+	static text(value, limit = 400) {
+		return String(value ?? "")
+			.slice(0, limit)
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/@/g, "&#64;")
+			.replace(/[\r\n]+/g, " ")
+			.replace(/([\\`*_[\]|])/g, "\\$1");
+	}
+
+	static table(headers, rows, limit = 30) {
+		const visible = rows.slice(0, limit);
+		const table = [
+			`| ${headers.join(" | ")} |`,
+			`| ${headers.map(() => "---").join(" | ")} |`,
+			...visible.map((row) => `| ${row.join(" | ")} |`),
+		];
+		if (rows.length > visible.length)
+			table.push(
+				`\nShowing ${visible.length} of ${rows.length} rows. Full details are retained in the report artifacts.`,
+			);
+		return table.join("\n");
+	}
+
+	static details(label, body) {
+		return `<details>\n<summary>${ReportRenderer.text(label, 250)}</summary>\n\n${body}\n\n</details>`;
+	}
+
+	link(label, url) {
+		if (!/^https:\/\//.test(url || "")) return ReportRenderer.text(label);
+		return `[${ReportRenderer.text(label)}](${url.replace(/[()\s]/g, encodeURIComponent)})`;
+	}
+
+	source(file, sha, line) {
+		if (!file) return "See job logs";
+		const url = `${this.sourceUrl}/${sha}/${file.split("/").map(encodeURIComponent).join("/")}${Number.isSafeInteger(line) && line > 0 ? `#L${line}` : ""}`;
+		return this.link(`${file}${line ? `:${line}` : ""}`, url);
+	}
+
+	findings() {
+		const tests = [];
+		const lint = new Map();
+		for (const check of this.collection.checks) {
+			for (const asset of check.result?.assets || []) {
+				for (const test of asset.data?.tests || [])
+					tests.push({
+						...test,
+						check,
+						owner: asset.selector.owner || "collector",
+					});
+				for (const issue of asset.data?.lintIssues || []) {
+					const key = JSON.stringify([
+						check.check.project,
+						check.source.sha,
+						issue.source || asset.format,
+						issue.rule,
+						issue.file,
+						issue.line,
+						issue.column,
+						issue.message,
+					]);
+					if (!lint.has(key))
+						lint.set(key, {
+							...issue,
+							check,
+							owner: asset.selector.owner || "collector",
+						});
+				}
+			}
+		}
+		return { tests, lint: [...lint.values()] };
+	}
+
+	selected(comment) {
+		if (!comment) return { test: true, lint: true, coverage: true };
+		const selections = Object.fromEntries(
+			Object.entries(this.collection.reporters).map(([kind, values]) => [
+				kind,
+				values.includes("comment"),
+			]),
+		);
+		if (
+			this.receipts.some(
+				(receipt) =>
+					receipt.reporter === "github" && receipt.fallback === "comment",
+			)
+		)
+			selections.coverage = true;
+		return selections;
+	}
+
+	tests(tests, comment) {
+		if (!tests.length) return "";
+		const failed = tests.filter((item) =>
+			["failed", "error"].includes(item.status),
+		);
+		const passed = tests.filter((item) => item.status === "passed").length;
+		const skipped = tests.filter((item) => item.status === "skipped").length;
+		const projects = new Map();
+		for (const item of tests) {
+			const key = item.check.check.project;
+			if (!projects.has(key))
+				projects.set(key, { passed: 0, failed: 0, skipped: 0 });
+			projects.get(key)[
+				["failed", "error"].includes(item.status) ? "failed" : item.status
+			]++;
+		}
+		const body = [
+			ReportRenderer.table(
+				["Project", "Executions"],
+				[...projects].map(([name, counts]) => [
+					ReportRenderer.text(name),
+					`${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped`,
+				]),
+			),
+			"Counts include every runtime execution, not globally unique test cases.",
+		];
+		const cases = new Map();
+		for (const item of failed) {
+			const key = JSON.stringify([
+				item.check.check.project,
+				item.check.source.sha,
+				item.suite,
+				item.name,
+				item.file,
+				item.message,
+			]);
+			if (!cases.has(key)) cases.set(key, { item, executions: [] });
+			cases
+				.get(key)
+				.executions.push(
+					this.link(
+						Object.values(item.check.check.variant).join(" / ") ||
+							item.check.check.name,
+						item.check.job.html_url,
+					),
+				);
+		}
+		if (cases.size)
+			body.push(
+				ReportRenderer.table(
+					["Failing case", "Executions", "Diagnostic"],
+					[...cases.values()].map(({ item, executions }) => [
+						ReportRenderer.text(`${item.suite} / ${item.name}`),
+						[...new Set(executions)].join(", "),
+						ReportRenderer.text(item.message),
+					]),
+				),
+			);
+		if (!comment)
+			body.push(
+				ReportRenderer.table(
+					["Check / runtime", "Result", "Evidence"],
+					this.collection.checks
+						.filter((check) =>
+							check.check.reports.some((report) => report.kind === "test"),
+						)
+						.map((check) => [
+							ReportRenderer.text(
+								`${check.check.name} / ${Object.values(check.check.variant).join(" / ")}`,
+							),
+							ReportRenderer.text(check.result?.outcome || "Missing result"),
+							this.link("Job and artifacts", check.job.html_url),
+						]),
+					100,
+				),
+			);
+		return ReportRenderer.details(
+			`Tests: ${passed} passed, ${failed.length} failed${skipped ? `, ${skipped} skipped` : ""} executions`,
+			body.join("\n\n"),
+		);
+	}
+
+	lint(issues) {
+		const checks = this.collection.checks.filter((check) =>
+			check.check.reports.some((report) => report.kind === "lint"),
+		);
+		if (!checks.length) return "";
+		const errors = issues.filter((issue) => issue.severity === "error").length;
+		const warnings = issues.filter(
+			(issue) => issue.severity === "warning",
+		).length;
+		const body = [
+			ReportRenderer.table(
+				["Check", "Result", "Evidence"],
+				checks.map((check) => [
+					ReportRenderer.text(check.check.name),
+					ReportRenderer.text(check.result?.outcome || "Missing result"),
+					this.link("Lint job", check.job.html_url),
+				]),
+			),
+		];
+		for (const check of checks)
+			for (const asset of check.result?.assets || [])
+				if (asset.data?.summary)
+					body.push(
+						`**${ReportRenderer.text(check.check.name)} native summary**\n\n${asset.data.summary
+							.split("\n")
+							.filter((line) => line.startsWith("|"))
+							.slice(0, 80)
+							.map(
+								(line) =>
+									`| ${line
+										.split("|")
+										.slice(1, -1)
+										.map((cell) => ReportRenderer.text(cell.trim(), 300))
+										.join(" | ")} |`,
+							)
+							.join("\n")}`,
+					);
+		if (issues.length)
+			body.push(
+				ReportRenderer.table(
+					["Location", "Rule", "Finding"],
+					issues.map((issue) => [
+						this.source(issue.file, issue.check.source.sha, issue.line),
+						ReportRenderer.text(issue.rule),
+						ReportRenderer.text(`${issue.severity}: ${issue.message}`),
+					]),
+				),
+			);
+		const failed = checks.filter(
+			(check) => check.result?.outcome === "failure",
+		).length;
+		const incomplete = checks.filter(
+			(check) => !check.result || check.result.errors.length,
+		).length;
+		const status = [
+			`${checks.length} ${checks.length === 1 ? "check" : "checks"}`,
+			...(failed ? [`${failed} failed`] : []),
+			...(incomplete ? [`${incomplete} incomplete`] : []),
+			...(issues.length ? [`${errors} errors`, `${warnings} warnings`] : []),
+		];
+		if (!failed && !incomplete && !errors) status.push("passed");
+		return ReportRenderer.details(
+			`Lint: ${status.join(", ")}`,
+			body.join("\n\n"),
+		);
+	}
+
+	coverage(comment) {
+		const datasets = this.collection.datasets;
+		if (!datasets.length) return "";
+		const measurements = datasets.map((dataset) => {
+			const coverage = dataset.errors.length
+				? null
+				: dataset.assets[0]?.data?.coverage;
+			const lines = coverage?.lines;
+			return {
+				dataset,
+				coverage,
+				label: `${dataset.label}: ${lines ? `${lines.percentage.toFixed(1)}%` : "unknown"}`,
+			};
+		});
+		const title =
+			measurements.length <= 2
+				? measurements.map(({ label }) => label).join("; ")
+				: `${measurements.length} datasets; ${measurements.filter(({ coverage }) => !coverage).length} unavailable`;
+		const body = [
+			ReportRenderer.table(
+				["Dataset", "Lines", "Change"],
+				measurements.map(({ dataset, coverage }) => {
+					const base = dataset.baseline?.coverage?.lines;
+					const delta =
+						coverage && base
+							? coverage.lines.percentage - base.percentage
+							: null;
+					return [
+						ReportRenderer.text(dataset.label),
+						coverage
+							? `${coverage.lines.percentage.toFixed(1)}% (${coverage.lines.covered}/${coverage.lines.total})`
+							: "**Unknown: missing or invalid report**",
+						delta === null
+							? ReportRenderer.text(
+									dataset.baseline?.reason || "No comparable baseline",
+								)
+							: this.link(
+									`${delta >= 0 ? "+" : ""}${delta.toFixed(1)} pp vs ${dataset.baseline.sha.slice(0, 7)}`,
+									dataset.baseline.url,
+								),
+					];
+				}),
+			),
+			"Measurements remain separate by dataset. No coverage gate is configured by this reporting workflow. Changes require a comparable base-commit measurement.",
+		];
+		if (!comment)
+			body.push(
+				ReportRenderer.table(
+					["Dataset", "Native metrics", "Tested source"],
+					measurements.map(({ dataset, coverage }) => [
+						ReportRenderer.text(dataset.label),
+						["branches", "functions", "statements"]
+							.map(
+								(metric) =>
+									`${metric}: ${coverage?.[metric]?.total ? `${coverage[metric].percentage.toFixed(1)}%` : "unavailable"}`,
+							)
+							.join("; "),
+						`\`${dataset.source.sha.slice(0, 7)}\` (${ReportRenderer.text(dataset.source.kind)})`,
+					]),
+				),
+			);
+		return ReportRenderer.details(`Coverage: ${title}`, body.join("\n\n"));
+	}
+
+	render({ comment = false } = {}) {
+		const selected = this.selected(comment);
+		if (comment && !Object.values(selected).some(Boolean)) return "";
+		const errors = this.errors;
+		const { tests, lint } = this.findings();
+		const publicationFailed = this.receipts.some(
+			(receipt) => receipt.status === "failed",
+		);
+		const incomplete =
+			this.collection.errors.length ||
+			this.collection.checks.some(
+				(check) => !check.result || check.result.errors.length,
+			);
+		const title = errors.length
+			? publicationFailed
+				? "Publication failed"
+				: incomplete
+					? "Reports incomplete"
+					: "CI checks failed"
+			: "CI checks passed";
+		const outcome = errors.length
+			? "Required execution, evidence, or publication did not complete successfully."
+			: "Checks, report validation, and selected publication completed successfully.";
+		const identity = this.collection.identity;
+		const parts = [
+			`## ${errors.length ? "❌" : "✅"} ${title}`,
+			outcome,
+			`${this.link(`Run ${identity.runId}, attempt ${identity.attempt}`, this.runUrl)} · Workflow revision \`${identity.sha.slice(0, 7)}\`.`,
+			`Tested sources: ${[...new Set(this.collection.checks.map((check) => `\`${check.source.sha.slice(0, 7)}\` (${ReportRenderer.text(check.source.kind)})`))].join(", ")}.`,
+		];
+		if (errors.length)
+			parts.push(
+				`### Needs attention\n\n${errors
+					.slice(0, 8)
+					.map((error) => `- ${ReportRenderer.text(error, 220)}`)
+					.join(
+						"\n",
+					)}${errors.length > 8 ? `\n\nShowing 8 of ${errors.length} problems. See the full report artifacts.` : ""}`,
+			);
+		const failures = tests.filter((item) =>
+			["failed", "error"].includes(item.status),
+		);
+		if (selected.test && failures.length)
+			parts.push(
+				`**${failures.length} failed test executions.** ${this.link("Open a failing job", failures[0].check.job.html_url)}.`,
+			);
+		if (selected.lint && lint.some((issue) => issue.severity === "error"))
+			parts.push(
+				`**${lint.filter((issue) => issue.severity === "error").length} lint errors.** ${this.link("Open lint diagnostics", lint.find((issue) => issue.severity === "error").check.job.html_url)}.`,
+			);
+		if (selected.test) parts.push(this.tests(tests, comment));
+		if (selected.lint) parts.push(this.lint(lint));
+		if (selected.coverage) parts.push(this.coverage(comment));
+		if (!comment)
+			parts.push(
+				ReportRenderer.details(
+					"Workflow checks and conditional skips",
+					`${ReportRenderer.table(
+						["Caller job", "Outcome"],
+						Object.entries(this.collection.jobs).map(([name, job]) => [
+							ReportRenderer.text(name),
+							ReportRenderer.text(job.result),
+						]),
+					)}\n\nThese are job outcomes. Status-only checks do not imply structured test counts. Existing route validators determine whether skips are intentional.`,
+				),
+			);
+		const receipts = comment
+			? this.receipts.filter((receipt) => receipt.reporter !== "comment")
+			: this.receipts;
+		if (receipts.length)
+			parts.push(
+				ReportRenderer.details(
+					`Publication: ${receipts.filter((receipt) => receipt.status === "failed").length} failed; ${receipts.filter((receipt) => receipt.status === "unavailable").length} unavailable`,
+					ReportRenderer.table(
+						["Destination / dataset", "Outcome", "Details"],
+						receipts.map((receipt) => [
+							ReportRenderer.text(
+								`${receipt.reporter} / ${this.collection.datasets.find((dataset) => dataset.id === receipt.dataset)?.label || receipt.dataset}`,
+							),
+							ReportRenderer.text(receipt.status),
+							receipt.url
+								? this.link(receipt.message || "Provider result", receipt.url)
+								: ReportRenderer.text(receipt.message),
+						]),
+					),
+				),
+			);
+		if (!comment)
+			parts.push(
+				ReportRenderer.details(
+					"Report provenance and rerun details",
+					`${ReportRenderer.table(
+						["Check", "Original execution", "Source"],
+						this.collection.checks.map((check) => [
+							ReportRenderer.text(check.check.name),
+							this.link(
+								`Attempt ${check.execution.attempt}, job ${check.execution.job.id}`,
+								check.job.html_url,
+							),
+							`\`${check.source.sha.slice(0, 7)}\` (${ReportRenderer.text(check.source.kind)})`,
+						]),
+						100,
+					)}\n\nEarlier evidence is reused only for executions verified unchanged in this run.`,
+				),
+			);
+		parts.push(
+			`${this.link("Full Actions report and native artifacts", this.runUrl)}.`,
+		);
+		const budget = comment ? 32 * 1024 : 256 * 1024;
+		let markdown = `${parts.filter(Boolean).join("\n\n")}\n`;
+		if (Buffer.byteLength(markdown) > budget) {
+			const notice = `\n\nDetailed results exceed this view's size limit. ${this.link("Read all retained results", this.runUrl)}.\n`;
+			markdown = "";
+			for (const part of parts.filter(Boolean))
+				if (Buffer.byteLength(markdown + part + notice) < budget - 2)
+					markdown += `${part}\n\n`;
+			markdown += notice;
+		}
+		return markdown;
+	}
+}
+
+;// CONCATENATED MODULE: ./src/index.js
+
+
+
+
+
+
+
+
+
+async function run({ core, glob: globModule = NativeGlob, inputs }) {
+	try {
+		const fileSystemService = new FileSystemService(inputs.workingDirectory);
+		const logger = new LoggerService(core);
+
+		const parserCore = new ReportParserCore(
+			fileSystemService,
+			logger,
+			inputs.pathMapping,
+		);
+		const pathResolver = new ReportPathResolver(fileSystemService, logger);
+
+		logger.info(`Report Name: ${inputs.reportName}`);
+		logger.info(`Output Format: ${inputs.outputFormat}`);
+		if (inputs.pathMapping) {
+			logger.info(`Path Mapping: ${inputs.pathMapping}`);
+		}
+
+		// Parse output formats (comma-separated or "all")
+		const outputFormats = parserCore.parseOutputFormats(inputs.outputFormat);
+		logger.info(`Output formats: ${outputFormats.join(", ")}`);
+
+		// Resolve report paths using the dedicated component
+		const patternList = pathResolver.resolvePatterns(inputs.reportPaths);
+
+		// Find report files
+		const uniqueFiles = await pathResolver.findFiles(patternList, globModule);
+		logger.info(`Found ${uniqueFiles.length} report file(s)`);
+		core.setOutput("parsed-files", JSON.stringify(uniqueFiles));
+		const collectionErrors = [];
+		try {
+			await pathResolver.assertExplicitMatches(inputs.reportPaths, globModule);
+		} catch (error) {
+			collectionErrors.push(error.message);
+		}
+
+		if (uniqueFiles.length === 0) {
+			if (collectionErrors.length) throw new Error(collectionErrors.join("\n"));
+			logger.warning("No report files found");
+			return;
+		}
+
+		// Parse reports using core
+		const aggregatedData = parserCore.parseReports(uniqueFiles);
+		collectionErrors.push(...aggregatedData.parseErrors);
+		core.setOutput("parsed-reports", aggregatedData.parsedReports);
+		core.setOutput(
+			"executed-tests",
+			aggregatedData.getPassedCount() + aggregatedData.getFailedCount(),
+		);
+
+		// Generate GitHub annotations if requested
+		if (outputFormats.includes("annotations")) {
+			generateAnnotations(core, aggregatedData);
+		}
+
+		// Generate outputs using core
+		const { markdown, summary, testMarkdown, coverageMarkdown, lintMarkdown } =
+			parserCore.generateOutput(
+				aggregatedData,
+				inputs.reportName,
+				inputs.includePassed,
+				inputs.outputFormat,
+			);
+
+		// Write to GitHub Step Summary if needed
+		if (outputFormats.includes("summary")) {
+			await core.summary.addRaw(summary).write();
+		}
+
+		// Set outputs
+		core.setOutput("markdown", markdown);
+		core.setOutput("test-markdown", testMarkdown);
+		core.setOutput("coverage-markdown", coverageMarkdown);
+		core.setOutput("lint-markdown", lintMarkdown);
+		core.setOutput(
+			"has-errors",
+			collectionErrors.length > 0 || aggregatedData.hasErrors(),
+		);
+		core.setOutput("summary", summary);
+		if (collectionErrors.length) throw new Error(collectionErrors.join("\n"));
+
+		// Log summary
+		logger.info("\n--- Summary ---");
+		logger.info(`Total tests: ${aggregatedData.getTotalTests()}`);
+		logger.info(`Passed: ${aggregatedData.getPassedCount()}`);
+		logger.info(`Failed: ${aggregatedData.getFailedCount()}`);
+		logger.info(`Skipped: ${aggregatedData.getSkippedCount()}`);
+		logger.info(`Lint issues: ${aggregatedData.lintIssues.length}`);
+		if (aggregatedData.coverage) {
+			logger.info(
+				`Coverage: ${aggregatedData.coverage
+					.getOverallPercentage()
+					.toFixed(2)}%`,
+			);
+		}
+	} catch (error) {
+		core.setFailed(`Action failed: ${error.message}`);
+		throw error;
+	}
+}
+
+/**
+ * Generate GitHub annotations for failed tests and lint issues
+ */
+function generateAnnotations(core, reportData) {
+	// Annotate failed tests
+	const failedTests = reportData.getFailedTests();
+	for (const test of failedTests.slice(0, 10)) {
+		// Limit to 10 annotations
+		const properties = {
+			title: `Test Failed: ${test.name}`,
+		};
+
+		if (test.file) {
+			properties.file = test.file;
+		}
+
+		core.error(test.message || "Test failed", properties);
+	}
+
+	// Annotate lint errors and warnings
+	annotateLintIssues(core, reportData.getErrors(), core.error, 10);
+	annotateLintIssues(core, reportData.getWarnings(), core.warning, 10);
+}
+
+/**
+ * Helper to annotate lint issues
+ */
+function annotateLintIssues(core, issues, annotationFn, limit) {
+	for (const issue of issues.slice(0, limit)) {
+		const properties = {
+			title: `${issue.rule}: ${issue.message}`,
+			file: issue.file,
+			startLine: issue.line,
+			startColumn: issue.column,
+		};
+
+		annotationFn.call(core, issue.message, properties);
+	}
+}
+
+var __webpack_exports__ParserFactory = __nested_webpack_exports__.O6;
+var __webpack_exports__ReportRenderer = __nested_webpack_exports__.wb;
+var __webpack_exports__run = __nested_webpack_exports__.eF;
+
+
 ;// CONCATENATED MODULE: ./node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js
 
 
@@ -10040,7 +11700,7 @@ const OptionsBuilder_defaultOnDangerousProperty = (name) => {
 };
 
 
-const xmlparser_OptionsBuilder_defaultOptions = {
+const OptionsBuilder_defaultOptions = {
   preserveOrder: false,
   attributeNamePrefix: '@_',
   attributesGroupName: false,
@@ -10155,7 +11815,7 @@ function OptionsBuilder_normalizeProcessEntities(value, htmlEntities) {
 }
 
 const OptionsBuilder_buildOptions = function (options) {
-  const built = Object.assign({}, xmlparser_OptionsBuilder_defaultOptions, options);
+  const built = Object.assign({}, OptionsBuilder_defaultOptions, options);
 
   // Validate property names to prevent prototype pollution
   const propertyNameOptions = [
@@ -10525,7 +12185,7 @@ const src_createValidator = (production, { xmlVersion = '1.0', asciiOnly = false
  * @param {{ xmlVersion?: '1.0'|'1.1', asciiOnly?: boolean }} [opts]
  * @returns {{ valid: boolean, production: string, input: string, reason?: string, position?: number }}
  */
-const xml_naming_src_validate = (str, production, { xmlVersion = '1.0', asciiOnly = false } = {}) => {
+const src_validate = (str, production, { xmlVersion = '1.0', asciiOnly = false } = {}) => {
   if (!src_PRODUCTIONS.includes(production)) {
     throw new TypeError(
       `Unknown production "${production}". Must be one of: ${src_PRODUCTIONS.join(', ')}`
@@ -10593,7 +12253,7 @@ const xml_naming_src_validate = (str, production, { xmlVersion = '1.0', asciiOnl
  * @returns {Array<{ valid: boolean, production: string, input: string, reason?: string, position?: number }>}
  */
 const src_validateAll = (strings, production, opts = {}) =>
-  strings.map(str => xml_naming_src_validate(str, production, opts));
+  strings.map(str => src_validate(str, production, opts));
 
 // ---------------------------------------------------------------------------
 // Sanitizer
@@ -17903,7 +19563,7 @@ class CoberturaReport {
 /** Validate native formats without installing or executing project dependencies. */
 class NativeReports {
 	constructor() {
-		this.parsers = new ParserFactory(null).parsers;
+		this.parsers = new __webpack_exports__ParserFactory(null).parsers;
 	}
 
 	parse(content, filename, kind) {
@@ -19040,440 +20700,6 @@ class Recording {
 	}
 }
 
-;// CONCATENATED MODULE: ../parse-ci-reports/src/formatters/CIReportFormatter.js
-/** One normalized model, a compact selected comment and a complete run summary. */
-class ReportRenderer {
-	constructor({ collection, receipts = [], errors = [], runUrl, sourceUrl }) {
-		Object.assign(this, { collection, receipts, errors, runUrl, sourceUrl });
-	}
-
-	static text(value, limit = 400) {
-		return String(value ?? "")
-			.slice(0, limit)
-			.replace(/&/g, "&amp;")
-			.replace(/</g, "&lt;")
-			.replace(/>/g, "&gt;")
-			.replace(/@/g, "&#64;")
-			.replace(/[\r\n]+/g, " ")
-			.replace(/([\\`*_[\]|])/g, "\\$1");
-	}
-
-	static table(headers, rows, limit = 30) {
-		const visible = rows.slice(0, limit);
-		const table = [
-			`| ${headers.join(" | ")} |`,
-			`| ${headers.map(() => "---").join(" | ")} |`,
-			...visible.map((row) => `| ${row.join(" | ")} |`),
-		];
-		if (rows.length > visible.length)
-			table.push(
-				`\nShowing ${visible.length} of ${rows.length} rows. Full details are retained in the report artifacts.`,
-			);
-		return table.join("\n");
-	}
-
-	static details(label, body) {
-		return `<details>\n<summary>${ReportRenderer.text(label, 250)}</summary>\n\n${body}\n\n</details>`;
-	}
-
-	link(label, url) {
-		if (!/^https:\/\//.test(url || "")) return ReportRenderer.text(label);
-		return `[${ReportRenderer.text(label)}](${url.replace(/[()\s]/g, encodeURIComponent)})`;
-	}
-
-	source(file, sha, line) {
-		if (!file) return "See job logs";
-		const url = `${this.sourceUrl}/${sha}/${file.split("/").map(encodeURIComponent).join("/")}${Number.isSafeInteger(line) && line > 0 ? `#L${line}` : ""}`;
-		return this.link(`${file}${line ? `:${line}` : ""}`, url);
-	}
-
-	findings() {
-		const tests = [];
-		const lint = new Map();
-		for (const check of this.collection.checks) {
-			for (const asset of check.result?.assets || []) {
-				for (const test of asset.data?.tests || [])
-					tests.push({
-						...test,
-						check,
-						owner: asset.selector.owner || "collector",
-					});
-				for (const issue of asset.data?.lintIssues || []) {
-					const key = JSON.stringify([
-						check.check.project,
-						check.source.sha,
-						issue.source || asset.format,
-						issue.rule,
-						issue.file,
-						issue.line,
-						issue.column,
-						issue.message,
-					]);
-					if (!lint.has(key))
-						lint.set(key, {
-							...issue,
-							check,
-							owner: asset.selector.owner || "collector",
-						});
-				}
-			}
-		}
-		return { tests, lint: [...lint.values()] };
-	}
-
-	selected(comment) {
-		if (!comment) return { test: true, lint: true, coverage: true };
-		const selections = Object.fromEntries(
-			Object.entries(this.collection.reporters).map(([kind, values]) => [
-				kind,
-				values.includes("comment"),
-			]),
-		);
-		if (
-			this.receipts.some(
-				(receipt) =>
-					receipt.reporter === "github" && receipt.fallback === "comment",
-			)
-		)
-			selections.coverage = true;
-		return selections;
-	}
-
-	tests(tests, comment) {
-		if (!tests.length) return "";
-		const failed = tests.filter((item) =>
-			["failed", "error"].includes(item.status),
-		);
-		const passed = tests.filter((item) => item.status === "passed").length;
-		const skipped = tests.filter((item) => item.status === "skipped").length;
-		const projects = new Map();
-		for (const item of tests) {
-			const key = item.check.check.project;
-			if (!projects.has(key))
-				projects.set(key, { passed: 0, failed: 0, skipped: 0 });
-			projects.get(key)[
-				["failed", "error"].includes(item.status) ? "failed" : item.status
-			]++;
-		}
-		const body = [
-			ReportRenderer.table(
-				["Project", "Executions"],
-				[...projects].map(([name, counts]) => [
-					ReportRenderer.text(name),
-					`${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped`,
-				]),
-			),
-			"Counts include every runtime execution, not globally unique test cases.",
-		];
-		const cases = new Map();
-		for (const item of failed) {
-			const key = JSON.stringify([
-				item.check.check.project,
-				item.check.source.sha,
-				item.suite,
-				item.name,
-				item.file,
-				item.message,
-			]);
-			if (!cases.has(key)) cases.set(key, { item, executions: [] });
-			cases
-				.get(key)
-				.executions.push(
-					this.link(
-						Object.values(item.check.check.variant).join(" / ") ||
-							item.check.check.name,
-						item.check.job.html_url,
-					),
-				);
-		}
-		if (cases.size)
-			body.push(
-				ReportRenderer.table(
-					["Failing case", "Executions", "Diagnostic"],
-					[...cases.values()].map(({ item, executions }) => [
-						ReportRenderer.text(`${item.suite} / ${item.name}`),
-						[...new Set(executions)].join(", "),
-						ReportRenderer.text(item.message),
-					]),
-				),
-			);
-		if (!comment)
-			body.push(
-				ReportRenderer.table(
-					["Check / runtime", "Result", "Evidence"],
-					this.collection.checks
-						.filter((check) =>
-							check.check.reports.some((report) => report.kind === "test"),
-						)
-						.map((check) => [
-							ReportRenderer.text(
-								`${check.check.name} / ${Object.values(check.check.variant).join(" / ")}`,
-							),
-							ReportRenderer.text(check.result?.outcome || "Missing result"),
-							this.link("Job and artifacts", check.job.html_url),
-						]),
-					100,
-				),
-			);
-		return ReportRenderer.details(
-			`Tests: ${passed} passed, ${failed.length} failed${skipped ? `, ${skipped} skipped` : ""} executions`,
-			body.join("\n\n"),
-		);
-	}
-
-	lint(issues) {
-		const checks = this.collection.checks.filter((check) =>
-			check.check.reports.some((report) => report.kind === "lint"),
-		);
-		if (!checks.length) return "";
-		const errors = issues.filter((issue) => issue.severity === "error").length;
-		const warnings = issues.filter(
-			(issue) => issue.severity === "warning",
-		).length;
-		const body = [
-			ReportRenderer.table(
-				["Check", "Result", "Evidence"],
-				checks.map((check) => [
-					ReportRenderer.text(check.check.name),
-					ReportRenderer.text(check.result?.outcome || "Missing result"),
-					this.link("Lint job", check.job.html_url),
-				]),
-			),
-		];
-		for (const check of checks)
-			for (const asset of check.result?.assets || [])
-				if (asset.data?.summary)
-					body.push(
-						`**${ReportRenderer.text(check.check.name)} native summary**\n\n${asset.data.summary
-							.split("\n")
-							.filter((line) => line.startsWith("|"))
-							.slice(0, 80)
-							.map(
-								(line) =>
-									`| ${line
-										.split("|")
-										.slice(1, -1)
-										.map((cell) => ReportRenderer.text(cell.trim(), 300))
-										.join(" | ")} |`,
-							)
-							.join("\n")}`,
-					);
-		if (issues.length)
-			body.push(
-				ReportRenderer.table(
-					["Location", "Rule", "Finding"],
-					issues.map((issue) => [
-						this.source(issue.file, issue.check.source.sha, issue.line),
-						ReportRenderer.text(issue.rule),
-						ReportRenderer.text(`${issue.severity}: ${issue.message}`),
-					]),
-				),
-			);
-		const failed = checks.filter(
-			(check) => check.result?.outcome === "failure",
-		).length;
-		const incomplete = checks.filter(
-			(check) => !check.result || check.result.errors.length,
-		).length;
-		const status = [
-			`${checks.length} ${checks.length === 1 ? "check" : "checks"}`,
-			...(failed ? [`${failed} failed`] : []),
-			...(incomplete ? [`${incomplete} incomplete`] : []),
-			...(issues.length ? [`${errors} errors`, `${warnings} warnings`] : []),
-		];
-		if (!failed && !incomplete && !errors) status.push("passed");
-		return ReportRenderer.details(
-			`Lint: ${status.join(", ")}`,
-			body.join("\n\n"),
-		);
-	}
-
-	coverage(comment) {
-		const datasets = this.collection.datasets;
-		if (!datasets.length) return "";
-		const measurements = datasets.map((dataset) => {
-			const coverage = dataset.errors.length
-				? null
-				: dataset.assets[0]?.data?.coverage;
-			const lines = coverage?.lines;
-			return {
-				dataset,
-				coverage,
-				label: `${dataset.label}: ${lines ? `${lines.percentage.toFixed(1)}%` : "unknown"}`,
-			};
-		});
-		const title =
-			measurements.length <= 2
-				? measurements.map(({ label }) => label).join("; ")
-				: `${measurements.length} datasets; ${measurements.filter(({ coverage }) => !coverage).length} unavailable`;
-		const body = [
-			ReportRenderer.table(
-				["Dataset", "Lines", "Change"],
-				measurements.map(({ dataset, coverage }) => {
-					const base = dataset.baseline?.coverage?.lines;
-					const delta =
-						coverage && base
-							? coverage.lines.percentage - base.percentage
-							: null;
-					return [
-						ReportRenderer.text(dataset.label),
-						coverage
-							? `${coverage.lines.percentage.toFixed(1)}% (${coverage.lines.covered}/${coverage.lines.total})`
-							: "**Unknown: missing or invalid report**",
-						delta === null
-							? ReportRenderer.text(
-									dataset.baseline?.reason || "No comparable baseline",
-								)
-							: this.link(
-									`${delta >= 0 ? "+" : ""}${delta.toFixed(1)} pp vs ${dataset.baseline.sha.slice(0, 7)}`,
-									dataset.baseline.url,
-								),
-					];
-				}),
-			),
-			"Measurements remain separate by dataset. No coverage gate is configured by this reporting workflow. Changes require a comparable base-commit measurement.",
-		];
-		if (!comment)
-			body.push(
-				ReportRenderer.table(
-					["Dataset", "Native metrics", "Tested source"],
-					measurements.map(({ dataset, coverage }) => [
-						ReportRenderer.text(dataset.label),
-						["branches", "functions", "statements"]
-							.map(
-								(metric) =>
-									`${metric}: ${coverage?.[metric]?.total ? `${coverage[metric].percentage.toFixed(1)}%` : "unavailable"}`,
-							)
-							.join("; "),
-						`\`${dataset.source.sha.slice(0, 7)}\` (${ReportRenderer.text(dataset.source.kind)})`,
-					]),
-				),
-			);
-		return ReportRenderer.details(`Coverage: ${title}`, body.join("\n\n"));
-	}
-
-	render({ comment = false } = {}) {
-		const selected = this.selected(comment);
-		if (comment && !Object.values(selected).some(Boolean)) return "";
-		const errors = this.errors;
-		const { tests, lint } = this.findings();
-		const publicationFailed = this.receipts.some(
-			(receipt) => receipt.status === "failed",
-		);
-		const incomplete =
-			this.collection.errors.length ||
-			this.collection.checks.some(
-				(check) => !check.result || check.result.errors.length,
-			);
-		const title = errors.length
-			? publicationFailed
-				? "Publication failed"
-				: incomplete
-					? "Reports incomplete"
-					: "CI checks failed"
-			: "CI checks passed";
-		const outcome = errors.length
-			? "Required execution, evidence, or publication did not complete successfully."
-			: "Checks, report validation, and selected publication completed successfully.";
-		const identity = this.collection.identity;
-		const parts = [
-			`## ${errors.length ? "❌" : "✅"} ${title}`,
-			outcome,
-			`${this.link(`Run ${identity.runId}, attempt ${identity.attempt}`, this.runUrl)} · Workflow revision \`${identity.sha.slice(0, 7)}\`.`,
-			`Tested sources: ${[...new Set(this.collection.checks.map((check) => `\`${check.source.sha.slice(0, 7)}\` (${ReportRenderer.text(check.source.kind)})`))].join(", ")}.`,
-		];
-		if (errors.length)
-			parts.push(
-				`### Needs attention\n\n${errors
-					.slice(0, 8)
-					.map((error) => `- ${ReportRenderer.text(error, 220)}`)
-					.join(
-						"\n",
-					)}${errors.length > 8 ? `\n\nShowing 8 of ${errors.length} problems. See the full report artifacts.` : ""}`,
-			);
-		const failures = tests.filter((item) =>
-			["failed", "error"].includes(item.status),
-		);
-		if (selected.test && failures.length)
-			parts.push(
-				`**${failures.length} failed test executions.** ${this.link("Open a failing job", failures[0].check.job.html_url)}.`,
-			);
-		if (selected.lint && lint.some((issue) => issue.severity === "error"))
-			parts.push(
-				`**${lint.filter((issue) => issue.severity === "error").length} lint errors.** ${this.link("Open lint diagnostics", lint.find((issue) => issue.severity === "error").check.job.html_url)}.`,
-			);
-		if (selected.test) parts.push(this.tests(tests, comment));
-		if (selected.lint) parts.push(this.lint(lint));
-		if (selected.coverage) parts.push(this.coverage(comment));
-		if (!comment)
-			parts.push(
-				ReportRenderer.details(
-					"Workflow checks and conditional skips",
-					`${ReportRenderer.table(
-						["Caller job", "Outcome"],
-						Object.entries(this.collection.jobs).map(([name, job]) => [
-							ReportRenderer.text(name),
-							ReportRenderer.text(job.result),
-						]),
-					)}\n\nThese are job outcomes. Status-only checks do not imply structured test counts. Existing route validators determine whether skips are intentional.`,
-				),
-			);
-		const receipts = comment
-			? this.receipts.filter((receipt) => receipt.reporter !== "comment")
-			: this.receipts;
-		if (receipts.length)
-			parts.push(
-				ReportRenderer.details(
-					`Publication: ${receipts.filter((receipt) => receipt.status === "failed").length} failed; ${receipts.filter((receipt) => receipt.status === "unavailable").length} unavailable`,
-					ReportRenderer.table(
-						["Destination / dataset", "Outcome", "Details"],
-						receipts.map((receipt) => [
-							ReportRenderer.text(
-								`${receipt.reporter} / ${this.collection.datasets.find((dataset) => dataset.id === receipt.dataset)?.label || receipt.dataset}`,
-							),
-							ReportRenderer.text(receipt.status),
-							receipt.url
-								? this.link(receipt.message || "Provider result", receipt.url)
-								: ReportRenderer.text(receipt.message),
-						]),
-					),
-				),
-			);
-		if (!comment)
-			parts.push(
-				ReportRenderer.details(
-					"Report provenance and rerun details",
-					`${ReportRenderer.table(
-						["Check", "Original execution", "Source"],
-						this.collection.checks.map((check) => [
-							ReportRenderer.text(check.check.name),
-							this.link(
-								`Attempt ${check.execution.attempt}, job ${check.execution.job.id}`,
-								check.job.html_url,
-							),
-							`\`${check.source.sha.slice(0, 7)}\` (${ReportRenderer.text(check.source.kind)})`,
-						]),
-						100,
-					)}\n\nEarlier evidence is reused only for executions verified unchanged in this run.`,
-				),
-			);
-		parts.push(
-			`${this.link("Full Actions report and native artifacts", this.runUrl)}.`,
-		);
-		const budget = comment ? 32 * 1024 : 256 * 1024;
-		let markdown = `${parts.filter(Boolean).join("\n\n")}\n`;
-		if (Buffer.byteLength(markdown) > budget) {
-			const notice = `\n\nDetailed results exceed this view's size limit. ${this.link("Read all retained results", this.runUrl)}.\n`;
-			markdown = "";
-			for (const part of parts.filter(Boolean))
-				if (Buffer.byteLength(markdown + part + notice) < budget - 2)
-					markdown += `${part}\n\n`;
-			markdown += notice;
-		}
-		return markdown;
-	}
-}
-
 ;// CONCATENATED MODULE: ./src/CheckRunner.js
 
 
@@ -19684,7 +20910,7 @@ class Diagnostics {
 		sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 	}) {
 		Object.assign(this, { collection, core, github, context, sleep });
-		this.findings = new ReportRenderer({ collection }).findings();
+		this.findings = new __webpack_exports__ReportRenderer({ collection }).findings();
 	}
 
 	annotations(kind) {
@@ -19873,15 +21099,23 @@ class ExecutionIdentity {
 	}
 
 	async jobs(attempt = this.attempt) {
-		return this.github.paginate(
-			this.github.rest.actions.listJobsForWorkflowRunAttempt,
-			{
-				...this.context.repo,
-				run_id: this.context.runId,
-				attempt_number: attempt,
-				per_page: 100,
-			},
-		);
+		for (let retry = 0; ; retry++) {
+			try {
+				return await this.github.paginate(
+					this.github.rest.actions.listJobsForWorkflowRunAttempt,
+					{
+						...this.context.repo,
+						run_id: this.context.runId,
+						attempt_number: attempt,
+						per_page: 100,
+					},
+				);
+			} catch (error) {
+				if (retry === 3 || ![500, 502, 503, 504].includes(error.status))
+					throw error;
+				await this.sleep(1000 * 2 ** retry);
+			}
+		}
 	}
 
 	static sameExecution(left, right) {
@@ -20540,7 +21774,7 @@ class Runtime {
 		});
 		return {
 			errors,
-			renderer: new ReportRenderer({
+			renderer: new __webpack_exports__ReportRenderer({
 				collection,
 				receipts,
 				errors,
@@ -20756,7 +21990,7 @@ class Runtime {
 		const runUrl = `${this.context.serverUrl}/${this.context.repo.owner}/${this.context.repo.repo}/actions/runs/${this.context.runId}/attempts/${process.env.GITHUB_RUN_ATTEMPT}`;
 		await this.core.summary
 			.addRaw(
-				`## ❌ CI reports incomplete\n\n${ReportRenderer.text(message)}\n\nNo missing publication was inferred successful. [Open collection and producer jobs](${runUrl}).\n\nWorkflow revision: ${this.context.sha}.\n`,
+				`## ❌ CI reports incomplete\n\n${__webpack_exports__ReportRenderer.text(message)}\n\nNo missing publication was inferred successful. [Open collection and producer jobs](${runUrl}).\n\nWorkflow revision: ${this.context.sha}.\n`,
 			)
 			.write();
 		this.core.setFailed(message);

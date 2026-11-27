@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { XMLValidator } from "fast-xml-parser";
-import { ParserFactory } from "../../parse-ci-reports/src/parsers/ParserFactory.js";
+import { ParserFactory } from "../../parse-ci-reports/dist/index.js";
 import { CoberturaReport } from "./CoberturaReport.js";
 import { Protocol } from "./Protocol.js";
 

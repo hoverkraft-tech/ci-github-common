@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ReportRenderer } from "../../parse-ci-reports/src/formatters/CIReportFormatter.js";
+import { ReportRenderer } from "../../parse-ci-reports/dist/index.js";
 import { Reporters } from "./Reporters.js";
 
 function collection() {

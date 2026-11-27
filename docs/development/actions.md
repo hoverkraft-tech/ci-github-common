@@ -20,14 +20,16 @@ and `test.report-group` to the calling job ID in `__shared-ci.yml`. Source tests
 run through the package-owned `test:ci` script. These released workflows remain
 status-only in the new collector until their producer adapter is released.
 The recorder's dedicated test workflow uses `run-check` to exercise the current
-protocol, with dependencies installed for both the recorder and shared parser.
+protocol with its locked dependencies.
 Every participating job feeds one outer `ci-reports` workflow.
 
 Keep local workflow self-references. Follow the
 [release order in ADR 0005](../adr/0005-ci-reporting-contract.md#consequences-and-rollout).
-The recorder reuses the parser's native-format classes and the download action's
-bundled artifact client. Rebuild these bundles when changing shared code; do not
-install project dependencies in publisher jobs.
+The recorder reuses the parser's compiled native-format classes and renderer,
+and the download action's bundled artifact client. Build the parser before the
+recorder when changing shared code. The recorder's build must not depend on
+whether the parser has a local dependency installation. Do not install project
+dependencies in publisher jobs.
 
 Each action's integration workflow exercises its public entrypoint. Actions with
 runtime dependencies bundle them with their licenses; dependency-free helpers

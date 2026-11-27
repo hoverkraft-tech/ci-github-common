@@ -86,3 +86,24 @@ test("preparation binds only the unique active runner and collection refuses act
 		/still active/,
 	);
 });
+
+test("transient GitHub job-list errors receive bounded retries; permission failures do not", async () => {
+	const identity = resolver({});
+	let requests = 0;
+	identity.github.paginate = async () => {
+		if (++requests < 3)
+			throw Object.assign(new Error("Unavailable"), { status: 500 });
+		return [job];
+	};
+	assert.deepEqual(await identity.jobs(), [job]);
+	assert.equal(requests, 3);
+	for (const status of [503, 403]) {
+		requests = 0;
+		identity.github.paginate = async () => {
+			requests++;
+			throw Object.assign(new Error("Unavailable"), { status });
+		};
+		await assert.rejects(identity.jobs(), /Unavailable/);
+		assert.equal(requests, status === 503 ? 4 : 1);
+	}
+});

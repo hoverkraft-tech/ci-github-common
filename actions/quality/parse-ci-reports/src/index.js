@@ -4,6 +4,9 @@ import { NativeGlob } from "./NativeGlob.js";
 import { ReportParserCore } from "./ReportParserCore.js";
 import { ReportPathResolver } from "./ReportPathResolver.js";
 
+export { ReportRenderer } from "./formatters/CIReportFormatter.js";
+export { ParserFactory } from "./parsers/ParserFactory.js";
+
 export async function run({ core, glob: globModule = NativeGlob, inputs }) {
 	try {
 		const fileSystemService = new FileSystemService(inputs.workingDirectory);

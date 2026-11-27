@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { ReportRenderer } from "../../parse-ci-reports/src/formatters/CIReportFormatter.js";
+import { ReportRenderer } from "../../parse-ci-reports/dist/index.js";
 import { CheckRunner } from "./CheckRunner.js";
 import { Collector } from "./Collector.js";
 import { CoveragePublication } from "./CoveragePublication.js";

@@ -1,5 +1,5 @@
 import { gzipSync } from "node:zlib";
-import { ReportRenderer } from "../../parse-ci-reports/src/formatters/CIReportFormatter.js";
+import { ReportRenderer } from "../../parse-ci-reports/dist/index.js";
 import { Reporters } from "./Reporters.js";
 
 /** Deduplicate diagnostics and preserve the publisher selected by their producer. */

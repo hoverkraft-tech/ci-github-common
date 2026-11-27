@@ -15,15 +15,23 @@ export class ExecutionIdentity {
 	}
 
 	async jobs(attempt = this.attempt) {
-		return this.github.paginate(
-			this.github.rest.actions.listJobsForWorkflowRunAttempt,
-			{
-				...this.context.repo,
-				run_id: this.context.runId,
-				attempt_number: attempt,
-				per_page: 100,
-			},
-		);
+		for (let retry = 0; ; retry++) {
+			try {
+				return await this.github.paginate(
+					this.github.rest.actions.listJobsForWorkflowRunAttempt,
+					{
+						...this.context.repo,
+						run_id: this.context.runId,
+						attempt_number: attempt,
+						per_page: 100,
+					},
+				);
+			} catch (error) {
+				if (retry === 3 || ![500, 502, 503, 504].includes(error.status))
+					throw error;
+				await this.sleep(1000 * 2 ** retry);
+			}
+		}
 	}
 
 	static sameExecution(left, right) {
