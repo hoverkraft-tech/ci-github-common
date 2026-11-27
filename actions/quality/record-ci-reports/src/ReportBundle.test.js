@@ -113,11 +113,24 @@ test("producer plans drive multi-component collection without caller job names o
 
 test("single artifact extraction and diagnostics-only producers work with the same bundle contract", (t) => {
 	const f = fixture(t, [producer("test", ".project", false)]);
-	const recorded = f.record("test");
+	const directory = path.join(f.root, ".project");
+	fs.mkdirSync(directory);
+	const lcov = path.join(directory, "lcov.info");
+	fs.writeFileSync(lcov, "SF:index.js\nDA:1,1\nend_of_record\n");
+	const mergeSha = "b".repeat(40);
+	const recorded = f.record("test", {
+		files: [path.join(directory, "junit.xml"), lcov],
+		categories: [{ file: lcov, type: "coverage" }],
+		sourceSha: mergeSha,
+	});
 	const result = f.collect({ directory: recorded.directory });
 	assert.equal(result.complete, true);
 	assert.deepEqual(result.reports, []);
-	assert.equal(result.collection.reportFiles.length, 1);
+	assert.equal(result.collection.reportFiles.length, 2);
+	assert.equal(result.collection.statuses[0].sha, mergeSha);
+	assert.ok(
+		result.collection.reportFiles.some((file) => file.endsWith("lcov.info")),
+	);
 	assert.equal(
 		f.collect({ directory: recorded.directory, provider: "github" }).complete,
 		false,

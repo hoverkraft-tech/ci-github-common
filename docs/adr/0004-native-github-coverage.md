@@ -199,19 +199,29 @@ The reporting contract and its language producers span several repositories.
 Common's own repository CI must not depend on an unreleased Node.js producer
 that already depends on this common change.
 
-1. Keep common's action tests on the released Node.js CI workflow and its own
-   lint/report orchestration on the matching released common workflows. The
-   dedicated reporting fixtures continue to exercise the new local contract.
-2. Merge and release the common reporting implementation first.
-3. Replace the producer PRs' development common pins with that release, then
+1. Keep common's action tests on the released Node.js CI workflow. Its linter and
+   collector remain self-references so repository CI exercises the current change.
+2. Import the released Node.js native artifacts inside `__shared-ci.yml` using
+   the local recorder. Derive the complete import plan from the source jobs in
+   `needs`, require one JUnit/LCOV artifact per action from the current attempt,
+   and preserve each original workflow result. Keep each action's diagnostics
+   separate. Imported LCOV is summary data only, with the tested merge revision;
+   it cannot establish PR head coverage or enable external publication.
+3. Merge and release the common reporting implementation first.
+4. Replace the producer PRs' development common pins with that release, then
    merge and release the language producers.
-4. Adopt the new released Node.js workflow and local reporting contract in
-   common's own CI together, in a follow-up PR.
+5. Update common to the released Node.js producer, forward its report-plan outputs
+   and remove the temporary import jobs together in a follow-up PR.
 
-This stages repository adoption without replacing shared Node.js CI or adding a
-compatibility layer. Keep external references pinned to release commits with
-version comments. Development producer pins are temporary and must be replaced
-before those producer PRs merge.
+The importer is limited to common's existing single-execution action tests. It
+uses the current recorder and strict collector without changing their public
+contract or introducing another workflow. Missing or duplicate artifacts,
+missing native files, parsing failures and failed source workflows remain fatal.
+The collector continues to require plans for every producer; this transition
+adds no automatic fallback based on discovered artifacts.
+
+Keep external references pinned to release commits with version comments.
+Development producer pins must be replaced before those producer PRs merge.
 
 ## Alternatives
 

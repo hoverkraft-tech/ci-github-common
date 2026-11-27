@@ -17,15 +17,14 @@ Follow `parse-ci-reports` for each JavaScript action: call the released Node.js
 job permissions. Disable its build and lint jobs; keep CodeQL with the repository
 config, dependency review and GitHub coverage enabled. Set `test.comment` to false
 and `test.report-group` to the calling job ID in `__shared-ci.yml`. Source tests
-run through the package-owned `test:ci` script. One `ci-reports` job collects the
-native reports through the released common workflow after all source-test jobs,
-including failures, and updates one coverage comment with separate figures for
-each action. It also combines test
-results and lint summaries; individual producer comments stay disabled.
+run through the package-owned `test:ci` script. The temporary import jobs in
+`__shared-ci.yml` require each action's JUnit and LCOV files from the current
+attempt, preserve source failures and record separate diagnostics through the
+local recorder. The local linter and `ci-reports` workflows publish one combined
+CI comment, exercising the current implementation.
 
-The reporting integration fixtures call local actions and workflows to validate
-the new reporting contract. Keep repository CI on matching released producers and
-collectors; see the [release order in ADR 0004](../adr/0004-native-github-coverage.md#release-order).
+Keep local workflow self-references. The [release order in ADR 0004](../adr/0004-native-github-coverage.md#release-order)
+describes when to update the released Node.js producer and remove the importer.
 
 Each action's integration workflow exercises its public entrypoint. Actions with
 runtime dependencies bundle them with their licenses; dependency-free helpers
