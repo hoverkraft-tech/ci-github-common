@@ -20,7 +20,7 @@ is needed. Requires Linux, Bash, contents: read and actions: read.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/quality/run-check@beab1278f3b6e89f3c2e91e774071efb82073a6c # feat/native-github-coverage
+- uses: hoverkraft-tech/ci-github-common/actions/quality/run-check@035ff1e0a15666bd00842ec61d7048c2d4e403f3 # feat/native-github-coverage
   with:
     # Bash command. Write native reports under the fresh CI_REPORTS_DIR environment variable.
     # This input is required.
@@ -37,7 +37,7 @@ is needed. Requires Linux, Bash, contents: read and actions: read.
     # Newline-separated native test report patterns, relative to CI_REPORTS_DIR.
     test-results: ""
 
-    # Newline-separated native coverage patterns, relative to CI_REPORTS_DIR. One measurement per project.
+    # Newline-separated native coverage patterns, relative to CI_REPORTS_DIR. One measurement per project. May use the same path as test-results for native Vitest/Jest JSON containing coverageMap.
     test-coverage: ""
 
     # Newline-separated native lint report patterns, relative to CI_REPORTS_DIR.
@@ -49,14 +49,14 @@ is needed. Requires Linux, Bash, contents: read and actions: read.
 
 ## Inputs
 
-| **Input**               | **Description**                                                                                      | **Required** | **Default**    |
-| ----------------------- | ---------------------------------------------------------------------------------------------------- | ------------ | -------------- |
-| **`command`**           | Bash command. Write native reports under the fresh CI_REPORTS_DIR environment variable.              | **true**     | -              |
-| **`name`**              | Human-readable check name.                                                                           | **false**    | `Custom check` |
-| **`working-directory`** | Repository-relative project directory.                                                               | **false**    | `.`            |
-| **`test-results`**      | Newline-separated native test report patterns, relative to CI_REPORTS_DIR.                           | **false**    | -              |
-| **`test-coverage`**     | Newline-separated native coverage patterns, relative to CI_REPORTS_DIR. One measurement per project. | **false**    | -              |
-| **`lint-results`**      | Newline-separated native lint report patterns, relative to CI_REPORTS_DIR.                           | **false**    | -              |
+| **Input**               | **Description**                                                                                                                                                                                | **Required** | **Default**    |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | -------------- |
+| **`command`**           | Bash command. Write native reports under the fresh CI_REPORTS_DIR environment variable.                                                                                                        | **true**     | -              |
+| **`name`**              | Human-readable check name.                                                                                                                                                                     | **false**    | `Custom check` |
+| **`working-directory`** | Repository-relative project directory.                                                                                                                                                         | **false**    | `.`            |
+| **`test-results`**      | Newline-separated native test report patterns, relative to CI_REPORTS_DIR.                                                                                                                     | **false**    | -              |
+| **`test-coverage`**     | Newline-separated native coverage patterns, relative to CI_REPORTS_DIR. One measurement per project. May use the same path as test-results for native Vitest/Jest JSON containing coverageMap. | **false**    | -              |
+| **`lint-results`**      | Newline-separated native lint report patterns, relative to CI_REPORTS_DIR.                                                                                                                     | **false**    | -              |
 
 <!-- inputs:end -->
 <!-- outputs:start -->

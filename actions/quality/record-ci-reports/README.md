@@ -19,13 +19,13 @@ Requires contents: read and actions: read. Never forward outputs to ci-reports.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-common/actions/quality/record-ci-reports@beab1278f3b6e89f3c2e91e774071efb82073a6c # feat/native-github-coverage
+- uses: hoverkraft-tech/ci-github-common/actions/quality/record-ci-reports@035ff1e0a15666bd00842ec61d7048c2d4e403f3 # feat/native-github-coverage
   with:
     # Lifecycle operation, prepare or finalize.
     # This input is required.
     operation: ""
 
-    # Prepare only. JSON check name, project, variant and typed report selectors. See docs/usage/ci-reports.md.
+    # Prepare only. JSON check name, project, variant and typed report selectors. Test and coverage selectors may reference the same native Vitest/Jest JSON file; both requirements are validated and the file is retained once. See docs/usage/ci-reports.md.
     definition: ""
 
     # Finalize only. Opaque handle from prepare in the same job.
@@ -43,13 +43,13 @@ Requires contents: read and actions: read. Never forward outputs to ci-reports.
 
 ## Inputs
 
-| **Input**        | **Description**                                                                                           | **Required** | **Default** |
-| ---------------- | --------------------------------------------------------------------------------------------------------- | ------------ | ----------- |
-| **`operation`**  | Lifecycle operation, prepare or finalize.                                                                 | **true**     | -           |
-| **`definition`** | Prepare only. JSON check name, project, variant and typed report selectors. See docs/usage/ci-reports.md. | **false**    | -           |
-| **`recording`**  | Finalize only. Opaque handle from prepare in the same job.                                                | **false**    | -           |
-| **`outcome`**    | Finalize only. Actual command outcome, success, failure or cancelled.                                     | **false**    | -           |
-| **`exit-code`**  | Finalize only. Optional original command exit code.                                                       | **false**    | -           |
+| **Input**        | **Description**                                                                                                                                                                                                                                           | **Required** | **Default** |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- |
+| **`operation`**  | Lifecycle operation, prepare or finalize.                                                                                                                                                                                                                 | **true**     | -           |
+| **`definition`** | Prepare only. JSON check name, project, variant and typed report selectors. Test and coverage selectors may reference the same native Vitest/Jest JSON file; both requirements are validated and the file is retained once. See docs/usage/ci-reports.md. | **false**    | -           |
+| **`recording`**  | Finalize only. Opaque handle from prepare in the same job.                                                                                                                                                                                                | **false**    | -           |
+| **`outcome`**    | Finalize only. Actual command outcome, success, failure or cancelled.                                                                                                                                                                                     | **false**    | -           |
+| **`exit-code`**  | Finalize only. Optional original command exit code.                                                                                                                                                                                                       | **false**    | -           |
 
 <!-- inputs:end -->
 <!-- outputs:start -->
