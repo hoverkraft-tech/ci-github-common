@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
-import * as glob from "@actions/glob";
 
 const fixtures = {
 	"node-junit.xml": {
@@ -120,7 +119,7 @@ function inputs(reportPaths, overrides = {}) {
 for (const [name, { kind, hasErrors }] of Object.entries(fixtures)) {
 	it(`parses ${name} into reporting outputs`, async () => {
 		const result = recorder();
-		await run({ core: result.core, glob, inputs: inputs(name) });
+		await run({ core: result.core, inputs: inputs(name) });
 		assert.equal(result.failures.length, 0);
 		assert.ok(result.outputs.markdown);
 		assert.ok(result.outputs[`${kind}-markdown`]);
@@ -133,11 +132,21 @@ for (const [name, { kind, hasErrors }] of Object.entries(fixtures)) {
 	});
 }
 describe("run", () => {
+	it("retains valid diagnostics when another required report is missing or malformed", async () => {
+		for (const other of ["absent.xml", "malformed.json"]) {
+			const result = recorder();
+			await assert.rejects(
+				run({ core: result.core, inputs: inputs(`junit.xml,${other}`) }),
+			);
+			assert.ok(result.outputs["test-markdown"]);
+			assert.equal(result.outputs["has-errors"], true);
+			assert.equal(result.failures.length, 1);
+		}
+	});
 	it("rewrites annotations and exposes failures without failing reporting", async () => {
 		const result = recorder();
 		await run({
 			core: result.core,
-			glob,
 			inputs: inputs("junit.xml,results.sarif,lcov.info"),
 		});
 		assert.equal(result.outputs["has-errors"], true);
@@ -161,7 +170,7 @@ describe("run", () => {
 		it(`rejects missing explicit reports: ${pattern}`, async () => {
 			const result = recorder();
 			await assert.rejects(
-				run({ core: result.core, glob, inputs: inputs(pattern) }),
+				run({ core: result.core, inputs: inputs(pattern) }),
 				/No report files matched explicit pattern/,
 			);
 			assert.equal(result.failures.length, 1);
@@ -172,7 +181,6 @@ describe("run", () => {
 		const result = recorder();
 		await run({
 			core: result.core,
-			glob,
 			inputs: inputs("auto:all", {
 				workingDirectory: path.join(root, "empty"),
 			}),
@@ -185,7 +193,6 @@ describe("run", () => {
 		const result = recorder();
 		await run({
 			core: result.core,
-			glob,
 			inputs: inputs("auto:test,*.sarif,!absent/**"),
 		});
 		assert.ok(JSON.parse(result.outputs["parsed-files"]).length >= 2);
@@ -194,7 +201,7 @@ describe("run", () => {
 	it("reports malformed input as an action failure", async () => {
 		const result = recorder();
 		await assert.rejects(
-			run({ core: result.core, glob, inputs: inputs("malformed.json") }),
+			run({ core: result.core, inputs: inputs("malformed.json") }),
 		);
 		assert.equal(result.failures.length, 1);
 	});
@@ -203,7 +210,6 @@ describe("run", () => {
 		await assert.rejects(
 			run({
 				core: result.core,
-				glob,
 				inputs: inputs("auto:all", {
 					workingDirectory: path.join(root, "absent"),
 				}),

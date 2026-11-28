@@ -1,0 +1,59 @@
+# Register expected native reports before a check, then validate and retain them.
+# Providers use prepare/finalize internally. For custom commands, use run-check.
+# Requires contents: read and actions: read. Never forward outputs to ci-reports.
+name: Record CI reports
+description: Register a check before execution and retain validated native evidence afterward.
+author: hoverkraft
+branding:
+  icon: check-square
+  color: blue
+inputs:
+  operation:
+    description: Lifecycle operation, prepare or finalize.
+    required: true
+  definition:
+    description: Prepare only. JSON check name, project, variant and typed report selectors. Test and coverage selectors may reference the same native Vitest/Jest JSON file; both requirements are validated and the file is retained once. See docs/usage/ci-reports.md.
+  recording:
+    description: Finalize only. Opaque handle from prepare in the same job.
+  outcome:
+    description: Finalize only. Actual command outcome, success, failure or cancelled.
+  exit-code:
+    description: Finalize only. Optional original command exit code.
+outputs:
+  recording:
+    description: Local recording handle, used only in the same job.
+    value: ${{ steps.record.outputs.recording }}
+  report-directory:
+    description: Fresh private output directory for this check.
+    value: ${{ steps.record.outputs.report-directory }}
+  registration-id:
+    description: Immutable check registration ID for diagnostics.
+    value: ${{ steps.record.outputs.registration-id }}
+  artifact-id:
+    description: Retained native result artifact ID for diagnostics.
+    value: ${{ steps.record.outputs.artifact-id }}
+runs:
+  using: composite
+  steps:
+    - id: record
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        TOKEN: ${{ github.token }}
+        OPERATION: ${{ inputs.operation }}
+        DEFINITION: ${{ inputs.definition }}
+        RECORDING: ${{ inputs.recording }}
+        OUTCOME: ${{ inputs.outcome }}
+        EXIT_CODE: ${{ inputs.exit-code }}
+      with:
+        script: |
+          const path = require('node:path');
+          const { pathToFileURL } = require('node:url');
+          const actionPath = process.env.ACTION_PATH;
+          const { createArtifactClient } = await import(pathToFileURL(path.resolve(actionPath, '../../download-artifact/dist/index.js')));
+          const { Runtime } = await import(pathToFileURL(path.join(process.env.ACTION_PATH, 'dist/index.js')));
+          const runtime = new Runtime({ core, github, context, actionPath, token: process.env.TOKEN, client: createArtifactClient() });
+          await runtime.producer(process.env.OPERATION, {
+            definition: process.env.DEFINITION, recording: process.env.RECORDING,
+            outcome: process.env.OUTCOME, exitCode: process.env.EXIT_CODE,
+          });

@@ -2,7 +2,6 @@ name: Internal - Tests for create-and-merge-pull-request action
 
 on:
   workflow_call:
-
 permissions: {}
 
 jobs:

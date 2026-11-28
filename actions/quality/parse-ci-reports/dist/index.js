@@ -25,7 +25,9 @@ var __webpack_exports__ = {};
 
 // EXPORTS
 __nccwpck_require__.d(__webpack_exports__, {
-  e: () => (/* binding */ run)
+  O6: () => (/* reexport */ ParserFactory),
+  wb: () => (/* reexport */ ReportRenderer),
+  eF: () => (/* binding */ run)
 });
 
 ;// CONCATENATED MODULE: external "node:fs"
@@ -131,6 +133,37 @@ class LoggerService {
 		this.core.error(message);
 	}
 }
+
+;// CONCATENATED MODULE: ./src/NativeGlob.js
+
+
+
+/** Node 24 supplies globbing without a separate matcher dependency. */
+const NativeGlob = {
+	async create(patterns) {
+		const entries = patterns.split(/\r?\n/).filter(Boolean);
+		const include = entries.filter((pattern) => !pattern.startsWith("!"));
+		const exclude = entries
+			.filter((pattern) => pattern.startsWith("!"))
+			.map((pattern) => pattern.slice(1));
+		if (
+			entries.length > 512 ||
+			entries.some((pattern) => pattern.length > 2048)
+		)
+			throw new Error("Report discovery patterns exceed their resource limit.");
+		return {
+			async *globGenerator() {
+				for (const filename of external_node_fs_namespaceObject.globSync(include, { exclude })) {
+					if (
+						external_node_fs_namespaceObject.lstatSync(filename).isFile() &&
+						external_node_fs_namespaceObject.realpathSync(filename) === external_node_path_namespaceObject.resolve(filename)
+					)
+						yield filename;
+				}
+			},
+		};
+	},
+};
 
 ;// CONCATENATED MODULE: ./src/formatters/BaseFormatter.js
 /**
@@ -8661,9 +8694,6 @@ class CoberturaParser extends BaseParser {
 				throw new Error("Invalid Cobertura format: missing coverage element");
 			}
 
-			const lineRate = parseFloat(coverage["@_line-rate"] || 0);
-			const branchRate = parseFloat(coverage["@_branch-rate"] || 0);
-
 			// Calculate totals from packages if available
 			let totalLines = 0;
 			let coveredLines = 0;
@@ -8684,15 +8714,34 @@ class CoberturaParser extends BaseParser {
 				}
 			}
 
-			// Fallback to rates if totals not calculated
-			if (totalLines === 0 && lineRate > 0) {
-				totalLines = 100;
-				coveredLines = Math.round(lineRate * 100);
-			}
-
-			if (totalBranches === 0 && branchRate > 0) {
-				totalBranches = 100;
-				coveredBranches = Math.round(branchRate * 100);
+			// Aggregate attributes are actual counts. A percentage alone must
+			// never manufacture a denominator of 100 lines or branches.
+			const counts = (metric) => {
+				const total = Number(coverage[`@_${metric}-valid`] || 0);
+				const covered = Number(coverage[`@_${metric}-covered`] || 0);
+				if (
+					!Number.isSafeInteger(total) ||
+					!Number.isSafeInteger(covered) ||
+					covered < 0 ||
+					covered > total
+				)
+					throw new Error("Invalid aggregate coverage counts.");
+				return [total, covered];
+			};
+			if (totalLines === 0) [totalLines, coveredLines] = counts("lines");
+			if (coverage["@_branches-valid"] !== undefined) {
+				// Istanbul can report branches on lines without a statement. These
+				// contribute to exact aggregate counts but not class line entries.
+				const [total, covered] = counts("branches");
+				if (
+					total < totalBranches ||
+					covered < coveredBranches ||
+					total - covered < totalBranches - coveredBranches
+				)
+					throw new Error(
+						"Aggregate branch counts contradict measured branches.",
+					);
+				[totalBranches, coveredBranches] = [total, covered];
 			}
 
 			reportData.setCoverage(
@@ -9653,6 +9702,8 @@ class ReportParserCore {
 	 */
 	parseReports(files) {
 		const aggregatedData = new ReportData();
+		aggregatedData.parseErrors = [];
+		aggregatedData.parsedReports = [];
 
 		// Log path rewriting configuration if enabled
 		if (this.pathRewriter.isEnabled()) {
@@ -9667,9 +9718,19 @@ class ReportParserCore {
 
 		for (const file of files) {
 			this.logger.info(`Parsing ${file}...`);
-			const reportData = this.parserFactory.parse(file);
+			let reportData;
+			try {
+				reportData = this.parserFactory.parse(file);
+			} catch (error) {
+				aggregatedData.parseErrors.push(`${file}: ${error.message}`);
+				continue;
+			}
 
 			// Apply path rewriting to test results
+			aggregatedData.parsedReports.push({
+				file,
+				type: reportData.coverage ? "coverage" : reportData.reportType,
+			});
 			for (const test of reportData.tests) {
 				test.file = this.pathRewriter.rewritePath(test.file);
 			}
@@ -9916,13 +9977,452 @@ class ReportPathResolver {
 // Export ReportCategory for convenience
 
 
+;// CONCATENATED MODULE: ./src/formatters/CIReportFormatter.js
+/** One normalized model, a compact selected comment and a complete run summary. */
+class ReportRenderer {
+	constructor({ collection, receipts = [], errors = [], runUrl, sourceUrl }) {
+		Object.assign(this, { collection, receipts, errors, runUrl, sourceUrl });
+	}
+
+	static text(value, limit = 400) {
+		return String(value ?? "")
+			.slice(0, limit)
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/@/g, "&#64;")
+			.replace(/[\r\n]+/g, " ")
+			.replace(/([\\`*_[\]|])/g, "\\$1");
+	}
+
+	static table(headers, rows, limit = 30) {
+		const visible = rows.slice(0, limit);
+		const table = [
+			`| ${headers.join(" | ")} |`,
+			`| ${headers.map(() => "---").join(" | ")} |`,
+			...visible.map((row) => `| ${row.join(" | ")} |`),
+		];
+		if (rows.length > visible.length)
+			table.push(
+				`\nShowing ${visible.length} of ${rows.length} rows. Full details are retained in the report artifacts.`,
+			);
+		return table.join("\n");
+	}
+
+	static details(label, body) {
+		return `<details>\n<summary>${ReportRenderer.text(label, 250)}</summary>\n\n${body}\n\n</details>`;
+	}
+
+	link(label, url) {
+		if (!/^https:\/\//.test(url || "")) return ReportRenderer.text(label);
+		return `[${ReportRenderer.text(label)}](${url.replace(/[()\s]/g, encodeURIComponent)})`;
+	}
+
+	source(file, sha, line) {
+		if (!file) return "See job logs";
+		const url = `${this.sourceUrl}/${sha}/${file.split("/").map(encodeURIComponent).join("/")}${Number.isSafeInteger(line) && line > 0 ? `#L${line}` : ""}`;
+		return this.link(`${file}${line ? `:${line}` : ""}`, url);
+	}
+
+	findings() {
+		const tests = [];
+		const lint = new Map();
+		for (const check of this.collection.checks) {
+			for (const asset of check.result?.assets || []) {
+				for (const test of asset.data?.tests || [])
+					tests.push({
+						...test,
+						check,
+						owner: asset.selector.owner || "collector",
+					});
+				for (const issue of asset.data?.lintIssues || []) {
+					const key = JSON.stringify([
+						check.check.project,
+						check.source.sha,
+						issue.source || asset.format,
+						issue.rule,
+						issue.file,
+						issue.line,
+						issue.column,
+						issue.message,
+					]);
+					if (!lint.has(key))
+						lint.set(key, {
+							...issue,
+							check,
+							owner: asset.selector.owner || "collector",
+						});
+				}
+			}
+		}
+		return { tests, lint: [...lint.values()] };
+	}
+
+	selected(comment) {
+		if (!comment) return { test: true, lint: true, coverage: true };
+		const selections = Object.fromEntries(
+			Object.entries(this.collection.reporters).map(([kind, values]) => [
+				kind,
+				values.includes("comment"),
+			]),
+		);
+		if (
+			this.receipts.some(
+				(receipt) =>
+					receipt.reporter === "github" && receipt.fallback === "comment",
+			)
+		)
+			selections.coverage = true;
+		return selections;
+	}
+
+	tests(tests, comment) {
+		if (!tests.length) return "";
+		const failed = tests.filter((item) =>
+			["failed", "error"].includes(item.status),
+		);
+		const passed = tests.filter((item) => item.status === "passed").length;
+		const skipped = tests.filter((item) => item.status === "skipped").length;
+		const projects = new Map();
+		for (const item of tests) {
+			const key = item.check.check.project;
+			if (!projects.has(key))
+				projects.set(key, { passed: 0, failed: 0, skipped: 0 });
+			projects.get(key)[
+				["failed", "error"].includes(item.status) ? "failed" : item.status
+			]++;
+		}
+		const body = [
+			ReportRenderer.table(
+				["Project", "Executions"],
+				[...projects].map(([name, counts]) => [
+					ReportRenderer.text(name),
+					`${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped`,
+				]),
+			),
+			"Counts include every runtime execution, not globally unique test cases.",
+		];
+		const cases = new Map();
+		for (const item of failed) {
+			const key = JSON.stringify([
+				item.check.check.project,
+				item.check.source.sha,
+				item.suite,
+				item.name,
+				item.file,
+				item.message,
+			]);
+			if (!cases.has(key)) cases.set(key, { item, executions: [] });
+			cases
+				.get(key)
+				.executions.push(
+					this.link(
+						Object.values(item.check.check.variant).join(" / ") ||
+							item.check.check.name,
+						item.check.job.html_url,
+					),
+				);
+		}
+		if (cases.size)
+			body.push(
+				ReportRenderer.table(
+					["Failing case", "Executions", "Diagnostic"],
+					[...cases.values()].map(({ item, executions }) => [
+						ReportRenderer.text(`${item.suite} / ${item.name}`),
+						[...new Set(executions)].join(", "),
+						ReportRenderer.text(item.message),
+					]),
+				),
+			);
+		if (!comment)
+			body.push(
+				ReportRenderer.table(
+					["Check / runtime", "Result", "Evidence"],
+					this.collection.checks
+						.filter((check) =>
+							check.check.reports.some((report) => report.kind === "test"),
+						)
+						.map((check) => [
+							ReportRenderer.text(
+								`${check.check.name} / ${Object.values(check.check.variant).join(" / ")}`,
+							),
+							ReportRenderer.text(check.result?.outcome || "Missing result"),
+							this.link("Job and artifacts", check.job.html_url),
+						]),
+					100,
+				),
+			);
+		return ReportRenderer.details(
+			`Tests: ${passed} passed, ${failed.length} failed${skipped ? `, ${skipped} skipped` : ""} executions`,
+			body.join("\n\n"),
+		);
+	}
+
+	lint(issues) {
+		const checks = this.collection.checks.filter((check) =>
+			check.check.reports.some((report) => report.kind === "lint"),
+		);
+		if (!checks.length) return "";
+		const errors = issues.filter((issue) => issue.severity === "error").length;
+		const warnings = issues.filter(
+			(issue) => issue.severity === "warning",
+		).length;
+		const body = [
+			ReportRenderer.table(
+				["Check", "Result", "Evidence"],
+				checks.map((check) => [
+					ReportRenderer.text(check.check.name),
+					ReportRenderer.text(check.result?.outcome || "Missing result"),
+					this.link("Lint job", check.job.html_url),
+				]),
+			),
+		];
+		for (const check of checks)
+			for (const asset of check.result?.assets || [])
+				if (asset.data?.summary)
+					body.push(
+						`**${ReportRenderer.text(check.check.name)} native summary**\n\n${asset.data.summary
+							.split("\n")
+							.filter((line) => line.startsWith("|"))
+							.slice(0, 80)
+							.map(
+								(line) =>
+									`| ${line
+										.split("|")
+										.slice(1, -1)
+										.map((cell) => ReportRenderer.text(cell.trim(), 300))
+										.join(" | ")} |`,
+							)
+							.join("\n")}`,
+					);
+		if (issues.length)
+			body.push(
+				ReportRenderer.table(
+					["Location", "Rule", "Finding"],
+					issues.map((issue) => [
+						this.source(issue.file, issue.check.source.sha, issue.line),
+						ReportRenderer.text(issue.rule),
+						ReportRenderer.text(`${issue.severity}: ${issue.message}`),
+					]),
+				),
+			);
+		const failed = checks.filter(
+			(check) => check.result?.outcome === "failure",
+		).length;
+		const incomplete = checks.filter(
+			(check) => !check.result || check.result.errors.length,
+		).length;
+		const status = [
+			`${checks.length} ${checks.length === 1 ? "check" : "checks"}`,
+			...(failed ? [`${failed} failed`] : []),
+			...(incomplete ? [`${incomplete} incomplete`] : []),
+			...(issues.length ? [`${errors} errors`, `${warnings} warnings`] : []),
+		];
+		if (!failed && !incomplete && !errors) status.push("passed");
+		return ReportRenderer.details(
+			`Lint: ${status.join(", ")}`,
+			body.join("\n\n"),
+		);
+	}
+
+	coverage(comment) {
+		const datasets = this.collection.datasets;
+		if (!datasets.length) return "";
+		const measurements = datasets.map((dataset) => {
+			const coverage = dataset.errors.length
+				? null
+				: dataset.assets[0]?.data?.coverage;
+			const metric = coverage?.metric || "lines";
+			const lines = coverage?.[metric];
+			return {
+				dataset,
+				coverage,
+				metric,
+				label: `${dataset.label}: ${lines ? `${lines.percentage.toFixed(1)}% ${metric}` : "unknown"}`,
+			};
+		});
+		const title =
+			measurements.length <= 2
+				? measurements.map(({ label }) => label).join("; ")
+				: `${measurements.length} datasets; ${measurements.filter(({ coverage }) => !coverage).length} unavailable`;
+		const body = [
+			ReportRenderer.table(
+				["Dataset", "Coverage", "Change"],
+				measurements.map(({ dataset, coverage, metric }) => {
+					const current = coverage?.[metric];
+					const base = dataset.baseline?.coverage?.[metric];
+					const delta =
+						coverage && base ? current.percentage - base.percentage : null;
+					return [
+						ReportRenderer.text(dataset.label),
+						coverage
+							? `${current.percentage.toFixed(1)}% ${metric} (${current.covered}/${current.total})`
+							: "**Unknown: missing or invalid report**",
+						delta === null
+							? ReportRenderer.text(
+									dataset.baseline?.reason || "No comparable baseline",
+								)
+							: this.link(
+									`${delta >= 0 ? "+" : ""}${delta.toFixed(1)} pp vs ${dataset.baseline.sha.slice(0, 7)}`,
+									dataset.baseline.url,
+								),
+					];
+				}),
+			),
+			"Measurements remain separate by dataset. No coverage gate is configured by this reporting workflow. Changes require a comparable base-commit measurement.",
+		];
+		if (!comment)
+			body.push(
+				ReportRenderer.table(
+					["Dataset", "Native metrics", "Tested source"],
+					measurements.map(({ dataset, coverage }) => [
+						ReportRenderer.text(dataset.label),
+						["branches", "functions", "statements"]
+							.map(
+								(metric) =>
+									`${metric}: ${coverage?.[metric]?.total ? `${coverage[metric].percentage.toFixed(1)}%` : "unavailable"}`,
+							)
+							.join("; "),
+						`\`${dataset.source.sha.slice(0, 7)}\` (${ReportRenderer.text(dataset.source.kind)})`,
+					]),
+				),
+			);
+		return ReportRenderer.details(`Coverage: ${title}`, body.join("\n\n"));
+	}
+
+	render({ comment = false } = {}) {
+		const selected = this.selected(comment);
+		if (comment && !Object.values(selected).some(Boolean)) return "";
+		const errors = this.errors;
+		const { tests, lint } = this.findings();
+		const publicationFailed = this.receipts.some(
+			(receipt) => receipt.status === "failed",
+		);
+		const incomplete =
+			this.collection.errors.length ||
+			this.collection.checks.some(
+				(check) => !check.result || check.result.errors.length,
+			);
+		const title = errors.length
+			? publicationFailed
+				? "Publication failed"
+				: incomplete
+					? "Reports incomplete"
+					: "CI checks failed"
+			: "CI checks passed";
+		const outcome = errors.length
+			? "Required execution, evidence, or publication did not complete successfully."
+			: "Checks, report validation, and selected publication completed successfully.";
+		const identity = this.collection.identity;
+		const parts = [
+			`## ${errors.length ? "❌" : "✅"} ${title}`,
+			outcome,
+			`${this.link(`Run ${identity.runId}, attempt ${identity.attempt}`, this.runUrl)} · Workflow revision \`${identity.sha.slice(0, 7)}\`.`,
+			`Tested sources: ${[...new Set(this.collection.checks.map((check) => `\`${check.source.sha.slice(0, 7)}\` (${ReportRenderer.text(check.source.kind)})`))].join(", ")}.`,
+		];
+		if (errors.length)
+			parts.push(
+				`### Needs attention\n\n${errors
+					.slice(0, 8)
+					.map((error) => `- ${ReportRenderer.text(error, 220)}`)
+					.join(
+						"\n",
+					)}${errors.length > 8 ? `\n\nShowing 8 of ${errors.length} problems. See the full report artifacts.` : ""}`,
+			);
+		const failures = tests.filter((item) =>
+			["failed", "error"].includes(item.status),
+		);
+		if (selected.test && failures.length)
+			parts.push(
+				`**${failures.length} failed test executions.** ${this.link("Open a failing job", failures[0].check.job.html_url)}.`,
+			);
+		if (selected.lint && lint.some((issue) => issue.severity === "error"))
+			parts.push(
+				`**${lint.filter((issue) => issue.severity === "error").length} lint errors.** ${this.link("Open lint diagnostics", lint.find((issue) => issue.severity === "error").check.job.html_url)}.`,
+			);
+		if (selected.test) parts.push(this.tests(tests, comment));
+		if (selected.lint) parts.push(this.lint(lint));
+		if (selected.coverage) parts.push(this.coverage(comment));
+		if (!comment)
+			parts.push(
+				ReportRenderer.details(
+					"Workflow checks and conditional skips",
+					`${ReportRenderer.table(
+						["Caller job", "Outcome"],
+						Object.entries(this.collection.jobs).map(([name, job]) => [
+							ReportRenderer.text(name),
+							ReportRenderer.text(job.result),
+						]),
+					)}\n\nThese are job outcomes. Status-only checks do not imply structured test counts. Existing route validators determine whether skips are intentional.`,
+				),
+			);
+		const receipts = comment
+			? this.receipts.filter((receipt) => receipt.reporter !== "comment")
+			: this.receipts;
+		if (receipts.length)
+			parts.push(
+				ReportRenderer.details(
+					`Publication: ${receipts.filter((receipt) => receipt.status === "failed").length} failed; ${receipts.filter((receipt) => receipt.status === "unavailable").length} unavailable`,
+					ReportRenderer.table(
+						["Destination / dataset", "Outcome", "Details"],
+						receipts.map((receipt) => [
+							ReportRenderer.text(
+								`${receipt.reporter} / ${this.collection.datasets.find((dataset) => dataset.id === receipt.dataset)?.label || receipt.dataset}`,
+							),
+							ReportRenderer.text(receipt.status),
+							receipt.url
+								? this.link(receipt.message || "Provider result", receipt.url)
+								: ReportRenderer.text(receipt.message),
+						]),
+					),
+				),
+			);
+		if (!comment)
+			parts.push(
+				ReportRenderer.details(
+					"Report provenance and rerun details",
+					`${ReportRenderer.table(
+						["Check", "Original execution", "Source"],
+						this.collection.checks.map((check) => [
+							ReportRenderer.text(check.check.name),
+							this.link(
+								`Attempt ${check.execution.attempt}, job ${check.execution.job.id}`,
+								check.job.html_url,
+							),
+							`\`${check.source.sha.slice(0, 7)}\` (${ReportRenderer.text(check.source.kind)})`,
+						]),
+						100,
+					)}\n\nEarlier evidence is reused only for executions verified unchanged in this run.`,
+				),
+			);
+		parts.push(
+			`${this.link("Full Actions report and native artifacts", this.runUrl)}.`,
+		);
+		const budget = comment ? 32 * 1024 : 256 * 1024;
+		let markdown = `${parts.filter(Boolean).join("\n\n")}\n`;
+		if (Buffer.byteLength(markdown) > budget) {
+			const notice = `\n\nDetailed results exceed this view's size limit. ${this.link("Read all retained results", this.runUrl)}.\n`;
+			markdown = "";
+			for (const part of parts.filter(Boolean))
+				if (Buffer.byteLength(markdown + part + notice) < budget - 2)
+					markdown += `${part}\n\n`;
+			markdown += notice;
+		}
+		return markdown;
+	}
+}
+
 ;// CONCATENATED MODULE: ./src/index.js
 
 
 
 
 
-async function run({ core, glob: globModule, inputs }) {
+
+
+
+
+async function run({ core, glob: globModule = NativeGlob, inputs }) {
 	try {
 		const fileSystemService = new FileSystemService(inputs.workingDirectory);
 		const logger = new LoggerService(core);
@@ -9951,15 +10451,27 @@ async function run({ core, glob: globModule, inputs }) {
 		const uniqueFiles = await pathResolver.findFiles(patternList, globModule);
 		logger.info(`Found ${uniqueFiles.length} report file(s)`);
 		core.setOutput("parsed-files", JSON.stringify(uniqueFiles));
-		await pathResolver.assertExplicitMatches(inputs.reportPaths, globModule);
+		const collectionErrors = [];
+		try {
+			await pathResolver.assertExplicitMatches(inputs.reportPaths, globModule);
+		} catch (error) {
+			collectionErrors.push(error.message);
+		}
 
 		if (uniqueFiles.length === 0) {
+			if (collectionErrors.length) throw new Error(collectionErrors.join("\n"));
 			logger.warning("No report files found");
 			return;
 		}
 
 		// Parse reports using core
 		const aggregatedData = parserCore.parseReports(uniqueFiles);
+		collectionErrors.push(...aggregatedData.parseErrors);
+		core.setOutput("parsed-reports", aggregatedData.parsedReports);
+		core.setOutput(
+			"executed-tests",
+			aggregatedData.getPassedCount() + aggregatedData.getFailedCount(),
+		);
 
 		// Generate GitHub annotations if requested
 		if (outputFormats.includes("annotations")) {
@@ -9985,8 +10497,12 @@ async function run({ core, glob: globModule, inputs }) {
 		core.setOutput("test-markdown", testMarkdown);
 		core.setOutput("coverage-markdown", coverageMarkdown);
 		core.setOutput("lint-markdown", lintMarkdown);
-		core.setOutput("has-errors", aggregatedData.hasErrors());
+		core.setOutput(
+			"has-errors",
+			collectionErrors.length > 0 || aggregatedData.hasErrors(),
+		);
 		core.setOutput("summary", summary);
+		if (collectionErrors.length) throw new Error(collectionErrors.join("\n"));
 
 		// Log summary
 		logger.info("\n--- Summary ---");
@@ -10048,5 +10564,7 @@ function annotateLintIssues(core, issues, annotationFn, limit) {
 	}
 }
 
-var __webpack_exports__run = __webpack_exports__.e;
-export { __webpack_exports__run as run };
+var __webpack_exports__ParserFactory = __webpack_exports__.O6;
+var __webpack_exports__ReportRenderer = __webpack_exports__.wb;
+var __webpack_exports__run = __webpack_exports__.eF;
+export { __webpack_exports__ParserFactory as ParserFactory, __webpack_exports__ReportRenderer as ReportRenderer, __webpack_exports__run as run };

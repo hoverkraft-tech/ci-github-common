@@ -2,12 +2,6 @@
 
 # GitHub Reusable Workflow: CI reports
 
-<div align="center">
-  <img src="../logo.svg" width="60px" align="center" alt="CI reports" />
-</div>
-
----
-
 <!-- header:end -->
 <!-- badges:start -->
 
@@ -22,36 +16,24 @@
 
 ## Overview
 
-Collect native reports after lint and test jobs and update one PR comment per report type.
+One reporting boundary for the whole originating workflow run.
+Put every participating producer (including reusable matrix jobs) in needs and
+use if: always(). Forward only job-results: toJSON(needs); no report inventory.
 
-Call once with `needs` listing the lint and test jobs, `if: always()` and
-`job-results: ${{ toJSON(needs) }}`. Keep producer jobs as required checks.
-Producers must disable individual comments and upload only report files in
-artifacts named `ci-reports-<run_attempt>-<job ID>-<unique name>`. Use the same
-job IDs in the caller and its reusable workflows, or set the producer's report
-group to its outer calling job ID. Only artifacts belonging to these jobs are
-downloaded. Directories are kept
-separate so identically named reports cannot overwrite one another.
-The shared linter uploads its native `super-linter-summary.md`; call it from
-a job named `lint` with `comment: false`. Other lint producers can upload any
-lint format supported by parse-ci-reports (ESLint, SARIF, Checkstyle, etc.).
-Comments show concise totals with report and job details collapsed by default.
-
-Only this run's current attempt is read. When rerunning failed jobs, reports
-from jobs that did not rerun are explicitly unavailable; rerun all jobs for a
-complete report. Missing reports never imply successful tests. Coverage stays
-separate per source report; percentages are never averaged.
-GitHub's abandoned reusable-job results remain visible with a warning;
-they do not establish success, even when individual reports contain no failures.
-
-Grant contents: read and pull-requests: write. Fork PRs retain
-summaries without commenting. Use the caller's concurrency to cancel superseded
-runs. This workflow serializes publication and rejects an outdated PR head.
+Defaults: lint and test results use annotations. Coverage uses GitHub Code
+Quality when positively available, with a PR comment fallback otherwise.
+Select newline-separated reporters, or an empty string to disable publication.
+Evidence validation and the final CI reports complete check remain required.
+See docs/usage/ci-reports.md for permissions, examples and the report contract.
 
 ### Permissions
 
+- **`actions`**: `read`
+- **`code-quality`**: `write`
 - **`contents`**: `read`
+- **`id-token`**: `write`
 - **`pull-requests`**: `write`
+- **`security-events`**: `write`
 
 <!-- overview:end -->
 <!-- usage:start -->
@@ -67,18 +49,33 @@ on:
 permissions: {}
 jobs:
   ci-reports:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@33462c06bcbbd9144d7f661929e61953604b444d # 4.3.2
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/ci-reports.yml@beab1278f3b6e89f3c2e91e774071efb82073a6c # feat/native-github-coverage
     permissions:
+      actions: read
+      code-quality: write
       contents: read
+      id-token: write
       pull-requests: write
+      security-events: write
+    secrets:
+      # Optional Codecov token. Without it, Codecov uses GitHub OIDC.
+      codecov-token: ""
     with:
-      # Publish combined PR comments. Disable for report previews or workflow tests; summaries and outputs remain available.
-      # Default: `true`
-      comment: true
-
-      # JSON needs context containing lint and test jobs and their results.
+      # JSON needs context for every completed producer in the originating workflow.
       # This input is required.
       job-results: ""
+
+      # Newline-separated annotations, comment, code-scanning. Empty disables publication.
+      # Default: `annotations`
+      lint-reporters: annotations
+
+      # Newline-separated annotations, comment. Empty disables publication.
+      # Default: `annotations`
+      test-results-reporters: annotations
+
+      # Newline-separated `auto`, `github`, `codecov`, `coveralls`, `comment`. Auto uses GitHub when available, then comment or summary. Explicit `github` is required.
+      # Default: `auto`
+      test-coverage-reporters: auto
 ```
 
 <!-- usage:end -->
@@ -88,10 +85,12 @@ jobs:
 
 ### Workflow Call Inputs
 
-| **Input**         | **Description**                                                                                                      | **Required** | **Type**    | **Default** |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- | ----------- |
-| **`comment`**     | Publish combined PR comments. Disable for report previews or workflow tests; summaries and outputs remain available. | **false**    | **boolean** | `true`      |
-| **`job-results`** | JSON needs context containing lint and test jobs and their results.                                                  | **true**     | **string**  | -           |
+| **Input**                     | **Description**                                                                                                                                                 | **Required** | **Type**   | **Default**   |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------- | ------------- |
+| **`job-results`**             | JSON needs context for every completed producer in the originating workflow.                                                                                    | **true**     | **string** | -             |
+| **`lint-reporters`**          | Newline-separated annotations, comment, code-scanning. Empty disables publication.                                                                              | **false**    | **string** | `annotations` |
+| **`test-results-reporters`**  | Newline-separated annotations, comment. Empty disables publication.                                                                                             | **false**    | **string** | `annotations` |
+| **`test-coverage-reporters`** | Newline-separated `auto`, `github`, `codecov`, `coveralls`, `comment`. Auto uses GitHub when available, then comment or summary. Explicit `github` is required. | **false**    | **string** | `auto`        |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -100,11 +99,10 @@ jobs:
 
 ## Outputs
 
-| **Output**              | **Description**                                                                           |
-| ----------------------- | ----------------------------------------------------------------------------------------- |
-| **`lint-markdown`**     | Consolidated lint report, including native Super-Linter summaries and parsed diagnostics. |
-| **`test-markdown`**     | Consolidated test report, including job status and missing-report information.            |
-| **`coverage-markdown`** | Consolidated coverage report with separate source sections.                               |
+| **Output**        | **Description**                                                           |
+| ----------------- | ------------------------------------------------------------------------- |
+| **`markdown`**    | Final summary after all publication attempts, including comment delivery. |
+| **`artifact-id`** | Validated report collection artifact ID.                                  |
 
 <!-- outputs:end -->
 <!-- examples:start -->

@@ -9,20 +9,15 @@
 # with no commits (such as creating a tag on an existing commit).
 # Explicit `linter-env` validator settings take precedence.
 #
-# For consolidated reporting, call this workflow from a job named `lint`, set
-# `comment: false`, and include that job in the CI reports workflow dependencies.
-# The native Super-Linter summary is uploaded even after lint failures. CodeQL
-# findings remain in code scanning; Ratchet diagnostics remain in workflow logs.
+# Include this workflow job in the common ci-reports workflow dependencies.
+# Its registration identifies the native Super-Linter summary automatically,
+# regardless of the calling job name. Failed lint runs still retain diagnostics.
+# CodeQL findings stay in code scanning; Ratchet diagnostics stay in workflow logs.
 
 name: "Linter"
 on:
   workflow_call:
     inputs:
-      comment:
-        description: Publish the Super-Linter PR comment. Disable when using the CI reports workflow.
-        type: boolean
-        required: false
-        default: true
       runs-on:
         description: |
           JSON array of runner(s) to use.
@@ -89,10 +84,9 @@ jobs:
     name: 🧹 Lint Code Base
     runs-on: ${{ fromJson(inputs.runs-on) }}
     permissions:
+      actions: read
       contents: read
-      issues: write
       packages: read
-      pull-requests: write
       statuses: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -109,8 +103,6 @@ jobs:
           PYTHON_LINTER_TOOLCHAIN: ${{ inputs.python-linter-toolchain }}
         with:
           script: |
-            const { randomUUID } = require("node:crypto");
-            core.setOutput("artifact-name", `ci-reports-${process.env.GITHUB_RUN_ATTEMPT}-${context.job}-${randomUUID()}`);
             const environment = new Map([
               ["VALIDATE_JAVASCRIPT_TOOLCHAIN", process.env.JAVASCRIPT_LINTER_TOOLCHAIN],
               ["VALIDATE_PYTHON_TOOLCHAIN", process.env.PYTHON_LINTER_TOOLCHAIN],
@@ -171,26 +163,48 @@ jobs:
           working-directory: ${{ steps.has-prettier-plugins.outputs.package-json-dir }}
           # Consumer Prettier plugins may require installation hooks.
           ignore-scripts: "false"
+      - id: prepare
+        uses: $/actions/quality/record-ci-reports
+        with:
+          operation: prepare
+          definition: '{"name":"Super-Linter","reports":[{"kind":"lint","pattern":"super-linter-summary.md","owner":"tool"}]}'
+      - name: Remove the previous generated summary
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            require('node:fs').rmSync('super-linter-output/super-linter-summary.md', { force: true });
 
       - name: Run shared Super-Linter image
+        id: lint
         uses: docker://ghcr.io/hoverkraft-tech/docker-base-images/super-linter:2.0.2@sha256:12dedee667b43856a9cc792628fecc4723fc0868bf8090d268981407a7402b2c
         env:
-          ENABLE_GITHUB_PULL_REQUEST_SUMMARY_COMMENT: ${{ inputs.comment && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+          ENABLE_GITHUB_PULL_REQUEST_SUMMARY_COMMENT: false
           SAVE_SUPER_LINTER_SUMMARY: true
           SUPER_LINTER_OUTPUT_DIRECTORY_NAME: super-linter-output
           SUPER_LINTER_SUMMARY_FILE_NAME: super-linter-summary.md
           VALIDATE_ALL_CODEBASE: ${{ inputs.lint-all }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GITHUB_TOKEN: ${{ secrets.github-token || secrets.GITHUB_TOKEN || github.token }} # zizmor: ignore[secrets-outside-env] reusable workflow token override is intentional
-
-      - name: Upload native lint summary
-        if: always() && steps.configure.outputs.artifact-name != '' && hashFiles('super-linter-output/super-linter-summary.md') != ''
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - name: Stage the native lint summary
+        if: ${{ !cancelled() && steps.prepare.outcome == 'success' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          REPORT_DIRECTORY: ${{ steps.prepare.outputs.report-directory }}
         with:
-          name: ${{ steps.configure.outputs.artifact-name }}
-          path: super-linter-output/super-linter-summary.md
-          if-no-files-found: error
-          retention-days: 7
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const source = 'super-linter-output/super-linter-summary.md';
+            if (fs.existsSync(source) && fs.lstatSync(source).isFile()) {
+              fs.copyFileSync(source, path.join(process.env.REPORT_DIRECTORY, 'super-linter-summary.md'));
+            }
+      - name: Retain and validate native lint evidence
+        if: ${{ !cancelled() && steps.prepare.outcome == 'success' }}
+        uses: $/actions/quality/record-ci-reports
+        with:
+          operation: finalize
+          recording: ${{ steps.prepare.outputs.recording }}
+          outcome: ${{ steps.lint.outcome }}
 
   codeql:
     if: ${{ inputs.codeql-languages }}

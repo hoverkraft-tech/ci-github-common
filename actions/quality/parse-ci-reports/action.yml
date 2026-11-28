@@ -443,6 +443,12 @@ inputs:
     default: "."
 
 outputs:
+  parsed-reports:
+    description: Parsed report files and categories as a JSON array, used by the common recorder.
+    value: ${{ steps.parse-reports.outputs.parsed-reports }}
+  executed-tests:
+    description: Number of passed or failed tests, excluding skipped tests.
+    value: ${{ steps.parse-reports.outputs.executed-tests }}
   test-markdown:
     description: "Compact test-only Markdown with collapsed details. Empty when no test results were parsed."
     value: ${{ steps.parse-reports.outputs.test-markdown }}
@@ -495,7 +501,7 @@ runs:
             pathMapping: process.env.PATH_MAPPING || null
           };
 
-          await run({ core, glob, inputs });
+          await run({ core, inputs });
 
     - name: Fail if errors detected
       if: inputs.fail-on-error == 'true' && steps.parse-reports.outputs.has-errors == 'true'

@@ -2,12 +2,6 @@
 
 # GitHub Reusable Workflow: Linter
 
-<div align="center">
-  <img src="../logo.svg" width="60px" align="center" alt="Linter" />
-</div>
-
----
-
 <!-- header:end -->
 
 <!-- jscpd:ignore-start -->
@@ -39,18 +33,16 @@ Commitlint is disabled by default for scheduled and manual runs, and for pushes
 with no commits (such as creating a tag on an existing commit).
 Explicit `linter-env` validator settings take precedence.
 
-For consolidated reporting, call this workflow from a job named `lint`, set
-`comment: false`, and include that job in the CI reports workflow dependencies.
-The native Super-Linter summary is uploaded even after lint failures. CodeQL
-findings remain in code scanning; Ratchet diagnostics remain in workflow logs.
+Include this workflow job in the common ci-reports workflow dependencies.
+Its registration identifies the native Super-Linter summary automatically,
+regardless of the calling job name. Failed lint runs still retain diagnostics.
+CodeQL findings stay in code scanning; Ratchet diagnostics stay in workflow logs.
 
 ### Permissions
 
 - **`actions`**: `read`
 - **`contents`**: `read`
-- **`issues`**: `write`
 - **`packages`**: `read`
-- **`pull-requests`**: `write`
 - **`security-events`**: `write`
 - **`statuses`**: `write`
 
@@ -108,13 +100,11 @@ on:
 permissions: {}
 jobs:
   linter:
-    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@af0bdd6313bd49aaf4a8a7f0de005fb0db856b03 # 4.3.3
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@beab1278f3b6e89f3c2e91e774071efb82073a6c # feat/native-github-coverage
     permissions:
       actions: read
       contents: read
-      issues: write
       packages: read
-      pull-requests: write
       security-events: write
       statuses: write
     secrets:
@@ -123,10 +113,6 @@ jobs:
       # Default GITHUB_TOKEN.
       github-token: ""
     with:
-      # Publish the Super-Linter PR comment. Disable when using the CI reports workflow.
-      # Default: `true`
-      comment: true
-
       # JSON array of runner(s) to use.
       # See https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job.
       #
@@ -184,7 +170,6 @@ jobs:
 
 | **Input**                         | **Description**                                                                           | **Required** | **Type**    | **Default**                                                                                                                                        |
 | --------------------------------- | ----------------------------------------------------------------------------------------- | ------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`comment`**                     | Publish the Super-Linter PR comment. Disable when using the CI reports workflow.          | **false**    | **boolean** | `true`                                                                                                                                             |
 | **`runs-on`**                     | JSON array of runner(s) to use.                                                           | **false**    | **string**  | `["ubuntu-latest"]`                                                                                                                                |
 |                                   | See <https://docs.github.com/en/actions/using-jobs/choosing-the-runner-for-a-job>.        |              |             |                                                                                                                                                    |
 | **`linter-env`**                  | Environment variables in multilines format "key=value" to pass to the linter.             | **false**    | **string**  | -                                                                                                                                                  |

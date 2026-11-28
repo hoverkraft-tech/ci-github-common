@@ -1,6 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
+import { Coverage, ReportData } from "../models/ReportData.js";
 import { BaseParser, ReportCategory } from "./BaseParser.js";
-import { ReportData, Coverage } from "../models/ReportData.js";
 
 /**
  * Parser for Cobertura XML coverage format
@@ -61,9 +61,6 @@ export class CoberturaParser extends BaseParser {
 				throw new Error("Invalid Cobertura format: missing coverage element");
 			}
 
-			const lineRate = parseFloat(coverage["@_line-rate"] || 0);
-			const branchRate = parseFloat(coverage["@_branch-rate"] || 0);
-
 			// Calculate totals from packages if available
 			let totalLines = 0;
 			let coveredLines = 0;
@@ -84,15 +81,34 @@ export class CoberturaParser extends BaseParser {
 				}
 			}
 
-			// Fallback to rates if totals not calculated
-			if (totalLines === 0 && lineRate > 0) {
-				totalLines = 100;
-				coveredLines = Math.round(lineRate * 100);
-			}
-
-			if (totalBranches === 0 && branchRate > 0) {
-				totalBranches = 100;
-				coveredBranches = Math.round(branchRate * 100);
+			// Aggregate attributes are actual counts. A percentage alone must
+			// never manufacture a denominator of 100 lines or branches.
+			const counts = (metric) => {
+				const total = Number(coverage[`@_${metric}-valid`] || 0);
+				const covered = Number(coverage[`@_${metric}-covered`] || 0);
+				if (
+					!Number.isSafeInteger(total) ||
+					!Number.isSafeInteger(covered) ||
+					covered < 0 ||
+					covered > total
+				)
+					throw new Error("Invalid aggregate coverage counts.");
+				return [total, covered];
+			};
+			if (totalLines === 0) [totalLines, coveredLines] = counts("lines");
+			if (coverage["@_branches-valid"] !== undefined) {
+				// Istanbul can report branches on lines without a statement. These
+				// contribute to exact aggregate counts but not class line entries.
+				const [total, covered] = counts("branches");
+				if (
+					total < totalBranches ||
+					covered < coveredBranches ||
+					total - covered < totalBranches - coveredBranches
+				)
+					throw new Error(
+						"Aggregate branch counts contradict measured branches.",
+					);
+				[totalBranches, coveredBranches] = [total, covered];
 			}
 
 			reportData.setCoverage(

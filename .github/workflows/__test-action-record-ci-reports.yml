@@ -1,0 +1,66 @@
+name: Internal - Tests for record-ci-reports action
+on:
+  workflow_call:
+permissions: {}
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: hoverkraft-tech/ci-github-nodejs/actions/setup-node@191d7230d57982bfc11d57f68b005f386a6d7fbf # 3.1.1
+        with:
+          working-directory: actions/quality/record-ci-reports
+      - uses: $/actions/quality/run-check
+        with:
+          name: Reporting contract unit tests
+          working-directory: actions/quality/record-ci-reports
+          command: >-
+            node --experimental-test-coverage
+            --test-coverage-exclude='**/dist/**'
+            --test-reporter=spec --test-reporter-destination=stdout
+            --test-reporter=junit --test-reporter-destination="$CI_REPORTS_DIR/junit.xml"
+            --test-reporter=lcov --test-reporter-destination="$CI_REPORTS_DIR/lcov.info"
+            --test src/*.test.js
+          test-results: junit.xml
+          test-coverage: lcov.info
+  fixtures:
+    name: Recorder lifecycle (${{ matrix.component }})
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [frontend, backend]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: prepare
+        uses: $/actions/quality/record-ci-reports
+        with:
+          operation: prepare
+          definition: ${{ format('{{"name":"Lifecycle fixture","variant":{{"component":"{0}"}},"reports":[{{"kind":"test","pattern":"junit.xml"}}]}}', matrix.component) }}
+      - id: command
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          REPORT_DIRECTORY: ${{ steps.prepare.outputs.report-directory }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+            require('node:assert/strict').deepEqual(fs.readdirSync(process.env.REPORT_DIRECTORY), []);
+            fs.writeFileSync(path.join(process.env.REPORT_DIRECTORY, 'junit.xml'), '<testsuite tests="1"><testcase name="lifecycle fixture"/></testsuite>');
+      - if: ${{ !cancelled() && steps.prepare.outcome == 'success' }}
+        uses: $/actions/quality/record-ci-reports
+        with:
+          operation: finalize
+          recording: ${{ steps.prepare.outputs.recording }}
+          outcome: ${{ steps.command.outcome }}

@@ -2,7 +2,6 @@ name: Internal - Tests for test-action-distribution action
 
 on:
   workflow_call:
-
 permissions: {}
 
 jobs:

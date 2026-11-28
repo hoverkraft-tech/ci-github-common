@@ -1,0 +1,85 @@
+name: Internal CI reporting
+description: Private workflow adapter for collection, publication receipts and completion.
+inputs:
+  operation:
+    description: Internal workflow operation.
+    required: true
+  artifact-id:
+    description: Validated collection artifact ID.
+  dataset:
+    description: Validated dataset ID.
+  reporter:
+    description: External destination.
+  outcome:
+    description: Actual official uploader outcome.
+  job-results:
+    description: Originating producer results.
+    default: "{}"
+  reporters:
+    description: Selected destinations.
+    default: "{}"
+  publisher-jobs:
+    description: Settled publisher outcomes.
+    default: "{}"
+  cleanup-directory:
+    description: Temporary staging directory owned by a previous internal step.
+outputs:
+  artifact-id:
+    description: Internal artifact-id output.
+    value: ${{ steps.report.outputs.artifact-id }}
+  datasets:
+    description: Internal datasets output.
+    value: ${{ steps.report.outputs.datasets }}
+  reporters:
+    description: Internal reporters output.
+    value: ${{ steps.report.outputs.reporters }}
+  annotations:
+    description: Internal annotations output.
+    value: ${{ steps.report.outputs.annotations }}
+  code-scanning:
+    description: Internal code-scanning output.
+    value: ${{ steps.report.outputs.code-scanning }}
+  file:
+    description: Internal file output.
+    value: ${{ steps.report.outputs.file }}
+  format:
+    description: Internal format output.
+    value: ${{ steps.report.outputs.format }}
+  sha:
+    description: Internal sha output.
+    value: ${{ steps.report.outputs.sha }}
+  directory:
+    description: Internal directory output.
+    value: ${{ steps.report.outputs.directory }}
+  markdown:
+    description: Internal markdown output.
+    value: ${{ steps.report.outputs.markdown }}
+runs:
+  using: composite
+  steps:
+    - id: report
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        TOKEN: ${{ github.token }}
+        OPERATION: ${{ inputs.operation }}
+        ARTIFACT_ID: ${{ inputs.artifact-id }}
+        DATASET: ${{ inputs.dataset }}
+        REPORTER: ${{ inputs.reporter }}
+        OUTCOME: ${{ inputs.outcome }}
+        JOB_RESULTS: ${{ inputs.job-results }}
+        REPORTERS: ${{ inputs.reporters }}
+        PUBLISHER_JOBS: ${{ inputs.publisher-jobs }}
+        CLEANUP_DIRECTORY: ${{ inputs.cleanup-directory }}
+      with:
+        script: |
+          const path = require('node:path');
+          const { pathToFileURL } = require('node:url');
+          const actionPath = path.resolve(process.env.ACTION_PATH, '../../../actions/quality/record-ci-reports');
+          const { createArtifactClient } = await import(pathToFileURL(path.resolve(actionPath, '../../download-artifact/dist/index.js')));
+          const { Runtime } = await import(pathToFileURL(path.join(actionPath, 'dist/index.js')));
+          await new Runtime({ core, github, context, actionPath, token: process.env.TOKEN, client: createArtifactClient() }).internal(process.env.OPERATION, {
+            token: process.env.TOKEN, artifactId: process.env.ARTIFACT_ID, dataset: process.env.DATASET,
+            reporter: process.env.REPORTER, outcome: process.env.OUTCOME, jobs: process.env.JOB_RESULTS,
+            reporters: process.env.REPORTERS, publisherJobs: process.env.PUBLISHER_JOBS, cleanupDirectory: process.env.CLEANUP_DIRECTORY,
+          });

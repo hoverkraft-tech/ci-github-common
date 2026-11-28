@@ -1,195 +1,309 @@
-# Collect native reports after lint and test jobs and update one PR comment per report type.
+# One reporting boundary for the whole originating workflow run.
+# Put every participating producer (including reusable matrix jobs) in needs and
+# use if: always(). Forward only job-results: toJSON(needs); no report inventory.
 #
-# Call once with `needs` listing the lint and test jobs, `if: always()` and
-# `job-results: ${{ toJSON(needs) }}`. Keep producer jobs as required checks.
-# Producers must disable individual comments and upload only report files in
-# artifacts named `ci-reports-<run_attempt>-<job ID>-<unique name>`. Use the same
-# job IDs in the caller and its reusable workflows, or set the producer's report
-# group to its outer calling job ID. Only artifacts belonging to these jobs are
-# downloaded. Directories are kept
-# separate so identically named reports cannot overwrite one another.
-# The shared linter uploads its native `super-linter-summary.md`; call it from
-# a job named `lint` with `comment: false`. Other lint producers can upload any
-# lint format supported by parse-ci-reports (ESLint, SARIF, Checkstyle, etc.).
-# Comments show concise totals with report and job details collapsed by default.
-#
-# Only this run's current attempt is read. When rerunning failed jobs, reports
-# from jobs that did not rerun are explicitly unavailable; rerun all jobs for a
-# complete report. Missing reports never imply successful tests. Coverage stays
-# separate per source report; percentages are never averaged.
-# GitHub's abandoned reusable-job results remain visible with a warning;
-# they do not establish success, even when individual reports contain no failures.
-#
-# Grant contents: read and pull-requests: write. Fork PRs retain
-# summaries without commenting. Use the caller's concurrency to cancel superseded
-# runs. This workflow serializes publication and rejects an outdated PR head.
+# Defaults: lint and test results use annotations. Coverage uses GitHub Code
+# Quality when positively available, with a PR comment fallback otherwise.
+# Select newline-separated reporters, or an empty string to disable publication.
+# Evidence validation and the final CI reports complete check remain required.
+# See docs/usage/ci-reports.md for permissions, examples and the report contract.
 name: CI reports
-
 on:
   workflow_call:
     inputs:
-      comment:
-        description: Publish combined PR comments. Disable for report previews or workflow tests; summaries and outputs remain available.
-        type: boolean
-        default: true
       job-results:
-        description: JSON needs context containing lint and test jobs and their results.
+        description: JSON needs context for every completed producer in the originating workflow.
         type: string
         required: true
+      lint-reporters:
+        description: Newline-separated annotations, comment, code-scanning. Empty disables publication.
+        type: string
+        default: annotations
+      test-results-reporters:
+        description: Newline-separated annotations, comment. Empty disables publication.
+        type: string
+        default: annotations
+      test-coverage-reporters:
+        description: Newline-separated `auto`, `github`, `codecov`, `coveralls`, `comment`. Auto uses GitHub when available, then comment or summary. Explicit `github` is required.
+        type: string
+        default: auto
+    secrets:
+      codecov-token:
+        description: Optional Codecov token. Without it, Codecov uses GitHub OIDC.
     outputs:
-      lint-markdown:
-        description: Consolidated lint report, including native Super-Linter summaries and parsed diagnostics.
-        value: ${{ jobs.reports.outputs.lint-markdown }}
-      test-markdown:
-        description: Consolidated test report, including job status and missing-report information.
-        value: ${{ jobs.reports.outputs.test-markdown }}
-      coverage-markdown:
-        description: Consolidated coverage report with separate source sections.
-        value: ${{ jobs.reports.outputs.coverage-markdown }}
-
+      markdown:
+        description: Final summary after all publication attempts, including comment delivery.
+        value: ${{ jobs.complete.outputs.markdown }}
+      artifact-id:
+        description: Validated report collection artifact ID.
+        value: ${{ jobs.collect.outputs.artifact-id }}
 permissions: {}
-
 jobs:
-  reports:
+  collect:
+    name: Collect CI reports
+    if: ${{ !cancelled() && !contains(fromJSON(inputs.job-results).*.result, 'cancelled') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      actions: read
+    outputs:
+      artifact-id: ${{ steps.collect.outputs.artifact-id }}
+      datasets: ${{ steps.collect.outputs.datasets }}
+      reporters: ${{ steps.collect.outputs.reporters }}
+      annotations: ${{ steps.collect.outputs.annotations }}
+      code-scanning: ${{ steps.collect.outputs.code-scanning }}
+    steps:
+      - id: collect
+        uses: $/.github/actions/ci-reports
+        with:
+          operation: collect
+          job-results: ${{ inputs.job-results }}
+          reporters: ${{ format('{{"lint":{0},"test":{1},"coverage":{2}}}', toJSON(inputs.lint-reporters), toJSON(inputs.test-results-reporters), toJSON(inputs.test-coverage-reporters)) }}
+
+  annotations:
+    name: Publish annotations
+    needs: collect
+    if: ${{ !cancelled() && needs.collect.result == 'success' && needs.collect.outputs.annotations == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    steps:
+      - uses: $/.github/actions/ci-reports
+        with:
+          operation: annotations
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+
+  code-scanning:
+    name: Publish lint to code scanning
+    needs: collect
+    if: ${{ !cancelled() && needs.collect.result == 'success' && needs.collect.outputs.code-scanning == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      security-events: write
+    steps:
+      - uses: $/.github/actions/ci-reports
+        with:
+          operation: code-scanning
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+
+  github-coverage:
+    name: Publish GitHub coverage (${{ matrix.dataset.label }})
+    needs: collect
+    if: >-
+      ${{ !cancelled() && needs.collect.result == 'success' && needs.collect.outputs.datasets != '[]' &&
+          (contains(fromJSON(needs.collect.outputs.reporters).coverage, 'auto') || contains(fromJSON(needs.collect.outputs.reporters).coverage, 'github')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      pull-requests: read
+      code-quality: write
+    strategy:
+      fail-fast: false
+      matrix:
+        dataset: ${{ fromJSON(needs.collect.outputs.datasets || '[]') }}
+    steps:
+      - uses: $/.github/actions/ci-reports
+        with:
+          operation: github
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          dataset: ${{ matrix.dataset.id }}
+
+  codecov:
+    name: Submit Codecov coverage (${{ matrix.dataset.label }})
+    needs: collect
+    if: >-
+      ${{ !cancelled() && needs.collect.result == 'success' && needs.collect.outputs.datasets != '[]' &&
+          contains(fromJSON(needs.collect.outputs.reporters).coverage, 'codecov') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
       contents: read
+      pull-requests: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        dataset: ${{ fromJSON(needs.collect.outputs.datasets || '[]') }}
+    steps:
+      - id: prepare
+        uses: $/.github/actions/ci-reports
+        with:
+          operation: prepare-external
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          dataset: ${{ matrix.dataset.id }}
+          reporter: codecov
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.prepare.outputs.sha }}
+          persist-credentials: false
+      - id: upload
+        env:
+          CODECOV_TOKEN: ${{ secrets.codecov-token }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          version: v11.3.2
+          files: ${{ steps.prepare.outputs.file }}
+          flags: ${{ matrix.dataset.id }}
+          override_commit: ${{ steps.prepare.outputs.sha }}
+          disable_search: true
+          disable_file_fixes: true
+          disable_safe_directory: true
+          handle_no_reports_found: false
+          fail_ci_if_error: true
+          plugins: noop
+          cleanup: true
+          use_oidc: ${{ env.CODECOV_TOKEN == '' }}
+          token: ${{ env.CODECOV_TOKEN }}
+      - name: Retain submission outcome
+        if: ${{ !cancelled() }}
+        uses: $/.github/actions/ci-reports
+        with:
+          operation: external-receipt
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          dataset: ${{ matrix.dataset.id }}
+          reporter: codecov
+          outcome: ${{ steps.upload.outcome }}
+          cleanup-directory: ${{ steps.prepare.outputs.directory }}
+
+  coveralls:
+    name: Submit Coveralls coverage (${{ matrix.dataset.label }})
+    needs: collect
+    if: >-
+      ${{ !cancelled() && needs.collect.result == 'success' && needs.collect.outputs.datasets != '[]' &&
+          contains(fromJSON(needs.collect.outputs.reporters).coverage, 'coveralls') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    strategy:
+      fail-fast: false
+      matrix:
+        dataset: ${{ fromJSON(needs.collect.outputs.datasets || '[]') }}
+    steps:
+      - id: prepare
+        uses: $/.github/actions/ci-reports
+        with:
+          operation: prepare-external
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          dataset: ${{ matrix.dataset.id }}
+          reporter: coveralls
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.prepare.outputs.sha }}
+          persist-credentials: false
+      - id: upload
+        uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2.3.8
+        with:
+          coverage-reporter-version: v0.6.22
+          file: ${{ steps.prepare.outputs.file }}
+          format: ${{ steps.prepare.outputs.format }}
+          flag-name: ${{ matrix.dataset.id }}
+          git-commit: ${{ steps.prepare.outputs.sha }}
+          build-number: ${{ github.run_id }}-${{ github.run_attempt }}
+          parallel: true
+          allow-empty: false
+          fail-on-error: true
+      - name: Retain submission outcome
+        if: ${{ !cancelled() }}
+        uses: $/.github/actions/ci-reports
+        with:
+          operation: external-receipt
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          dataset: ${{ matrix.dataset.id }}
+          reporter: coveralls
+          outcome: ${{ steps.upload.outcome }}
+          cleanup-directory: ${{ steps.prepare.outputs.directory }}
+
+  coveralls-finish:
+    name: Complete Coveralls build
+    needs: [collect, coveralls]
+    if: >-
+      ${{ !cancelled() && needs.collect.result == 'success' && needs.collect.outputs.datasets != '[]' &&
+          contains(fromJSON(needs.collect.outputs.reporters).coverage, 'coveralls') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    steps:
+      - id: verify
+        uses: $/.github/actions/ci-reports
+        with:
+          operation: check-coveralls
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+      - id: finish
+        uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2.3.8
+        with:
+          coverage-reporter-version: v0.6.22
+          parallel-finished: true
+          build-number: ${{ github.run_id }}-${{ github.run_attempt }}
+          git-commit: ${{ steps.verify.outputs.sha }}
+          fail-on-error: true
+      - if: ${{ !cancelled() }}
+        uses: $/.github/actions/ci-reports
+        with:
+          operation: finish-coveralls
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          outcome: ${{ steps.finish.outcome }}
+
+  comment:
+    name: Update CI comment
+    needs:
+      [
+        collect,
+        annotations,
+        code-scanning,
+        github-coverage,
+        codecov,
+        coveralls,
+        coveralls-finish,
+      ]
+    if: ${{ !cancelled() && needs.collect.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
       pull-requests: write
     concurrency:
-      group: ci-reports-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+      group: ci-reports-comment-${{ github.repository }}-${{ github.workflow_ref }}-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: false
-    outputs:
-      lint-markdown: ${{ steps.compose.outputs.lint }}
-      test-markdown: ${{ steps.compose.outputs.tests }}
-      coverage-markdown: ${{ steps.compose.outputs.coverage }}
     steps:
-      - name: Prepare report directory
-        id: directory
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          JOB_RESULTS: ${{ inputs.job-results }}
+      - uses: $/.github/actions/ci-reports
         with:
-          script: |
-            const jobs = Object.entries(JSON.parse(process.env.JOB_RESULTS));
-            if (!jobs.length || jobs.some(([name, job]) => !/^[\w-]+$/.test(name) || !['success', 'failure', 'cancelled', 'skipped', 'abandoned'].includes(job?.result))) {
-              throw new Error('job-results must contain job IDs and their completed results');
-            }
-            const names = jobs.map(([name]) => name);
-            const group = names.length === 1 ? names[0] : `{${names.join(',')}}`;
-            core.setOutput('pattern', `ci-reports-${process.env.GITHUB_RUN_ATTEMPT}-${group}-*`);
-            const { mkdtemp } = require('node:fs/promises');
-            const path = require('node:path');
-            core.setOutput('path', await mkdtemp(path.join(process.env.RUNNER_TEMP, 'ci-reports-')));
-      - name: Download reports from this attempt
-        id: download
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+          operation: comment
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          publisher-jobs: ${{ toJSON(needs) }}
+
+  complete:
+    name: CI reports complete
+    needs:
+      [
+        collect,
+        annotations,
+        code-scanning,
+        github-coverage,
+        codecov,
+        coveralls,
+        coveralls-finish,
+        comment,
+      ]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      markdown: ${{ steps.complete.outputs.markdown }}
+    steps:
+      - id: complete
+        uses: $/.github/actions/ci-reports
         with:
-          pattern: ${{ steps.directory.outputs.pattern }}
-          path: ${{ steps.directory.outputs.path }}
-      - name: Discover native reports
-        id: native-reports
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          REPORT_DIRECTORY: ${{ steps.directory.outputs.path }}
-        with:
-          script: |
-            const directory = process.env.REPORT_DIRECTORY;
-            const reports = await glob.create(`${directory}/**/*\n!${directory}/**/super-linter-summary.md`, { matchDirectories: false });
-            core.setOutput('paths', (await reports.glob()).join('\n'));
-      - name: Parse reports
-        id: parse
-        if: steps.native-reports.outputs.paths != ''
-        uses: $/actions/quality/parse-ci-reports
-        with:
-          working-directory: ${{ steps.directory.outputs.path }}
-          report-paths: ${{ steps.native-reports.outputs.paths }}
-          report-name: CI results
-          output-format: markdown
-      - name: Compose reports and check publication eligibility
-        id: compose
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          JOB_RESULTS: ${{ inputs.job-results }}
-          LINT_MARKDOWN: ${{ steps.parse.outputs.lint-markdown }}
-          TEST_MARKDOWN: ${{ steps.parse.outputs.test-markdown }}
-          COVERAGE_MARKDOWN: ${{ steps.parse.outputs.coverage-markdown }}
-          PARSE_OUTCOME: ${{ steps.parse.outcome }}
-          DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
-          REPORT_DIRECTORY: ${{ steps.directory.outputs.path }}
-          COMMENT: ${{ inputs.comment }}
-        with:
-          script: |
-            const jobs = Object.entries(JSON.parse(process.env.JOB_RESULTS));
-            const results = ['success', 'failure', 'cancelled', 'skipped', 'abandoned'];
-            if (!jobs.length || jobs.some(([name, job]) => !/^[\w-]+$/.test(name) || !results.includes(job?.result))) {
-              throw new Error('job-results must contain job IDs and their completed results');
-            }
-            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/attempts/${process.env.GITHUB_RUN_ATTEMPT}`;
-            const header = `[Workflow run and full reports](${run}) · Commit ${context.sha.slice(0, 7)}\n\n`;
-            const fs = require('node:fs');
-            const path = require('node:path');
-            const directory = process.env.REPORT_DIRECTORY || '';
-            const artifacts = fs.existsSync(directory) ? fs.readdirSync(directory) : [];
-            let missing = 0;
-            const status = '| Job | Result | Report artifacts |\n| --- | --- | --- |\n' + jobs.map(([name, job]) => {
-              const prefix = `ci-reports-${process.env.GITHUB_RUN_ATTEMPT}-${name}-`;
-              const count = artifacts.filter(artifact => artifact.startsWith(prefix)).length;
-              if (!count) missing++;
-              return `| ${name} | ${job.result} | ${count || '**Unavailable**'} |`;
-            }).join('\n');
-            const outcomes = results.map(result => `${jobs.filter(([, job]) => job.result === result).length} ${result}`).join(' · ');
-            const warning = missing ? `\n\n⚠️ Reports unavailable for ${missing} job(s). Missing reports do not mean passing checks.` : '';
-            const abandoned = jobs.some(([, job]) => job.result === 'abandoned') ? '\n\n⚠️ GitHub reported an abandoned job result. Inspect its nested job checks; this does not establish success.' : '';
-            const notice = 'Only this attempt is included. On partial reruns, rerun all producer jobs for complete reports. CodeQL findings remain in code scanning; other diagnostics remain in the job logs.';
-            const jobDetails = `<details>\n<summary>Job results and report availability</summary>\n\n${status}\n\n${notice}\n\n</details>`;
-            const available = process.env.PARSE_OUTCOME === 'success' && process.env.DOWNLOAD_OUTCOME === 'success';
-            const lintReports = available && process.env.LINT_MARKDOWN ? [process.env.LINT_MARKDOWN] : [];
-            if (process.env.DOWNLOAD_OUTCOME === 'success') {
-              const summaries = await glob.create(path.join(directory, '**/super-linter-summary.md'), { followSymbolicLinks: false, matchDirectories: false });
-              for (const file of await summaries.glob()) {
-                const summary = fs.readFileSync(file, 'utf8');
-                if (!summary.trim()) continue;
-                const details = summary.length > 45000 ? `Summary exceeds the comment limit. [Read the artifact](${run}).` : summary;
-                lintReports.push(`<details>\n<summary>Super-Linter details</summary>\n\n${details}\n\n</details>`);
-              }
-            }
-            const lint = lintReports.length ? `**Lint:** Collected diagnostics and Super-Linter summaries. Execution status is included in the job outcomes.\n\n${lintReports.join('\n\n')}` : '';
-            for (const [type, report] of [['tests', available && process.env.TEST_MARKDOWN], ['coverage', available && process.env.COVERAGE_MARKDOWN], ['lint', lint]]) {
-              const prefix = `${header}**Jobs:** ${outcomes}.${warning}${abandoned}\n\n`;
-              let content = report || `No ${type} reports available for this attempt. See the job results and workflow logs.`;
-              if (!available) content = `⚠️ Report collection or parsing did not complete; results may be incomplete.\n\n${content}`;
-              if ((prefix + content + jobDetails).length > 60000) {
-                // Omit whole sections instead of cutting HTML or Markdown in the middle.
-                content = `${content.split('\n')[0]}\n\nDetails exceed the comment limit. [Read the full report artifacts](${run}).`;
-              }
-              const body = `${prefix}${content}\n\n${jobDetails}`;
-              core.setOutput(type, body);
-              await core.summary.addRaw(body + '\n\n').write();
-            }
-            const pr = context.payload.pull_request;
-            if (process.env.COMMENT !== 'true' || context.eventName !== 'pull_request' || pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) return;
-            const { data: current } = await github.rest.pulls.get({ ...context.repo, pull_number: pr.number });
-            core.setOutput('comment', current.state === 'open' && current.head.sha === pr.head.sha);
-      - name: Update test results comment
-        if: always() && steps.compose.outputs.comment == 'true'
-        uses: $/actions/create-or-update-comment
-        with:
-          title: "${{ github.workflow }} - Test results"
-          token: ${{ github.token }}
-          body: ${{ steps.compose.outputs.tests }}
-      - name: Update coverage comment
-        if: always() && steps.compose.outputs.comment == 'true'
-        uses: $/actions/create-or-update-comment
-        with:
-          title: "${{ github.workflow }} - Code coverage"
-          token: ${{ github.token }}
-          body: ${{ steps.compose.outputs.coverage }}
-      - name: Update lint comment
-        if: always() && steps.compose.outputs.comment == 'true'
-        uses: $/actions/create-or-update-comment
-        with:
-          title: "${{ github.workflow }} - Lint results"
-          token: ${{ github.token }}
-          body: ${{ steps.compose.outputs.lint }}
+          operation: complete
+          artifact-id: ${{ needs.collect.outputs.artifact-id }}
+          publisher-jobs: ${{ toJSON(needs) }}

@@ -1,0 +1,29 @@
+name: Internal - Tests for run-check action
+on:
+  workflow_call:
+permissions: {}
+jobs:
+  custom-checks:
+    name: Multiple custom checks in one job
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: $/actions/quality/run-check
+        with:
+          name: First custom check
+          test-results: junit.xml
+          command: |
+            test -d "$CI_REPORTS_DIR"
+            printf '%s' '<testsuite><testcase name="first"/></testsuite>' > "$CI_REPORTS_DIR/junit.xml"
+      - uses: $/actions/quality/run-check
+        with:
+          name: Second custom check
+          test-results: junit.xml
+          command: |
+            test ! -e "$CI_REPORTS_DIR/junit.xml"
+            printf '%s' '<testsuite><testcase name="second"/></testsuite>' > "$CI_REPORTS_DIR/junit.xml"

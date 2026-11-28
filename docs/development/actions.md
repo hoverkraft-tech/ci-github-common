@@ -12,15 +12,25 @@ Keep `*.test.js` beside the code they cover. Use `npm test` for Node's test runn
 `coverage/lcov.info` and `coverage/junit.xml`. The CI command creates the coverage directory on a clean
 checkout; coverage output is not committed.
 
-Follow `parse-ci-reports` for each JavaScript action: call the Node.js
+Follow `parse-ci-reports` for each JavaScript action: call the released Node.js
 `continuous-integration` workflow with the action's working directory and explicit
 job permissions. Disable its build and lint jobs; keep CodeQL with the repository
-config, dependency review and GitHub coverage enabled. Set `test.comment` to false
+config and dependency review enabled. Set `test.comment` to false
 and `test.report-group` to the calling job ID in `__shared-ci.yml`. Source tests
-run through the package-owned `test:ci` script. One `ci-reports` job collects the
-native reports after all source-test jobs, including failures, and updates one
-coverage comment with separate figures for each action. It also combines test
-results and lint summaries; individual producer comments stay disabled.
+run through the package-owned `test:ci` script. These released workflows remain
+status-only in the new collector until their producer adapter is released.
+The recorder's dedicated test workflow uses `run-check` to exercise the current
+protocol with its locked dependencies.
+Every participating job feeds one outer `ci-reports` workflow.
+
+Keep local workflow self-references. Follow the
+[release order in ADR 0005](../adr/0005-ci-reporting-contract.md#consequences-and-rollout).
+The recorder reuses the parser's compiled native-format classes and renderer,
+and the download action's bundled artifact client. Build the parser before the
+recorder when changing shared code. The recorder's build must not depend on
+whether the parser has a local dependency installation. Do not install project
+dependencies in publisher jobs.
+
 Each action's integration workflow exercises its public entrypoint. Actions with
 runtime dependencies bundle them with their licenses; dependency-free helpers
 load their own source without adding a build step.

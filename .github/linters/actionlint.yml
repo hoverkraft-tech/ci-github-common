@@ -1,3 +1,5 @@
+# FIXME: Remove only the code-quality exception when Actionlint supports it.
+# https://github.com/rhysd/actionlint/pull/674
 # actionlint 1.7.12 predates GitHub.com's reusable-job identity fields.
 # Keep every other expression check enabled; hosted tests exercise these fields.
 # https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#job-context
@@ -5,3 +7,18 @@ paths:
   .github/workflows/__test-action-distributions.yml:
     ignore:
       - '^property "workflow_(repository|sha)" is not defined in object type '
+  .github/workflows/__main-ci.yml:
+    ignore:
+      - ^unknown permission scope "code-quality"\.
+  .github/workflows/__pull-request-ci.yml:
+    ignore:
+      - ^unknown permission scope "code-quality"\.
+  .github/workflows/__release.yml:
+    ignore:
+      - ^unknown permission scope "code-quality"\.
+  .github/workflows/__shared-ci.yml:
+    ignore:
+      - ^unknown permission scope "code-quality"\.
+  .github/workflows/ci-reports.yml:
+    ignore:
+      - ^unknown permission scope "code-quality"\.

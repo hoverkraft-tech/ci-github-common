@@ -25,6 +25,8 @@ export class ReportParserCore {
 	 */
 	parseReports(files) {
 		const aggregatedData = new ReportData();
+		aggregatedData.parseErrors = [];
+		aggregatedData.parsedReports = [];
 
 		// Log path rewriting configuration if enabled
 		if (this.pathRewriter.isEnabled()) {
@@ -39,9 +41,19 @@ export class ReportParserCore {
 
 		for (const file of files) {
 			this.logger.info(`Parsing ${file}...`);
-			const reportData = this.parserFactory.parse(file);
+			let reportData;
+			try {
+				reportData = this.parserFactory.parse(file);
+			} catch (error) {
+				aggregatedData.parseErrors.push(`${file}: ${error.message}`);
+				continue;
+			}
 
 			// Apply path rewriting to test results
+			aggregatedData.parsedReports.push({
+				file,
+				type: reportData.coverage ? "coverage" : reportData.reportType,
+			});
 			for (const test of reportData.tests) {
 				test.file = this.pathRewriter.rewritePath(test.file);
 			}

@@ -40,8 +40,6 @@ jobs:
       security-events: write
       statuses: write
     uses: $/.github/workflows/linter.yml
-    with:
-      comment: false
 
   test-action-matrix-outputs:
     needs: lint
@@ -142,27 +140,60 @@ jobs:
       contents: read
     uses: $/.github/workflows/__test-action-working-directory.yml
 
-  test-workflow-ci-reports:
+  test-action-record-ci-reports:
     needs: lint
-    uses: $/.github/workflows/__test-workflow-ci-reports.yml
+    uses: $/.github/workflows/__test-action-record-ci-reports.yml
     permissions:
+      actions: read
       contents: read
-      pull-requests: write
 
+  test-action-run-check:
+    needs: lint
+    uses: $/.github/workflows/__test-action-run-check.yml
+    permissions:
+      actions: read
+      contents: read
+
+  # Released Node.js workflows remain status-only until their producer adapter
+  # is released after common. This keeps release dependencies acyclic.
   reports:
     needs:
-      - lint
+      - test-bundled-actions
       - test-action-distributions
       - test-action-test-action-distribution
-      - test-action-lint-pull-request-title
+      - lint
+      - test-action-matrix-outputs
       - test-action-create-and-merge-pull-request
+      - test-action-lint-pull-request-title
+      - test-action-checkout
+      - test-action-checkout-issue-comment
+      - test-action-get-github-actions-bot-user
+      - test-action-get-issue-number
       - test-action-parse-ci-reports
       - test-action-need-fix-to-issue
+      - test-action-repository-owner-is-organization
+      - test-action-slugify
       - test-action-download-artifact
+      - test-action-working-directory
+      - test-action-record-ci-reports
+      - test-action-run-check
     if: always()
     uses: $/.github/workflows/ci-reports.yml
     permissions:
+      actions: read
       contents: read
       pull-requests: write
+      code-quality: write
+      id-token: write
+      security-events: write
     with:
       job-results: ${{ toJSON(needs) }}
+
+  test-workflow-ci-reports:
+    needs: reports
+    uses: $/.github/workflows/__test-workflow-ci-reports.yml
+    permissions:
+      actions: read
+    with:
+      artifact-id: ${{ needs.reports.outputs.artifact-id }}
+      markdown: ${{ needs.reports.outputs.markdown }}

@@ -1,9 +1,13 @@
 import { FileSystemService } from "./FileSystemService.js";
 import { LoggerService } from "./LoggerService.js";
+import { NativeGlob } from "./NativeGlob.js";
 import { ReportParserCore } from "./ReportParserCore.js";
 import { ReportPathResolver } from "./ReportPathResolver.js";
 
-export async function run({ core, glob: globModule, inputs }) {
+export { ReportRenderer } from "./formatters/CIReportFormatter.js";
+export { ParserFactory } from "./parsers/ParserFactory.js";
+
+export async function run({ core, glob: globModule = NativeGlob, inputs }) {
 	try {
 		const fileSystemService = new FileSystemService(inputs.workingDirectory);
 		const logger = new LoggerService(core);
@@ -32,15 +36,27 @@ export async function run({ core, glob: globModule, inputs }) {
 		const uniqueFiles = await pathResolver.findFiles(patternList, globModule);
 		logger.info(`Found ${uniqueFiles.length} report file(s)`);
 		core.setOutput("parsed-files", JSON.stringify(uniqueFiles));
-		await pathResolver.assertExplicitMatches(inputs.reportPaths, globModule);
+		const collectionErrors = [];
+		try {
+			await pathResolver.assertExplicitMatches(inputs.reportPaths, globModule);
+		} catch (error) {
+			collectionErrors.push(error.message);
+		}
 
 		if (uniqueFiles.length === 0) {
+			if (collectionErrors.length) throw new Error(collectionErrors.join("\n"));
 			logger.warning("No report files found");
 			return;
 		}
 
 		// Parse reports using core
 		const aggregatedData = parserCore.parseReports(uniqueFiles);
+		collectionErrors.push(...aggregatedData.parseErrors);
+		core.setOutput("parsed-reports", aggregatedData.parsedReports);
+		core.setOutput(
+			"executed-tests",
+			aggregatedData.getPassedCount() + aggregatedData.getFailedCount(),
+		);
 
 		// Generate GitHub annotations if requested
 		if (outputFormats.includes("annotations")) {
@@ -66,8 +82,12 @@ export async function run({ core, glob: globModule, inputs }) {
 		core.setOutput("test-markdown", testMarkdown);
 		core.setOutput("coverage-markdown", coverageMarkdown);
 		core.setOutput("lint-markdown", lintMarkdown);
-		core.setOutput("has-errors", aggregatedData.hasErrors());
+		core.setOutput(
+			"has-errors",
+			collectionErrors.length > 0 || aggregatedData.hasErrors(),
+		);
 		core.setOutput("summary", summary);
+		if (collectionErrors.length) throw new Error(collectionErrors.join("\n"));
 
 		// Log summary
 		logger.info("\n--- Summary ---");
