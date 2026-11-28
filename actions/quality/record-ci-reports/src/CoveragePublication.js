@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { XMLBuilder } from "fast-xml-parser";
 import { CoberturaReport } from "./CoberturaReport.js";
+import { GoCoverageProfile } from "./GoCoverageProfile.js";
 import { Protocol } from "./Protocol.js";
 
 /** Stage explicit, source-normalized inputs without searching the consumer tree. */
@@ -20,6 +21,13 @@ export class CoveragePublication {
 		const input = fs.readFileSync(Protocol.file(this.directory, asset.file));
 		if (Protocol.digest(input) !== asset.sha256)
 			throw new Error("Coverage changed after collection.");
+		if (asset.format === "golang") {
+			for (const source of Object.values(asset.sourceMap))
+				Protocol.relative(source);
+			return new GoCoverageProfile(input.toString("utf8")).lcov(
+				asset.sourceMap,
+			);
+		}
 		if (asset.format === "lcov")
 			return input
 				.toString("utf8")
@@ -47,7 +55,9 @@ export class CoveragePublication {
 		if (dataset.errors.length || !dataset.assets.length)
 			throw new Error("Cannot publish incomplete coverage.");
 		const preferred =
-			reporter === "github" ? ["cobertura", "lcov"] : ["lcov", "cobertura"];
+			reporter === "github"
+				? ["cobertura", "lcov", "golang"]
+				: ["golang", "lcov", "cobertura"];
 		const asset = preferred
 			.map((format) => dataset.assets.find((item) => item.format === format))
 			.find(Boolean);
@@ -57,13 +67,17 @@ export class CoveragePublication {
 			);
 		const stage = path.join(this.directory, "publication", dataset.id);
 		fs.mkdirSync(stage, { recursive: true });
+		// Preserve the native profile; normalize block spans only for a selected publisher.
+		// LCOV avoids the Coveralls Go parser stripping arbitrary module path segments.
+		// https://github.com/coverallsapp/coverage-reporter/blob/master/src/coverage_reporter/parsers/golang_parser.cr
+		const format = asset.format === "golang" ? "lcov" : asset.format;
 		const file = path.join(
 			stage,
-			asset.format === "lcov" ? "coverage.info" : "coverage.xml",
+			format === "lcov" ? "coverage.info" : "coverage.xml",
 		);
 		fs.writeFileSync(file, this.normalized(asset));
 		if (reporter !== "github" || asset.format === "cobertura")
-			return { file, format: asset.format };
+			return { file, format };
 		const output = path.join(stage, "coverage.xml");
 		const packages = path.join(
 			this.temporaryDirectory,

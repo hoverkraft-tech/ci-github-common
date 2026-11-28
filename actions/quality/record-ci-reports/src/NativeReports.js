@@ -3,6 +3,7 @@ import path from "node:path";
 import { XMLValidator } from "fast-xml-parser";
 import { ParserFactory } from "../../parse-ci-reports/dist/index.js";
 import { CoberturaReport } from "./CoberturaReport.js";
+import { GoCoverageProfile } from "./GoCoverageProfile.js";
 import { Protocol } from "./Protocol.js";
 
 /** Validate native formats without installing or executing project dependencies. */
@@ -14,6 +15,8 @@ export class NativeReports {
 	parse(content, filename, kind) {
 		if (Buffer.byteLength(content) > Protocol.maxFileBytes)
 			throw new Error("Native report exceeds 64 MiB.");
+		if (kind === "coverage" && content.startsWith("mode:"))
+			return new GoCoverageProfile(content).native();
 		// Cobertura generators commonly emit an external DTD. It is metadata,
 		// never fetched; internal subsets and entity declarations remain rejected.
 		if (kind === "coverage")
@@ -161,6 +164,13 @@ export class NativeReports {
 	}
 
 	static measurement(content, format, sourceMap) {
+		if (format === "golang") {
+			const normalized = new GoCoverageProfile(content).lcov(sourceMap);
+			const mapped = Object.fromEntries(
+				Object.values(sourceMap).map((source) => [source, source]),
+			);
+			return NativeReports.measurement(normalized, "lcov", mapped);
+		}
 		const lines = new Map();
 		const add = (source, number, hits) => {
 			const key = `${sourceMap[source]}:${number}`;

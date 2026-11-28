@@ -11352,11 +11352,13 @@ class ReportRenderer {
 			const coverage = dataset.errors.length
 				? null
 				: dataset.assets[0]?.data?.coverage;
-			const lines = coverage?.lines;
+			const metric = coverage?.metric || "lines";
+			const lines = coverage?.[metric];
 			return {
 				dataset,
 				coverage,
-				label: `${dataset.label}: ${lines ? `${lines.percentage.toFixed(1)}%` : "unknown"}`,
+				metric,
+				label: `${dataset.label}: ${lines ? `${lines.percentage.toFixed(1)}% ${metric}` : "unknown"}`,
 			};
 		});
 		const title =
@@ -11365,17 +11367,16 @@ class ReportRenderer {
 				: `${measurements.length} datasets; ${measurements.filter(({ coverage }) => !coverage).length} unavailable`;
 		const body = [
 			ReportRenderer.table(
-				["Dataset", "Lines", "Change"],
-				measurements.map(({ dataset, coverage }) => {
-					const base = dataset.baseline?.coverage?.lines;
+				["Dataset", "Coverage", "Change"],
+				measurements.map(({ dataset, coverage, metric }) => {
+					const current = coverage?.[metric];
+					const base = dataset.baseline?.coverage?.[metric];
 					const delta =
-						coverage && base
-							? coverage.lines.percentage - base.percentage
-							: null;
+						coverage && base ? current.percentage - base.percentage : null;
 					return [
 						ReportRenderer.text(dataset.label),
 						coverage
-							? `${coverage.lines.percentage.toFixed(1)}% (${coverage.lines.covered}/${coverage.lines.total})`
+							? `${current.percentage.toFixed(1)}% ${metric} (${current.covered}/${current.total})`
 							: "**Unknown: missing or invalid report**",
 						delta === null
 							? ReportRenderer.text(
@@ -19552,7 +19553,133 @@ class CoberturaReport {
 	}
 }
 
+;// CONCATENATED MODULE: ./src/GoCoverageProfile.js
+/** Read Go's native block profile, preserving its statement-weighted measurement. */
+class GoCoverageProfile {
+	constructor(content) {
+		const [header, ...rows] = content.trim().split(/\r?\n/);
+		if (!/^mode: (set|count|atomic)$/.test(header))
+			throw new Error("Invalid Go coverage mode.");
+		this.mode = header.slice(6);
+		const blocks = new Map();
+		let span = 0;
+		for (const row of rows) {
+			const match = /^(.+\.go):(\d+)\.(\d+),(\d+)\.(\d+) (\d+) (\d+)$/.exec(
+				row,
+			);
+			if (!match) throw new Error("Invalid Go coverage block.");
+			const [, source, ...values] = match;
+			const [start, startColumn, end, endColumn, statements, hits] =
+				values.map(Number);
+			if (
+				values.some((value) => !Number.isSafeInteger(Number(value))) ||
+				start < 1 ||
+				startColumn < 1 ||
+				endColumn < 1 ||
+				end < start ||
+				(end === start && endColumn < startColumn)
+			)
+				throw new Error("Invalid Go coverage coordinates or counts.");
+			const key = `${source}:${start}.${startColumn},${end}.${endColumn}`;
+			const previous = blocks.get(key);
+			if (previous && previous.statements !== statements)
+				throw new Error("Conflicting Go statement counts for the same block.");
+			const count =
+				this.mode === "set"
+					? Number(Boolean(hits || previous?.hits))
+					: hits + (previous?.hits || 0);
+			if (!Number.isSafeInteger(count))
+				throw new Error(
+					"Go coverage hit count exceeds the safe integer range.",
+				);
+			blocks.set(key, {
+				source,
+				start,
+				startColumn,
+				end,
+				endColumn,
+				statements,
+				hits: count,
+			});
+			span += end - start + 1;
+			if (span > 1_000_000)
+				throw new Error("Go coverage exceeds one million line measurements.");
+		}
+		this.blocks = [...blocks.values()];
+		this.sourceFiles = [...new Set(this.blocks.map((block) => block.source))];
+		const total = this.blocks.reduce((sum, block) => sum + block.statements, 0);
+		const covered = this.blocks.reduce(
+			(sum, block) => sum + (block.hits ? block.statements : 0),
+			0,
+		);
+		if (!Number.isSafeInteger(total) || total < 1)
+			throw new Error("Go coverage has no valid instrumented statements.");
+		this.statements = { total, covered, percentage: (covered / total) * 100 };
+	}
+
+	/** Line-oriented destinations use the same inclusive block spans as Coveralls. */
+	lineMeasurements(sourceMap) {
+		const files = new Map();
+		for (const block of this.blocks) {
+			const source = sourceMap[block.source];
+			if (!source) throw new Error("Go coverage source mapping is missing.");
+			if (!files.has(source)) files.set(source, new Map());
+			const lines = files.get(source);
+			for (let line = block.start; line <= block.end; line++) {
+				const hits = (lines.get(line) || 0) + block.hits;
+				if (!Number.isSafeInteger(hits))
+					throw new Error("Go line hit count exceeds the safe integer range.");
+				lines.set(line, hits);
+			}
+		}
+		return files;
+	}
+
+	lcov(sourceMap) {
+		const output = [];
+		for (const [source, lines] of this.lineMeasurements(sourceMap)) {
+			output.push(`SF:${source}`);
+			for (const [line, hits] of [...lines].sort(
+				([left], [right]) => left - right,
+			))
+				output.push(`DA:${line},${hits}`);
+			output.push(
+				`LF:${lines.size}`,
+				`LH:${[...lines.values()].filter(Boolean).length}`,
+				"end_of_record",
+			);
+		}
+		return `${output.join("\n")}\n`;
+	}
+
+	native() {
+		const files = this.lineMeasurements(
+			Object.fromEntries(this.sourceFiles.map((source) => [source, source])),
+		);
+		const lines = [...files.values()].flatMap((value) => [...value.values()]);
+		const covered = lines.filter(Boolean).length;
+		return {
+			format: "golang",
+			sourceFiles: this.sourceFiles,
+			data: {
+				tests: [],
+				lintIssues: [],
+				coverage: {
+					metric: "statements",
+					statements: this.statements,
+					lines: {
+						total: lines.length,
+						covered,
+						percentage: (covered / lines.length) * 100,
+					},
+				},
+			},
+		};
+	}
+}
+
 ;// CONCATENATED MODULE: ./src/NativeReports.js
+
 
 
 
@@ -19569,6 +19696,8 @@ class NativeReports {
 	parse(content, filename, kind) {
 		if (Buffer.byteLength(content) > Protocol.maxFileBytes)
 			throw new Error("Native report exceeds 64 MiB.");
+		if (kind === "coverage" && content.startsWith("mode:"))
+			return new GoCoverageProfile(content).native();
 		// Cobertura generators commonly emit an external DTD. It is metadata,
 		// never fetched; internal subsets and entity declarations remain rejected.
 		if (kind === "coverage")
@@ -19715,6 +19844,13 @@ class NativeReports {
 	}
 
 	static measurement(content, format, sourceMap) {
+		if (format === "golang") {
+			const normalized = new GoCoverageProfile(content).lcov(sourceMap);
+			const mapped = Object.fromEntries(
+				Object.values(sourceMap).map((source) => [source, source]),
+			);
+			return NativeReports.measurement(normalized, "lcov", mapped);
+		}
 		const lines = new Map();
 		const add = (source, number, hits) => {
 			const key = `${sourceMap[source]}:${number}`;
@@ -20786,6 +20922,7 @@ class CheckRunner {
 
 
 
+
 /** Stage explicit, source-normalized inputs without searching the consumer tree. */
 class CoveragePublication {
 	constructor({
@@ -20801,6 +20938,13 @@ class CoveragePublication {
 		const input = external_node_fs_namespaceObject.readFileSync(Protocol.file(this.directory, asset.file));
 		if (Protocol.digest(input) !== asset.sha256)
 			throw new Error("Coverage changed after collection.");
+		if (asset.format === "golang") {
+			for (const source of Object.values(asset.sourceMap))
+				Protocol.relative(source);
+			return new GoCoverageProfile(input.toString("utf8")).lcov(
+				asset.sourceMap,
+			);
+		}
 		if (asset.format === "lcov")
 			return input
 				.toString("utf8")
@@ -20828,7 +20972,9 @@ class CoveragePublication {
 		if (dataset.errors.length || !dataset.assets.length)
 			throw new Error("Cannot publish incomplete coverage.");
 		const preferred =
-			reporter === "github" ? ["cobertura", "lcov"] : ["lcov", "cobertura"];
+			reporter === "github"
+				? ["cobertura", "lcov", "golang"]
+				: ["golang", "lcov", "cobertura"];
 		const asset = preferred
 			.map((format) => dataset.assets.find((item) => item.format === format))
 			.find(Boolean);
@@ -20838,13 +20984,17 @@ class CoveragePublication {
 			);
 		const stage = external_node_path_namespaceObject.join(this.directory, "publication", dataset.id);
 		external_node_fs_namespaceObject.mkdirSync(stage, { recursive: true });
+		// Preserve the native profile; normalize block spans only for a selected publisher.
+		// LCOV avoids the Coveralls Go parser stripping arbitrary module path segments.
+		// https://github.com/coverallsapp/coverage-reporter/blob/master/src/coverage_reporter/parsers/golang_parser.cr
+		const format = asset.format === "golang" ? "lcov" : asset.format;
 		const file = external_node_path_namespaceObject.join(
 			stage,
-			asset.format === "lcov" ? "coverage.info" : "coverage.xml",
+			format === "lcov" ? "coverage.info" : "coverage.xml",
 		);
 		external_node_fs_namespaceObject.writeFileSync(file, this.normalized(asset));
 		if (reporter !== "github" || asset.format === "cobertura")
-			return { file, format: asset.format };
+			return { file, format };
 		const output = external_node_path_namespaceObject.join(stage, "coverage.xml");
 		const packages = external_node_path_namespaceObject.join(
 			this.temporaryDirectory,

@@ -17,3 +17,30 @@ test("a failed native linter without structured findings stays visibly failed", 
 	delete check.result;
 	assert.match(renderer.lint([]), /1 incomplete/);
 });
+
+test("Go coverage displays native statements without relabeling them as lines", () => {
+	const renderer = new ReportRenderer({
+		collection: {
+			datasets: [
+				{
+					label: "api",
+					errors: [],
+					assets: [
+						{
+							data: {
+								coverage: {
+									metric: "statements",
+									statements: { total: 4, covered: 3, percentage: 75 },
+									lines: { total: 6, covered: 5, percentage: 83.333 },
+								},
+							},
+						},
+					],
+				},
+			],
+		},
+	});
+	const markdown = renderer.coverage(true);
+	assert.match(markdown, /75.0% statements \(3\/4\)/);
+	assert.doesNotMatch(markdown, /83.3%|75.0% lines/);
+});

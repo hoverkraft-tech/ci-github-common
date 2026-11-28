@@ -252,11 +252,13 @@ export class ReportRenderer {
 			const coverage = dataset.errors.length
 				? null
 				: dataset.assets[0]?.data?.coverage;
-			const lines = coverage?.lines;
+			const metric = coverage?.metric || "lines";
+			const lines = coverage?.[metric];
 			return {
 				dataset,
 				coverage,
-				label: `${dataset.label}: ${lines ? `${lines.percentage.toFixed(1)}%` : "unknown"}`,
+				metric,
+				label: `${dataset.label}: ${lines ? `${lines.percentage.toFixed(1)}% ${metric}` : "unknown"}`,
 			};
 		});
 		const title =
@@ -265,17 +267,16 @@ export class ReportRenderer {
 				: `${measurements.length} datasets; ${measurements.filter(({ coverage }) => !coverage).length} unavailable`;
 		const body = [
 			ReportRenderer.table(
-				["Dataset", "Lines", "Change"],
-				measurements.map(({ dataset, coverage }) => {
-					const base = dataset.baseline?.coverage?.lines;
+				["Dataset", "Coverage", "Change"],
+				measurements.map(({ dataset, coverage, metric }) => {
+					const current = coverage?.[metric];
+					const base = dataset.baseline?.coverage?.[metric];
 					const delta =
-						coverage && base
-							? coverage.lines.percentage - base.percentage
-							: null;
+						coverage && base ? current.percentage - base.percentage : null;
 					return [
 						ReportRenderer.text(dataset.label),
 						coverage
-							? `${coverage.lines.percentage.toFixed(1)}% (${coverage.lines.covered}/${coverage.lines.total})`
+							? `${current.percentage.toFixed(1)}% ${metric} (${current.covered}/${current.total})`
 							: "**Unknown: missing or invalid report**",
 						delta === null
 							? ReportRenderer.text(

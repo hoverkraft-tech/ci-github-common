@@ -178,7 +178,11 @@ A definition can contain:
 Native test formats currently include JUnit and TAP. Lint formats use the existing
 ESLint, Checkstyle, Prettier, Astro and SARIF parsers. The shared linter retains
 its native Super-Linter summary and keeps ownership of its diagnostics.
-Coverage currently accepts LCOV and Cobertura. Additional language-native
+Coverage accepts LCOV, Cobertura and native Go coverage profiles. Go summaries
+use native statement counts, with the unit shown explicitly. Selected line-oriented
+destinations receive normalized block spans as LCOV (and Cobertura for GitHub);
+the original Go profile remains unchanged. This also avoids Coveralls' native Go
+parser stripping module path segments in multi-module repositories. Additional language-native
 adapters must be implemented and verified before their provider migrations.
 
 The version 2 protocol retains an immutable registration, a result, native files
