@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -76,6 +76,44 @@ function fixture(t) {
 	});
 	return { directory, workspace, uploads, recording, identity };
 }
+
+test("container checkout ownership is trusted only for the workspace revision read", (t) => {
+	const state = fixture(t);
+	const gitConfig = path.join(state.directory, "isolated-git-config");
+	const env = {
+		...process.env,
+		GIT_TEST_ASSUME_DIFFERENT_OWNER: "1",
+		GIT_CONFIG_GLOBAL: gitConfig,
+		GIT_CONFIG_NOSYSTEM: "1",
+	};
+	const untrusted = () =>
+		spawnSync("git", ["-C", state.workspace, "rev-parse", "HEAD"], {
+			env,
+			encoding: "utf8",
+		});
+	assert.match(untrusted().stderr, /dubious ownership/);
+	const entrypoint = new URL(
+		process.env.ACTION_ENTRYPOINT || "./Recording.js",
+		import.meta.url,
+	).href;
+	const sha = execFileSync(
+		process.execPath,
+		[
+			"--input-type=module",
+			"-e",
+			`import { Recording } from ${JSON.stringify(entrypoint)}; console.log(new Recording(JSON.parse(process.argv[1])).source({}).sha);`,
+			JSON.stringify({
+				workspace: state.workspace,
+				temporaryDirectory: state.directory,
+				context: state.recording.context,
+			}),
+		],
+		{ env, encoding: "utf8" },
+	).trim();
+	assert.equal(sha, state.recording.context.sha);
+	assert.equal(fs.existsSync(gitConfig), false);
+	assert.match(untrusted().stderr, /dubious ownership/);
+});
 
 test("registration precedes execution; repeated checks in one job retain distinct native results", async (t) => {
 	const state = fixture(t);

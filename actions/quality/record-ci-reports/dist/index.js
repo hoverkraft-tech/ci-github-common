@@ -20657,9 +20657,18 @@ class Recording {
 	}
 
 	source(definition) {
+		// Container jobs can mount the trusted Actions checkout with a different UID.
+		// Scope trust to this read of the verified workspace, never global Git config.
 		const sha = (0,external_node_child_process_namespaceObject.execFileSync)(
 			"git",
-			["-C", this.workspace, "rev-parse", "HEAD"],
+			[
+				"-c",
+				`safe.directory=${this.workspace}`,
+				"-C",
+				this.workspace,
+				"rev-parse",
+				"HEAD",
+			],
 			{ encoding: "utf8" },
 		).trim();
 		if (definition.source && definition.source.sha !== sha)
