@@ -65,7 +65,7 @@ export class Recording {
 	async upload(name, directory, files) {
 		const result = await this.artifacts.uploadArtifact(
 			name,
-			files.map((file) => Protocol.file(directory, file)),
+			[...new Set(files)].map((file) => Protocol.file(directory, file)),
 			directory,
 			{ retentionDays: 7 },
 		);

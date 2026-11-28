@@ -3,10 +3,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { CoveragePublication } from "./CoveragePublication.js";
 import { GoCoverageProfile } from "./GoCoverageProfile.js";
 import { NativeReports } from "./NativeReports.js";
-import { CoveragePublication } from "./CoveragePublication.js";
 import { Protocol } from "./Protocol.js";
+
 const profile =
 	"mode: atomic\nexample.org/owner/module/main.go:3.1,5.2 3 2\nexample.org/owner/module/main.go:6.1,6.8 1 0\n";
 
@@ -37,11 +38,11 @@ test("Go coverage rejects malformed, conflicting and oversized measurements and 
 		assert.throws(() => new GoCoverageProfile(bad));
 	const block = profile.split("\n")[1];
 	assert.equal(
-		new GoCoverageProfile(profile + block + "\n").statements.total,
+		new GoCoverageProfile(`${profile}${block}\n`).statements.total,
 		4,
 	);
 	assert.throws(
-		() => new GoCoverageProfile(profile + block.replace("3 2", "4 2") + "\n"),
+		() => new GoCoverageProfile(`${profile}${block.replace("3 2", "4 2")}\n`),
 		/Conflicting/,
 	);
 });

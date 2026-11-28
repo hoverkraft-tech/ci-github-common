@@ -4,6 +4,7 @@ import path from "node:path";
 import { XMLBuilder } from "fast-xml-parser";
 import { CoberturaReport } from "./CoberturaReport.js";
 import { GoCoverageProfile } from "./GoCoverageProfile.js";
+import { IstanbulCoverage } from "./IstanbulCoverage.js";
 import { Protocol } from "./Protocol.js";
 
 /** Stage explicit, source-normalized inputs without searching the consumer tree. */
@@ -56,8 +57,8 @@ export class CoveragePublication {
 			throw new Error("Cannot publish incomplete coverage.");
 		const preferred =
 			reporter === "github"
-				? ["cobertura", "lcov", "golang"]
-				: ["golang", "lcov", "cobertura"];
+				? ["cobertura", "jest-json", "lcov", "golang"]
+				: ["jest-json", "golang", "lcov", "cobertura"];
 		const asset = preferred
 			.map((format) => dataset.assets.find((item) => item.format === format))
 			.find(Boolean);
@@ -67,6 +68,16 @@ export class CoveragePublication {
 			);
 		const stage = path.join(this.directory, "publication", dataset.id);
 		fs.mkdirSync(stage, { recursive: true });
+		if (asset.format === "jest-json") {
+			const input = fs.readFileSync(Protocol.file(this.directory, asset.file));
+			if (Protocol.digest(input) !== asset.sha256)
+				throw new Error("Coverage changed after collection.");
+			return new IstanbulCoverage(JSON.parse(input).coverageMap).write(
+				stage,
+				reporter === "github" ? "cobertura" : "lcov",
+				asset.sourceMap,
+			);
+		}
 		// Preserve the native profile; normalize block spans only for a selected publisher.
 		// LCOV avoids the Coveralls Go parser stripping arbitrary module path segments.
 		// https://github.com/coverallsapp/coverage-reporter/blob/master/src/coverage_reporter/parsers/golang_parser.cr

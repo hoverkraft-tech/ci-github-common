@@ -12,7 +12,7 @@ inputs:
     description: Lifecycle operation, prepare or finalize.
     required: true
   definition:
-    description: Prepare only. JSON check name, project, variant and typed report selectors. See docs/usage/ci-reports.md.
+    description: Prepare only. JSON check name, project, variant and typed report selectors. Test and coverage selectors may reference the same native Vitest/Jest JSON file; both requirements are validated and the file is retained once. See docs/usage/ci-reports.md.
   recording:
     description: Finalize only. Opaque handle from prepare in the same job.
   outcome:

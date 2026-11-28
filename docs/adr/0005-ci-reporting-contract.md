@@ -3,6 +3,7 @@
 - Status: accepted; implementation and hosted validation in progress
 - Date: 2026-11-27
 - Supersedes: [ADR 0004](0004-native-github-coverage.md)
+- Extended by: [ADR 0006](0006-combined-native-test-reports.md) for files containing both tests and coverage.
 
 ## Context
 

@@ -63,6 +63,11 @@ function fixture(t) {
 		execution: { current: async () => identity },
 		artifacts: {
 			uploadArtifact: async (name, files, root) => {
+				assert.equal(
+					files.length,
+					new Set(files).size,
+					"Upload each native file once",
+				);
 				const assets = Object.fromEntries(
 					files.map((file) => [
 						path.relative(root, file),
@@ -113,6 +118,36 @@ test("container checkout ownership is trusted only for the workspace revision re
 	assert.equal(sha, state.recording.context.sha);
 	assert.equal(fs.existsSync(gitConfig), false);
 	assert.match(untrusted().stderr, /dubious ownership/);
+});
+
+test("one combined native file satisfies both requirements and is uploaded once", async (t) => {
+	const state = fixture(t);
+	const prepared = await state.recording.prepare({
+		reports: [
+			{ kind: "test", pattern: "results.json" },
+			{ kind: "coverage", pattern: "results.json" },
+		],
+	});
+	fs.copyFileSync(
+		new URL("./fixtures/jest-report.json", import.meta.url),
+		path.join(prepared["report-directory"], "results.json"),
+	);
+	const finalized = await state.recording.finalize({
+		recording: prepared.recording,
+		outcome: "success",
+		exitCode: 0,
+	});
+	assert.equal(finalized.complete, true, finalized.errors.join("\n"));
+	const uploaded = state.uploads[1].assets;
+	assert.deepEqual(Object.keys(uploaded).sort(), [
+		"reports/results.json",
+		"result.json",
+	]);
+	const assets = JSON.parse(uploaded["result.json"]).assets;
+	assert.equal(assets.length, 2);
+	assert.equal(assets.flatMap((asset) => asset.data.tests).length, 2);
+	assert.equal(assets[1].data.coverage.lines.percentage, 50);
+	assert.equal(assets[0].sha256, assets[1].sha256);
 });
 
 test("registration precedes execution; repeated checks in one job retain distinct native results", async (t) => {

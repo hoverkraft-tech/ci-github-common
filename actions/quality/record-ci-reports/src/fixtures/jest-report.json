@@ -1,0 +1,60 @@
+{
+	"success": true,
+	"numTotalTests": 2,
+	"testResults": [
+		{
+			"name": "index.js",
+			"status": "passed",
+			"assertionResults": [
+				{
+					"fullName": "answer enabled",
+					"status": "passed",
+					"duration": 125,
+					"failureMessages": []
+				},
+				{
+					"fullName": "answer skipped",
+					"status": "pending",
+					"duration": null,
+					"failureMessages": []
+				}
+			]
+		}
+	],
+	"coverageMap": {
+		"index.js": {
+			"path": "index.js",
+			"statementMap": {
+				"0": {
+					"start": { "line": 1, "column": 0 },
+					"end": { "line": 1, "column": 10 }
+				},
+				"1": {
+					"start": { "line": 2, "column": 0 },
+					"end": { "line": 2, "column": null }
+				}
+			},
+			"s": { "0": 1, "1": 0 },
+			"fnMap": {},
+			"f": {},
+			"branchMap": {
+				"0": {
+					"type": "if",
+					"line": 1,
+					"loc": {
+						"start": { "line": 1, "column": 0 },
+						"end": { "line": 2, "column": 10 }
+					},
+					"locations": [
+						{
+							"start": { "line": 1, "column": 0 },
+							"end": { "line": 1, "column": 10 }
+						},
+						{ "start": {}, "end": {} }
+					]
+				}
+			},
+			"b": { "0": [1, 0] }
+		}
+	}
+}

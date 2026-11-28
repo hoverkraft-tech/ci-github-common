@@ -10,7 +10,7 @@ const { Collector } = await import(
 	process.env.ACTION_ENTRYPOINT || "./Collector.js"
 );
 
-function fixture(t, { coverage = false } = {}) {
+function fixture(t, { coverage = false, combined = false } = {}) {
 	const temporaryDirectory = fs.mkdtempSync(
 		path.join(os.tmpdir(), "collector-test-"),
 	);
@@ -53,12 +53,17 @@ function fixture(t, { coverage = false } = {}) {
 		version: 2,
 		id: randomUUID(),
 		check: Protocol.definition({
-			reports: [
-				{
-					kind: coverage ? "coverage" : "test",
-					pattern: coverage ? "lcov.info" : "junit.xml",
-				},
-			],
+			reports: combined
+				? [
+						{ kind: "test", pattern: "results.json" },
+						{ kind: "coverage", pattern: "results.json" },
+					]
+				: [
+						{
+							kind: coverage ? "coverage" : "test",
+							pattern: coverage ? "lcov.info" : "junit.xml",
+						},
+					],
 		}),
 		execution: {
 			repository: "owner/repo",
@@ -69,16 +74,25 @@ function fixture(t, { coverage = false } = {}) {
 		},
 		source: { sha, kind: "branch" },
 	};
-	const content = coverage
-		? "SF:index.js\nDA:1,1\nend_of_record\n"
-		: '<testsuite><testcase name="first"/></testsuite>';
+	const content = combined
+		? fs.readFileSync(
+				new URL("./fixtures/jest-report.json", import.meta.url),
+				"utf8",
+			)
+		: coverage
+			? "SF:index.js\nDA:1,1\nend_of_record\n"
+			: '<testsuite><testcase name="first"/></testsuite>';
 	const asset = {
-		file: coverage ? "reports/lcov.info" : "reports/junit.xml",
+		file: combined
+			? "reports/results.json"
+			: coverage
+				? "reports/lcov.info"
+				: "reports/junit.xml",
 		size: Buffer.byteLength(content),
 		sha256: Protocol.digest(content),
 		selector: registration.check.reports[0],
-		format: coverage ? "lcov" : "junit",
-		sourceMap: coverage ? { "index.js": "index.js" } : {},
+		format: combined ? "jest-json" : coverage ? "lcov" : "junit",
+		sourceMap: coverage || combined ? { "index.js": "index.js" } : {},
 		...(coverage ? { language: "JavaScript" } : {}),
 	};
 	const result = {
@@ -89,7 +103,16 @@ function fixture(t, { coverage = false } = {}) {
 		source: registration.source,
 		outcome: "success",
 		errors: [],
-		assets: [asset],
+		assets: combined
+			? [
+					asset,
+					{
+						...asset,
+						selector: registration.check.reports[1],
+						language: "JavaScript",
+					},
+				]
+			: [asset],
 	};
 	add(`ci-report-v2-registration-${registration.id}`, {
 		"registration.json": JSON.stringify(registration),
@@ -139,6 +162,30 @@ test("collection reparses native evidence instead of trusting embedded findings"
 		"first",
 	);
 	assert.deepEqual(collection.errors, []);
+});
+
+test("combined reports publish one coverage dataset and count each test once", async (t) => {
+	const f = fixture(t, { combined: true });
+	f.result.assets.push(structuredClone(f.result.assets[0]));
+	f.addResult();
+	const { collection, directory } = await f.collector.collect({
+		jobs: { tests: { result: "success" } },
+		reporters: { coverage: "comment" },
+	});
+	const result = collection.checks[0].result;
+	assert.equal(result.assets.flatMap((asset) => asset.data.tests).length, 2);
+	assert.match(result.errors.join("\n"), /Duplicate report aspect/);
+	assert.equal(collection.datasets.length, 1);
+	assert.deepEqual(collection.datasets[0].errors, []);
+	assert.equal(
+		collection.datasets[0].assets[0].data.coverage.lines.percentage,
+		50,
+	);
+	assert.equal(new Set(result.assets.map((asset) => asset.file)).size, 1);
+	assert.deepEqual(
+		fs.readdirSync(path.dirname(path.join(directory, result.assets[0].file))),
+		["results.json"],
+	);
 });
 
 test("one registration without a result survives flat download and makes missing evidence visible", async (t) => {

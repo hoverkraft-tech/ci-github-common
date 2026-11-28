@@ -1,8 +1,3433 @@
 import { createRequire as __WEBPACK_EXTERNAL_createRequire } from "module";
-/******/ // The require scope
-/******/ var __nccwpck_require__ = {};
+/******/ var __webpack_modules__ = ({
+
+/***/ 813:
+/***/ ((module) => {
+
+
+
+module.exports = (flag, argv = process.argv) => {
+	const prefix = flag.startsWith('-') ? '' : (flag.length === 1 ? '-' : '--');
+	const position = argv.indexOf(prefix + flag);
+	const terminatorPosition = argv.indexOf('--');
+	return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
+};
+
+
+/***/ }),
+
+/***/ 377:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+
+
+/**
+ * istanbul-lib-coverage exports an API that allows you to create and manipulate
+ * file coverage, coverage maps (a set of file coverage objects) and summary
+ * coverage objects. File coverage for the same file can be merged as can
+ * entire coverage maps.
+ *
+ * @module Exports
+ */
+const { FileCoverage } = __nccwpck_require__(862);
+const { CoverageMap } = __nccwpck_require__(692);
+const { CoverageSummary } = __nccwpck_require__(370);
+
+module.exports = {
+    /**
+     * creates a coverage summary object
+     * @param {Object} obj an argument with the same semantics
+     *  as the one passed to the `CoverageSummary` constructor
+     * @returns {CoverageSummary}
+     */
+    createCoverageSummary(obj) {
+        if (obj && obj instanceof CoverageSummary) {
+            return obj;
+        }
+        return new CoverageSummary(obj);
+    },
+    /**
+     * creates a CoverageMap object
+     * @param {Object} obj optional - an argument with the same semantics
+     *  as the one passed to the CoverageMap constructor.
+     * @returns {CoverageMap}
+     */
+    createCoverageMap(obj) {
+        if (obj && obj instanceof CoverageMap) {
+            return obj;
+        }
+        return new CoverageMap(obj);
+    },
+    /**
+     * creates a FileCoverage object
+     * @param {Object} obj optional - an argument with the same semantics
+     *  as the one passed to the FileCoverage constructor.
+     * @returns {FileCoverage}
+     */
+    createFileCoverage(obj) {
+        if (obj && obj instanceof FileCoverage) {
+            return obj;
+        }
+        return new FileCoverage(obj);
+    }
+};
+
+/** classes exported for reuse */
+module.exports.classes = {
+    /**
+     * the file coverage constructor
+     */
+    FileCoverage
+};
+
+
+/***/ }),
+
+/***/ 692:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+
+
+const { FileCoverage } = __nccwpck_require__(862);
+const { CoverageSummary } = __nccwpck_require__(370);
+
+function maybeConstruct(obj, klass) {
+    if (obj instanceof klass) {
+        return obj;
+    }
+
+    return new klass(obj);
+}
+
+function loadMap(source) {
+    const data = Object.create(null);
+    if (!source) {
+        return data;
+    }
+
+    Object.entries(source).forEach(([k, cov]) => {
+        data[k] = maybeConstruct(cov, FileCoverage);
+    });
+
+    return data;
+}
+
+/** CoverageMap is a map of `FileCoverage` objects keyed by file paths. */
+class CoverageMap {
+    /**
+     * @constructor
+     * @param {Object} [obj=undefined] obj A coverage map from which to initialize this
+     * map's contents. This can be the raw global coverage object.
+     */
+    constructor(obj) {
+        if (obj instanceof CoverageMap) {
+            this.data = obj.data;
+        } else {
+            this.data = loadMap(obj);
+        }
+    }
+
+    /**
+     * merges a second coverage map into this one
+     * @param {CoverageMap} obj - a CoverageMap or its raw data. Coverage is merged
+     *  correctly for the same files and additional file coverage keys are created
+     *  as needed.
+     */
+    merge(obj) {
+        const other = maybeConstruct(obj, CoverageMap);
+        Object.values(other.data).forEach(fc => {
+            this.addFileCoverage(fc);
+        });
+    }
+
+    /**
+     * filter the coveragemap based on the callback provided
+     * @param {Function (filename)} callback - Returns true if the path
+     *  should be included in the coveragemap. False if it should be
+     *  removed.
+     */
+    filter(callback) {
+        Object.keys(this.data).forEach(k => {
+            if (!callback(k)) {
+                delete this.data[k];
+            }
+        });
+    }
+
+    /**
+     * returns a JSON-serializable POJO for this coverage map
+     * @returns {Object}
+     */
+    toJSON() {
+        return this.data;
+    }
+
+    /**
+     * returns an array for file paths for which this map has coverage
+     * @returns {Array{string}} - array of files
+     */
+    files() {
+        return Object.keys(this.data);
+    }
+
+    /**
+     * returns the file coverage for the specified file.
+     * @param {String} file
+     * @returns {FileCoverage}
+     */
+    fileCoverageFor(file) {
+        const fc = this.data[file];
+        if (!fc) {
+            throw new Error(`No file coverage available for: ${file}`);
+        }
+        return fc;
+    }
+
+    /**
+     * adds a file coverage object to this map. If the path for the object,
+     * already exists in the map, it is merged with the existing coverage
+     * otherwise a new key is added to the map.
+     * @param {FileCoverage} fc the file coverage to add
+     */
+    addFileCoverage(fc) {
+        const cov = new FileCoverage(fc);
+        const { path } = cov;
+        if (this.data[path]) {
+            this.data[path].merge(cov);
+        } else {
+            this.data[path] = cov;
+        }
+    }
+
+    /**
+     * returns the coverage summary for all the file coverage objects in this map.
+     * @returns {CoverageSummary}
+     */
+    getCoverageSummary() {
+        const ret = new CoverageSummary();
+        Object.values(this.data).forEach(fc => {
+            ret.merge(fc.toSummary());
+        });
+
+        return ret;
+    }
+}
+
+module.exports = {
+    CoverageMap
+};
+
+
+/***/ }),
+
+/***/ 370:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+
+
+const percent = __nccwpck_require__(24);
+const dataProperties = __nccwpck_require__(515);
+
+function blankSummary() {
+    const empty = () => ({
+        total: 0,
+        covered: 0,
+        skipped: 0,
+        pct: 'Unknown'
+    });
+
+    return {
+        lines: empty(),
+        statements: empty(),
+        functions: empty(),
+        branches: empty(),
+        branchesTrue: empty()
+    };
+}
+
+// asserts that a data object "looks like" a summary coverage object
+function assertValidSummary(obj) {
+    const valid =
+        obj && obj.lines && obj.statements && obj.functions && obj.branches;
+    if (!valid) {
+        throw new Error(
+            'Invalid summary coverage object, missing keys, found:' +
+                Object.keys(obj).join(',')
+        );
+    }
+}
+
+/**
+ * CoverageSummary provides a summary of code coverage . It exposes 4 properties,
+ * `lines`, `statements`, `branches`, and `functions`. Each of these properties
+ * is an object that has 4 keys `total`, `covered`, `skipped` and `pct`.
+ * `pct` is a percentage number (0-100).
+ */
+class CoverageSummary {
+    /**
+     * @constructor
+     * @param {Object|CoverageSummary} [obj=undefined] an optional data object or
+     * another coverage summary to initialize this object with.
+     */
+    constructor(obj) {
+        if (!obj) {
+            this.data = blankSummary();
+        } else if (obj instanceof CoverageSummary) {
+            this.data = obj.data;
+        } else {
+            this.data = obj;
+        }
+        assertValidSummary(this.data);
+    }
+
+    /**
+     * merges a second summary coverage object into this one
+     * @param {CoverageSummary} obj - another coverage summary object
+     */
+    merge(obj) {
+        const keys = [
+            'lines',
+            'statements',
+            'branches',
+            'functions',
+            'branchesTrue'
+        ];
+        keys.forEach(key => {
+            if (obj[key]) {
+                this[key].total += obj[key].total;
+                this[key].covered += obj[key].covered;
+                this[key].skipped += obj[key].skipped;
+                this[key].pct = percent(this[key].covered, this[key].total);
+            }
+        });
+
+        return this;
+    }
+
+    /**
+     * returns a POJO that is JSON serializable. May be used to get the raw
+     * summary object.
+     */
+    toJSON() {
+        return this.data;
+    }
+
+    /**
+     * return true if summary has no lines of code
+     */
+    isEmpty() {
+        return this.lines.total === 0;
+    }
+}
+
+dataProperties(CoverageSummary, [
+    'lines',
+    'statements',
+    'functions',
+    'branches',
+    'branchesTrue'
+]);
+
+module.exports = {
+    CoverageSummary
+};
+
+
+/***/ }),
+
+/***/ 515:
+/***/ ((module) => {
+
+
+
+module.exports = function dataProperties(klass, properties) {
+    properties.forEach(p => {
+        Object.defineProperty(klass.prototype, p, {
+            enumerable: true,
+            get() {
+                return this.data[p];
+            }
+        });
+    });
+};
+
+
+/***/ }),
+
+/***/ 862:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+
+
+const percent = __nccwpck_require__(24);
+const dataProperties = __nccwpck_require__(515);
+const { CoverageSummary } = __nccwpck_require__(370);
+
+// returns a data object that represents empty coverage
+function emptyCoverage(filePath, reportLogic) {
+    const cov = {
+        path: filePath,
+        statementMap: {},
+        fnMap: {},
+        branchMap: {},
+        s: {},
+        f: {},
+        b: {}
+    };
+    if (reportLogic) cov.bT = {};
+    return cov;
+}
+
+// asserts that a data object "looks like" a coverage object
+function assertValidObject(obj) {
+    const valid =
+        obj &&
+        obj.path &&
+        obj.statementMap &&
+        obj.fnMap &&
+        obj.branchMap &&
+        obj.s &&
+        obj.f &&
+        obj.b;
+    if (!valid) {
+        throw new Error(
+            'Invalid file coverage object, missing keys, found:' +
+                Object.keys(obj).join(',')
+        );
+    }
+}
+
+const keyFromLoc = ({ start, end }) =>
+    `${start.line}|${start.column}|${end.line}|${end.column}`;
+
+const isObj = o => !!o && typeof o === 'object';
+const isLineCol = o =>
+    isObj(o) && typeof o.line === 'number' && typeof o.column === 'number';
+const isLoc = o => isObj(o) && isLineCol(o.start) && isLineCol(o.end);
+const getLoc = o => (isLoc(o) ? o : isLoc(o.loc) ? o.loc : null);
+
+// When merging, we can have a case where two ranges cover
+// the same block of code with `hits=1`, and each carve out a
+// different range with `hits=0` to indicate it's uncovered.
+// Find the nearest container so that we can properly indicate
+// that both sections are hit.
+// Returns null if no containing item is found.
+const findNearestContainer = (item, map) => {
+    const itemLoc = getLoc(item);
+    if (!itemLoc) return null;
+    // the B item is not an identified range in the A set, BUT
+    // it may be contained by an identified A range. If so, then
+    // any hit of that containing A range counts as a hit of this
+    // B range as well. We have to find the *narrowest* containing
+    // range to be accurate, since ranges can be hit and un-hit
+    // in a nested fashion.
+    let nearestContainingItem = null;
+    let containerDistance = null;
+    let containerKey = null;
+    for (const [i, mapItem] of Object.entries(map)) {
+        const mapLoc = getLoc(mapItem);
+        if (!mapLoc) continue;
+        // contained if all of line distances are > 0
+        // or line distance is 0 and col dist is >= 0
+        const distance = [
+            itemLoc.start.line - mapLoc.start.line,
+            itemLoc.start.column - mapLoc.start.column,
+            mapLoc.end.line - itemLoc.end.line,
+            mapLoc.end.column - itemLoc.end.column
+        ];
+        if (
+            distance[0] < 0 ||
+            distance[2] < 0 ||
+            (distance[0] === 0 && distance[1] < 0) ||
+            (distance[2] === 0 && distance[3] < 0)
+        ) {
+            continue;
+        }
+        if (nearestContainingItem === null) {
+            containerDistance = distance;
+            nearestContainingItem = mapItem;
+            containerKey = i;
+            continue;
+        }
+        // closer line more relevant than closer column
+        const closerBefore =
+            distance[0] < containerDistance[0] ||
+            (distance[0] === 0 && distance[1] < containerDistance[1]);
+        const closerAfter =
+            distance[2] < containerDistance[2] ||
+            (distance[2] === 0 && distance[3] < containerDistance[3]);
+        if (closerBefore || closerAfter) {
+            // closer
+            containerDistance = distance;
+            nearestContainingItem = mapItem;
+            containerKey = i;
+        }
+    }
+    return containerKey;
+};
+
+// either add two numbers, or all matching entries in a number[]
+const addHits = (aHits, bHits) => {
+    if (typeof aHits === 'number' && typeof bHits === 'number') {
+        return aHits + bHits;
+    } else if (Array.isArray(aHits) && Array.isArray(bHits)) {
+        return aHits.map((a, i) => (a || 0) + (bHits[i] || 0));
+    }
+    return null;
+};
+
+const addNearestContainerHits = (item, itemHits, map, mapHits) => {
+    const container = findNearestContainer(item, map);
+    if (container) {
+        return addHits(itemHits, mapHits[container]);
+    } else {
+        return itemHits;
+    }
+};
+
+const mergeProp = (aHits, aMap, bHits, bMap, itemKey = keyFromLoc) => {
+    const aItems = {};
+    for (const [key, itemHits] of Object.entries(aHits)) {
+        const item = aMap[key];
+        aItems[itemKey(item)] = [itemHits, item];
+    }
+    const bItems = {};
+    for (const [key, itemHits] of Object.entries(bHits)) {
+        const item = bMap[key];
+        bItems[itemKey(item)] = [itemHits, item];
+    }
+    const mergedItems = {};
+    for (const [key, aValue] of Object.entries(aItems)) {
+        let aItemHits = aValue[0];
+        const aItem = aValue[1];
+        const bValue = bItems[key];
+        if (!bValue) {
+            // not an identified range in b, but might be contained by one
+            aItemHits = addNearestContainerHits(aItem, aItemHits, bMap, bHits);
+        } else {
+            // is an identified range in b, so add the hits together
+            aItemHits = addHits(aItemHits, bValue[0]);
+        }
+        mergedItems[key] = [aItemHits, aItem];
+    }
+    // now find the items in b that are not in a. already added matches.
+    for (const [key, bValue] of Object.entries(bItems)) {
+        let bItemHits = bValue[0];
+        const bItem = bValue[1];
+        if (mergedItems[key]) continue;
+        // not an identified range in b, but might be contained by one
+        bItemHits = addNearestContainerHits(bItem, bItemHits, aMap, aHits);
+        mergedItems[key] = [bItemHits, bItem];
+    }
+
+    const hits = {};
+    const map = {};
+
+    Object.values(mergedItems).forEach(([itemHits, item], i) => {
+        hits[i] = itemHits;
+        map[i] = item;
+    });
+
+    return [hits, map];
+};
+
+/**
+ * provides a read-only view of coverage for a single file.
+ * The deep structure of this object is documented elsewhere. It has the following
+ * properties:
+ *
+ * * `path` - the file path for which coverage is being tracked
+ * * `statementMap` - map of statement locations keyed by statement index
+ * * `fnMap` - map of function metadata keyed by function index
+ * * `branchMap` - map of branch metadata keyed by branch index
+ * * `s` - hit counts for statements
+ * * `f` - hit count for functions
+ * * `b` - hit count for branches
+ */
+class FileCoverage {
+    /**
+     * @constructor
+     * @param {Object|FileCoverage|String} pathOrObj is a string that initializes
+     * and empty coverage object with the specified file path or a data object that
+     * has all the required properties for a file coverage object.
+     */
+    constructor(pathOrObj, reportLogic = false) {
+        if (!pathOrObj) {
+            throw new Error(
+                'Coverage must be initialized with a path or an object'
+            );
+        }
+        if (typeof pathOrObj === 'string') {
+            this.data = emptyCoverage(pathOrObj, reportLogic);
+        } else if (pathOrObj instanceof FileCoverage) {
+            this.data = pathOrObj.data;
+        } else if (typeof pathOrObj === 'object') {
+            this.data = pathOrObj;
+        } else {
+            throw new Error('Invalid argument to coverage constructor');
+        }
+        assertValidObject(this.data);
+    }
+
+    /**
+     * returns computed line coverage from statement coverage.
+     * This is a map of hits keyed by line number in the source.
+     */
+    getLineCoverage() {
+        const statementMap = this.data.statementMap;
+        const statements = this.data.s;
+        const lineMap = Object.create(null);
+
+        Object.entries(statements).forEach(([st, count]) => {
+            /* istanbul ignore if: is this even possible? */
+            if (!statementMap[st]) {
+                return;
+            }
+            const { line } = statementMap[st].start;
+            const prevVal = lineMap[line];
+            if (prevVal === undefined || prevVal < count) {
+                lineMap[line] = count;
+            }
+        });
+        return lineMap;
+    }
+
+    /**
+     * returns an array of uncovered line numbers.
+     * @returns {Array} an array of line numbers for which no hits have been
+     *  collected.
+     */
+    getUncoveredLines() {
+        const lc = this.getLineCoverage();
+        const ret = [];
+        Object.entries(lc).forEach(([l, hits]) => {
+            if (hits === 0) {
+                ret.push(l);
+            }
+        });
+        return ret;
+    }
+
+    /**
+     * returns a map of branch coverage by source line number.
+     * @returns {Object} an object keyed by line number. Each object
+     * has a `covered`, `total` and `coverage` (percentage) property.
+     */
+    getBranchCoverageByLine() {
+        const branchMap = this.branchMap;
+        const branches = this.b;
+        const ret = {};
+        Object.entries(branchMap).forEach(([k, map]) => {
+            const line = map.line || map.loc.start.line;
+            const branchData = branches[k];
+            ret[line] = ret[line] || [];
+            ret[line].push(...branchData);
+        });
+        Object.entries(ret).forEach(([k, dataArray]) => {
+            const covered = dataArray.filter(item => item > 0);
+            const coverage = (covered.length / dataArray.length) * 100;
+            ret[k] = {
+                covered: covered.length,
+                total: dataArray.length,
+                coverage
+            };
+        });
+        return ret;
+    }
+
+    /**
+     * return a JSON-serializable POJO for this file coverage object
+     */
+    toJSON() {
+        return this.data;
+    }
+
+    /**
+     * merges a second coverage object into this one, updating hit counts
+     * @param {FileCoverage} other - the coverage object to be merged into this one.
+     *  Note that the other object should have the same structure as this one (same file).
+     */
+    merge(other) {
+        if (other.all === true) {
+            return;
+        }
+
+        if (this.all === true) {
+            this.data = other.data;
+            return;
+        }
+
+        let [hits, map] = mergeProp(
+            this.s,
+            this.statementMap,
+            other.s,
+            other.statementMap
+        );
+        this.data.s = hits;
+        this.data.statementMap = map;
+
+        const keyFromLocProp = x => keyFromLoc(x.loc);
+        const keyFromLocationsProp = x => keyFromLoc(x.locations[0]);
+
+        [hits, map] = mergeProp(
+            this.f,
+            this.fnMap,
+            other.f,
+            other.fnMap,
+            keyFromLocProp
+        );
+        this.data.f = hits;
+        this.data.fnMap = map;
+
+        [hits, map] = mergeProp(
+            this.b,
+            this.branchMap,
+            other.b,
+            other.branchMap,
+            keyFromLocationsProp
+        );
+        this.data.b = hits;
+        this.data.branchMap = map;
+
+        // Tracking additional information about branch truthiness
+        // can be optionally enabled:
+        if (this.bT && other.bT) {
+            [hits, map] = mergeProp(
+                this.bT,
+                this.branchMap,
+                other.bT,
+                other.branchMap,
+                keyFromLocationsProp
+            );
+            this.data.bT = hits;
+        }
+    }
+
+    computeSimpleTotals(property) {
+        let stats = this[property];
+
+        if (typeof stats === 'function') {
+            stats = stats.call(this);
+        }
+
+        const ret = {
+            total: Object.keys(stats).length,
+            covered: Object.values(stats).filter(v => !!v).length,
+            skipped: 0
+        };
+        ret.pct = percent(ret.covered, ret.total);
+        return ret;
+    }
+
+    computeBranchTotals(property) {
+        const stats = this[property];
+        const ret = { total: 0, covered: 0, skipped: 0 };
+
+        Object.values(stats).forEach(branches => {
+            ret.covered += branches.filter(hits => hits > 0).length;
+            ret.total += branches.length;
+        });
+        ret.pct = percent(ret.covered, ret.total);
+        return ret;
+    }
+
+    /**
+     * resets hit counts for all statements, functions and branches
+     * in this coverage object resulting in zero coverage.
+     */
+    resetHits() {
+        const statements = this.s;
+        const functions = this.f;
+        const branches = this.b;
+        const branchesTrue = this.bT;
+        Object.keys(statements).forEach(s => {
+            statements[s] = 0;
+        });
+        Object.keys(functions).forEach(f => {
+            functions[f] = 0;
+        });
+        Object.keys(branches).forEach(b => {
+            branches[b].fill(0);
+        });
+        // Tracking additional information about branch truthiness
+        // can be optionally enabled:
+        if (branchesTrue) {
+            Object.keys(branchesTrue).forEach(bT => {
+                branchesTrue[bT].fill(0);
+            });
+        }
+    }
+
+    /**
+     * returns a CoverageSummary for this file coverage object
+     * @returns {CoverageSummary}
+     */
+    toSummary() {
+        const ret = {};
+        ret.lines = this.computeSimpleTotals('getLineCoverage');
+        ret.functions = this.computeSimpleTotals('f', 'fnMap');
+        ret.statements = this.computeSimpleTotals('s', 'statementMap');
+        ret.branches = this.computeBranchTotals('b');
+        // Tracking additional information about branch truthiness
+        // can be optionally enabled:
+        if (this.bT) {
+            ret.branchesTrue = this.computeBranchTotals('bT');
+        }
+        return new CoverageSummary(ret);
+    }
+}
+
+// expose coverage data attributes
+dataProperties(FileCoverage, [
+    'path',
+    'statementMap',
+    'fnMap',
+    'branchMap',
+    's',
+    'f',
+    'b',
+    'bT',
+    'all'
+]);
+
+module.exports = {
+    FileCoverage,
+    // exported for testing
+    findNearestContainer,
+    addHits,
+    addNearestContainerHits
+};
+
+
+/***/ }),
+
+/***/ 24:
+/***/ ((module) => {
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+
+
+module.exports = function percent(covered, total) {
+    let tmp;
+    if (total > 0) {
+        tmp = (1000 * 100 * covered) / total;
+        return Math.floor(tmp / 10) / 100;
+    } else {
+        return 100.0;
+    }
+};
+
+
+/***/ }),
+
+/***/ 761:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+
+
+/**
+ * @module Exports
+ */
+
+const Context = __nccwpck_require__(126);
+const watermarks = __nccwpck_require__(410);
+const ReportBase = __nccwpck_require__(405);
+
+module.exports = {
+    /**
+     * returns a reporting context for the supplied options
+     * @param {Object} [opts=null] opts
+     * @returns {Context}
+     */
+    createContext(opts) {
+        return new Context(opts);
+    },
+
+    /**
+     * returns the default watermarks that would be used when not
+     * overridden
+     * @returns {Object} an object with `statements`, `functions`, `branches`,
+     *  and `line` keys. Each value is a 2 element array that has the low and
+     *  high watermark as percentages.
+     */
+    getDefaultWatermarks() {
+        return watermarks.getDefault();
+    },
+
+    /**
+     * Base class for all reports
+     */
+    ReportBase
+};
+
+
+/***/ }),
+
+/***/ 126:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+const fs = __nccwpck_require__(896);
+const FileWriter = __nccwpck_require__(571);
+const XMLWriter = __nccwpck_require__(490);
+const tree = __nccwpck_require__(841);
+const watermarks = __nccwpck_require__(410);
+const SummarizerFactory = __nccwpck_require__(547);
+
+function defaultSourceLookup(path) {
+    try {
+        return fs.readFileSync(path, 'utf8');
+    } catch (ex) {
+        throw new Error(`Unable to lookup source: ${path} (${ex.message})`);
+    }
+}
+
+function normalizeWatermarks(specified = {}) {
+    Object.entries(watermarks.getDefault()).forEach(([k, value]) => {
+        const specValue = specified[k];
+        if (!Array.isArray(specValue) || specValue.length !== 2) {
+            specified[k] = value;
+        }
+    });
+
+    return specified;
+}
+
+/**
+ * A reporting context that is passed to report implementations
+ * @param {Object} [opts=null] opts options
+ * @param {String} [opts.dir='coverage'] opts.dir the reporting directory
+ * @param {Object} [opts.watermarks=null] opts.watermarks watermarks for
+ *  statements, lines, branches and functions
+ * @param {Function} [opts.sourceFinder=fsLookup] opts.sourceFinder a
+ *  function that returns source code given a file path. Defaults to
+ *  filesystem lookups based on path.
+ * @constructor
+ */
+class Context {
+    constructor(opts) {
+        this.dir = opts.dir || 'coverage';
+        this.watermarks = normalizeWatermarks(opts.watermarks);
+        this.sourceFinder = opts.sourceFinder || defaultSourceLookup;
+        this._summarizerFactory = new SummarizerFactory(
+            opts.coverageMap,
+            opts.defaultSummarizer
+        );
+        this.data = {};
+    }
+
+    /**
+     * returns a FileWriter implementation for reporting use. Also available
+     * as the `writer` property on the context.
+     * @returns {Writer}
+     */
+    getWriter() {
+        return this.writer;
+    }
+
+    /**
+     * returns the source code for the specified file path or throws if
+     * the source could not be found.
+     * @param {String} filePath the file path as found in a file coverage object
+     * @returns {String} the source code
+     */
+    getSource(filePath) {
+        return this.sourceFinder(filePath);
+    }
+
+    /**
+     * returns the coverage class given a coverage
+     * types and a percentage value.
+     * @param {String} type - the coverage type, one of `statements`, `functions`,
+     *  `branches`, or `lines`
+     * @param {Number} value - the percentage value
+     * @returns {String} one of `high`, `medium` or `low`
+     */
+    classForPercent(type, value) {
+        const watermarks = this.watermarks[type];
+        if (!watermarks) {
+            return 'unknown';
+        }
+        if (value < watermarks[0]) {
+            return 'low';
+        }
+        if (value >= watermarks[1]) {
+            return 'high';
+        }
+        return 'medium';
+    }
+
+    /**
+     * returns an XML writer for the supplied content writer
+     * @param {ContentWriter} contentWriter the content writer to which the returned XML writer
+     *  writes data
+     * @returns {XMLWriter}
+     */
+    getXMLWriter(contentWriter) {
+        return new XMLWriter(contentWriter);
+    }
+
+    /**
+     * returns a full visitor given a partial one.
+     * @param {Object} partialVisitor a partial visitor only having the functions of
+     *  interest to the caller. These functions are called with a scope that is the
+     *  supplied object.
+     * @returns {Visitor}
+     */
+    getVisitor(partialVisitor) {
+        return new tree.Visitor(partialVisitor);
+    }
+
+    getTree(name = 'defaultSummarizer') {
+        return this._summarizerFactory[name];
+    }
+}
+
+Object.defineProperty(Context.prototype, 'writer', {
+    enumerable: true,
+    get() {
+        if (!this.data.writer) {
+            this.data.writer = new FileWriter(this.dir);
+        }
+        return this.data.writer;
+    }
+});
+
+module.exports = Context;
+
+
+/***/ }),
+
+/***/ 571:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+const path = __nccwpck_require__(928);
+const fs = __nccwpck_require__(896);
+const mkdirp = __nccwpck_require__(512);
+const supportsColor = __nccwpck_require__(450);
+
+/**
+ * Base class for writing content
+ * @class ContentWriter
+ * @constructor
+ */
+class ContentWriter {
+    /**
+     * returns the colorized version of a string. Typically,
+     * content writers that write to files will return the
+     * same string and ones writing to a tty will wrap it in
+     * appropriate escape sequences.
+     * @param {String} str the string to colorize
+     * @param {String} clazz one of `high`, `medium` or `low`
+     * @returns {String} the colorized form of the string
+     */
+    colorize(str /*, clazz*/) {
+        return str;
+    }
+
+    /**
+     * writes a string appended with a newline to the destination
+     * @param {String} str the string to write
+     */
+    println(str) {
+        this.write(`${str}\n`);
+    }
+
+    /**
+     * closes this content writer. Should be called after all writes are complete.
+     */
+    close() {}
+}
+
+/**
+ * a content writer that writes to a file
+ * @param {Number} fd - the file descriptor
+ * @extends ContentWriter
+ * @constructor
+ */
+class FileContentWriter extends ContentWriter {
+    constructor(fd) {
+        super();
+
+        this.fd = fd;
+    }
+
+    write(str) {
+        fs.writeSync(this.fd, str);
+    }
+
+    close() {
+        fs.closeSync(this.fd);
+    }
+}
+
+// allow stdout to be captured for tests.
+let capture = false;
+let output = '';
+
+/**
+ * a content writer that writes to the console
+ * @extends ContentWriter
+ * @constructor
+ */
+class ConsoleWriter extends ContentWriter {
+    write(str) {
+        if (capture) {
+            output += str;
+        } else {
+            process.stdout.write(str);
+        }
+    }
+
+    colorize(str, clazz) {
+        const colors = {
+            low: '31;1',
+            medium: '33;1',
+            high: '32;1'
+        };
+
+        /* istanbul ignore next: different modes for CI and local */
+        if (supportsColor.stdout && colors[clazz]) {
+            return `\u001b[${colors[clazz]}m${str}\u001b[0m`;
+        }
+        return str;
+    }
+}
+
+/**
+ * utility for writing files under a specific directory
+ * @class FileWriter
+ * @param {String} baseDir the base directory under which files should be written
+ * @constructor
+ */
+class FileWriter {
+    constructor(baseDir) {
+        if (!baseDir) {
+            throw new Error('baseDir must be specified');
+        }
+        this.baseDir = baseDir;
+    }
+
+    /**
+     * static helpers for capturing stdout report output;
+     * super useful for tests!
+     */
+    static startCapture() {
+        capture = true;
+    }
+
+    static stopCapture() {
+        capture = false;
+    }
+
+    static getOutput() {
+        return output;
+    }
+
+    static resetOutput() {
+        output = '';
+    }
+
+    /**
+     * returns a FileWriter that is rooted at the supplied subdirectory
+     * @param {String} subdir the subdirectory under which to root the
+     *  returned FileWriter
+     * @returns {FileWriter}
+     */
+    writerForDir(subdir) {
+        if (path.isAbsolute(subdir)) {
+            throw new Error(
+                `Cannot create subdir writer for absolute path: ${subdir}`
+            );
+        }
+        return new FileWriter(`${this.baseDir}/${subdir}`);
+    }
+
+    /**
+     * copies a file from a source directory to a destination name
+     * @param {String} source path to source file
+     * @param {String} dest relative path to destination file
+     * @param {String} [header=undefined] optional text to prepend to destination
+     *  (e.g., an "this file is autogenerated" comment, copyright notice, etc.)
+     */
+    copyFile(source, dest, header) {
+        if (path.isAbsolute(dest)) {
+            throw new Error(`Cannot write to absolute path: ${dest}`);
+        }
+        dest = path.resolve(this.baseDir, dest);
+        mkdirp.sync(path.dirname(dest));
+        let contents;
+        if (header) {
+            contents = header + fs.readFileSync(source, 'utf8');
+        } else {
+            contents = fs.readFileSync(source);
+        }
+        fs.writeFileSync(dest, contents);
+    }
+
+    /**
+     * returns a content writer for writing content to the supplied file.
+     * @param {String|null} file the relative path to the file or the special
+     *  values `"-"` or `null` for writing to the console
+     * @returns {ContentWriter}
+     */
+    writeFile(file) {
+        if (file === null || file === '-') {
+            return new ConsoleWriter();
+        }
+        if (path.isAbsolute(file)) {
+            throw new Error(`Cannot write to absolute path: ${file}`);
+        }
+        file = path.resolve(this.baseDir, file);
+        mkdirp.sync(path.dirname(file));
+        return new FileContentWriter(fs.openSync(file, 'w'));
+    }
+}
+
+module.exports = FileWriter;
+
+
+/***/ }),
+
+/***/ 666:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+
+
+const path = __nccwpck_require__(928);
+let parsePath = path.parse;
+let SEP = path.sep;
+const origParser = parsePath;
+const origSep = SEP;
+
+function makeRelativeNormalizedPath(str, sep) {
+    const parsed = parsePath(str);
+    let root = parsed.root;
+    let dir;
+    let file = parsed.base;
+    let quoted;
+    let pos;
+
+    // handle a weird windows case separately
+    if (sep === '\\') {
+        pos = root.indexOf(':\\');
+        if (pos >= 0) {
+            root = root.substring(0, pos + 2);
+        }
+    }
+    dir = parsed.dir.substring(root.length);
+
+    if (str === '') {
+        return [];
+    }
+
+    if (sep !== '/') {
+        quoted = new RegExp(sep.replace(/\W/g, '\\$&'), 'g');
+        dir = dir.replace(quoted, '/');
+        file = file.replace(quoted, '/'); // excessively paranoid?
+    }
+
+    if (dir !== '') {
+        dir = `${dir}/${file}`;
+    } else {
+        dir = file;
+    }
+    if (dir.substring(0, 1) === '/') {
+        dir = dir.substring(1);
+    }
+    dir = dir.split(/\/+/);
+    return dir;
+}
+
+class Path {
+    constructor(strOrArray) {
+        if (Array.isArray(strOrArray)) {
+            this.v = strOrArray;
+        } else if (typeof strOrArray === 'string') {
+            this.v = makeRelativeNormalizedPath(strOrArray, SEP);
+        } else {
+            throw new Error(
+                `Invalid Path argument must be string or array:${strOrArray}`
+            );
+        }
+    }
+
+    toString() {
+        return this.v.join('/');
+    }
+
+    hasParent() {
+        return this.v.length > 0;
+    }
+
+    parent() {
+        if (!this.hasParent()) {
+            throw new Error('Unable to get parent for 0 elem path');
+        }
+        const p = this.v.slice();
+        p.pop();
+        return new Path(p);
+    }
+
+    elements() {
+        return this.v.slice();
+    }
+
+    name() {
+        return this.v.slice(-1)[0];
+    }
+
+    contains(other) {
+        let i;
+        if (other.length > this.length) {
+            return false;
+        }
+        for (i = 0; i < other.length; i += 1) {
+            if (this.v[i] !== other.v[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    ancestorOf(other) {
+        return other.contains(this) && other.length !== this.length;
+    }
+
+    descendantOf(other) {
+        return this.contains(other) && other.length !== this.length;
+    }
+
+    commonPrefixPath(other) {
+        const len = this.length > other.length ? other.length : this.length;
+        let i;
+        const ret = [];
+
+        for (i = 0; i < len; i += 1) {
+            if (this.v[i] === other.v[i]) {
+                ret.push(this.v[i]);
+            } else {
+                break;
+            }
+        }
+        return new Path(ret);
+    }
+
+    static compare(a, b) {
+        const al = a.length;
+        const bl = b.length;
+
+        if (al < bl) {
+            return -1;
+        }
+
+        if (al > bl) {
+            return 1;
+        }
+
+        const astr = a.toString();
+        const bstr = b.toString();
+        return astr < bstr ? -1 : astr > bstr ? 1 : 0;
+    }
+}
+
+['push', 'pop', 'shift', 'unshift', 'splice'].forEach(fn => {
+    Object.defineProperty(Path.prototype, fn, {
+        value(...args) {
+            return this.v[fn](...args);
+        }
+    });
+});
+
+Object.defineProperty(Path.prototype, 'length', {
+    enumerable: true,
+    get() {
+        return this.v.length;
+    }
+});
+
+module.exports = Path;
+Path.tester = {
+    setParserAndSep(p, sep) {
+        parsePath = p;
+        SEP = sep;
+    },
+    reset() {
+        parsePath = origParser;
+        SEP = origSep;
+    }
+};
+
+
+/***/ }),
+
+/***/ 405:
+/***/ ((module) => {
+
+
+
+// TODO: switch to class private field when targetting node.js 12
+const _summarizer = Symbol('ReportBase.#summarizer');
+
+class ReportBase {
+    constructor(opts = {}) {
+        this[_summarizer] = opts.summarizer;
+    }
+
+    execute(context) {
+        context.getTree(this[_summarizer]).visit(this, context);
+    }
+}
+
+module.exports = ReportBase;
+
+
+/***/ }),
+
+/***/ 547:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+
+
+const coverage = __nccwpck_require__(377);
+const Path = __nccwpck_require__(666);
+const { BaseNode, BaseTree } = __nccwpck_require__(841);
+
+class ReportNode extends BaseNode {
+    constructor(path, fileCoverage) {
+        super();
+
+        this.path = path;
+        this.parent = null;
+        this.fileCoverage = fileCoverage;
+        this.children = [];
+    }
+
+    static createRoot(children) {
+        const root = new ReportNode(new Path([]));
+
+        children.forEach(child => {
+            root.addChild(child);
+        });
+
+        return root;
+    }
+
+    addChild(child) {
+        child.parent = this;
+        this.children.push(child);
+    }
+
+    asRelative(p) {
+        if (p.substring(0, 1) === '/') {
+            return p.substring(1);
+        }
+        return p;
+    }
+
+    getQualifiedName() {
+        return this.asRelative(this.path.toString());
+    }
+
+    getRelativeName() {
+        const parent = this.getParent();
+        const myPath = this.path;
+        let relPath;
+        let i;
+        const parentPath = parent ? parent.path : new Path([]);
+        if (parentPath.ancestorOf(myPath)) {
+            relPath = new Path(myPath.elements());
+            for (i = 0; i < parentPath.length; i += 1) {
+                relPath.shift();
+            }
+            return this.asRelative(relPath.toString());
+        }
+        return this.asRelative(this.path.toString());
+    }
+
+    getParent() {
+        return this.parent;
+    }
+
+    getChildren() {
+        return this.children;
+    }
+
+    isSummary() {
+        return !this.fileCoverage;
+    }
+
+    getFileCoverage() {
+        return this.fileCoverage;
+    }
+
+    getCoverageSummary(filesOnly) {
+        const cacheProp = `c_${filesOnly ? 'files' : 'full'}`;
+        let summary;
+
+        if (Object.prototype.hasOwnProperty.call(this, cacheProp)) {
+            return this[cacheProp];
+        }
+
+        if (!this.isSummary()) {
+            summary = this.getFileCoverage().toSummary();
+        } else {
+            let count = 0;
+            summary = coverage.createCoverageSummary();
+            this.getChildren().forEach(child => {
+                if (filesOnly && child.isSummary()) {
+                    return;
+                }
+                count += 1;
+                summary.merge(child.getCoverageSummary(filesOnly));
+            });
+            if (count === 0 && filesOnly) {
+                summary = null;
+            }
+        }
+        this[cacheProp] = summary;
+        return summary;
+    }
+}
+
+class ReportTree extends BaseTree {
+    constructor(root, childPrefix) {
+        super(root);
+
+        const maybePrefix = node => {
+            if (childPrefix && !node.isRoot()) {
+                node.path.unshift(childPrefix);
+            }
+        };
+        this.visit({
+            onDetail: maybePrefix,
+            onSummary(node) {
+                maybePrefix(node);
+                node.children.sort((a, b) => {
+                    const astr = a.path.toString();
+                    const bstr = b.path.toString();
+                    return astr < bstr
+                        ? -1
+                        : astr > bstr
+                        ? 1
+                        : /* istanbul ignore next */ 0;
+                });
+            }
+        });
+    }
+}
+
+function findCommonParent(paths) {
+    return paths.reduce(
+        (common, path) => common.commonPrefixPath(path),
+        paths[0] || new Path([])
+    );
+}
+
+function findOrCreateParent(parentPath, nodeMap, created = () => {}) {
+    let parent = nodeMap[parentPath.toString()];
+
+    if (!parent) {
+        parent = new ReportNode(parentPath);
+        nodeMap[parentPath.toString()] = parent;
+        created(parentPath, parent);
+    }
+
+    return parent;
+}
+
+function toDirParents(list) {
+    const nodeMap = Object.create(null);
+    list.forEach(o => {
+        const parent = findOrCreateParent(o.path.parent(), nodeMap);
+        parent.addChild(new ReportNode(o.path, o.fileCoverage));
+    });
+
+    return Object.values(nodeMap);
+}
+
+function addAllPaths(topPaths, nodeMap, path, node) {
+    const parent = findOrCreateParent(
+        path.parent(),
+        nodeMap,
+        (parentPath, parent) => {
+            if (parentPath.hasParent()) {
+                addAllPaths(topPaths, nodeMap, parentPath, parent);
+            } else {
+                topPaths.push(parent);
+            }
+        }
+    );
+
+    parent.addChild(node);
+}
+
+function foldIntoOneDir(node, parent) {
+    const { children } = node;
+    if (children.length === 1 && !children[0].fileCoverage) {
+        children[0].parent = parent;
+        return foldIntoOneDir(children[0], parent);
+    }
+    node.children = children.map(child => foldIntoOneDir(child, node));
+    return node;
+}
+
+function pkgSummaryPrefix(dirParents, commonParent) {
+    if (!dirParents.some(dp => dp.path.length === 0)) {
+        return;
+    }
+
+    if (commonParent.length === 0) {
+        return 'root';
+    }
+
+    return commonParent.name();
+}
+
+class SummarizerFactory {
+    constructor(coverageMap, defaultSummarizer = 'pkg') {
+        this._coverageMap = coverageMap;
+        this._defaultSummarizer = defaultSummarizer;
+        this._initialList = coverageMap.files().map(filePath => ({
+            filePath,
+            path: new Path(filePath),
+            fileCoverage: coverageMap.fileCoverageFor(filePath)
+        }));
+        this._commonParent = findCommonParent(
+            this._initialList.map(o => o.path.parent())
+        );
+        if (this._commonParent.length > 0) {
+            this._initialList.forEach(o => {
+                o.path.splice(0, this._commonParent.length);
+            });
+        }
+    }
+
+    get defaultSummarizer() {
+        return this[this._defaultSummarizer];
+    }
+
+    get flat() {
+        if (!this._flat) {
+            this._flat = new ReportTree(
+                ReportNode.createRoot(
+                    this._initialList.map(
+                        node => new ReportNode(node.path, node.fileCoverage)
+                    )
+                )
+            );
+        }
+
+        return this._flat;
+    }
+
+    _createPkg() {
+        const dirParents = toDirParents(this._initialList);
+        if (dirParents.length === 1) {
+            return new ReportTree(dirParents[0]);
+        }
+
+        return new ReportTree(
+            ReportNode.createRoot(dirParents),
+            pkgSummaryPrefix(dirParents, this._commonParent)
+        );
+    }
+
+    get pkg() {
+        if (!this._pkg) {
+            this._pkg = this._createPkg();
+        }
+
+        return this._pkg;
+    }
+
+    _createNested() {
+        const nodeMap = Object.create(null);
+        const topPaths = [];
+        this._initialList.forEach(o => {
+            const node = new ReportNode(o.path, o.fileCoverage);
+            addAllPaths(topPaths, nodeMap, o.path, node);
+        });
+
+        const topNodes = topPaths.map(node => foldIntoOneDir(node));
+        if (topNodes.length === 1) {
+            return new ReportTree(topNodes[0]);
+        }
+
+        return new ReportTree(ReportNode.createRoot(topNodes));
+    }
+
+    get nested() {
+        if (!this._nested) {
+            this._nested = this._createNested();
+        }
+
+        return this._nested;
+    }
+}
+
+module.exports = SummarizerFactory;
+
+
+/***/ }),
+
+/***/ 841:
+/***/ ((module) => {
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+
+
+/**
+ * An object with methods that are called during the traversal of the coverage tree.
+ * A visitor has the following methods that are called during tree traversal.
+ *
+ *   * `onStart(root, state)` - called before traversal begins
+ *   * `onSummary(node, state)` - called for every summary node
+ *   * `onDetail(node, state)` - called for every detail node
+ *   * `onSummaryEnd(node, state)` - called after all children have been visited for
+ *      a summary node.
+ *   * `onEnd(root, state)` - called after traversal ends
+ *
+ * @param delegate - a partial visitor that only implements the methods of interest
+ *  The visitor object supplies the missing methods as noops. For example, reports
+ *  that only need the final coverage summary need implement `onStart` and nothing
+ *  else. Reports that use only detailed coverage information need implement `onDetail`
+ *  and nothing else.
+ * @constructor
+ */
+class Visitor {
+    constructor(delegate) {
+        this.delegate = delegate;
+    }
+}
+
+['Start', 'End', 'Summary', 'SummaryEnd', 'Detail']
+    .map(k => `on${k}`)
+    .forEach(fn => {
+        Object.defineProperty(Visitor.prototype, fn, {
+            writable: true,
+            value(node, state) {
+                if (typeof this.delegate[fn] === 'function') {
+                    this.delegate[fn](node, state);
+                }
+            }
+        });
+    });
+
+class CompositeVisitor extends Visitor {
+    constructor(visitors) {
+        super();
+
+        if (!Array.isArray(visitors)) {
+            visitors = [visitors];
+        }
+        this.visitors = visitors.map(v => {
+            if (v instanceof Visitor) {
+                return v;
+            }
+            return new Visitor(v);
+        });
+    }
+}
+
+['Start', 'Summary', 'SummaryEnd', 'Detail', 'End']
+    .map(k => `on${k}`)
+    .forEach(fn => {
+        Object.defineProperty(CompositeVisitor.prototype, fn, {
+            value(node, state) {
+                this.visitors.forEach(v => {
+                    v[fn](node, state);
+                });
+            }
+        });
+    });
+
+class BaseNode {
+    isRoot() {
+        return !this.getParent();
+    }
+
+    /**
+     * visit all nodes depth-first from this node down. Note that `onStart`
+     * and `onEnd` are never called on the visitor even if the current
+     * node is the root of the tree.
+     * @param visitor a full visitor that is called during tree traversal
+     * @param state optional state that is passed around
+     */
+    visit(visitor, state) {
+        if (this.isSummary()) {
+            visitor.onSummary(this, state);
+        } else {
+            visitor.onDetail(this, state);
+        }
+
+        this.getChildren().forEach(child => {
+            child.visit(visitor, state);
+        });
+
+        if (this.isSummary()) {
+            visitor.onSummaryEnd(this, state);
+        }
+    }
+}
+
+/**
+ * abstract base class for a coverage tree.
+ * @constructor
+ */
+class BaseTree {
+    constructor(root) {
+        this.root = root;
+    }
+
+    /**
+     * returns the root node of the tree
+     */
+    getRoot() {
+        return this.root;
+    }
+
+    /**
+     * visits the tree depth-first with the supplied partial visitor
+     * @param visitor - a potentially partial visitor
+     * @param state - the state to be passed around during tree traversal
+     */
+    visit(visitor, state) {
+        if (!(visitor instanceof Visitor)) {
+            visitor = new Visitor(visitor);
+        }
+        visitor.onStart(this.getRoot(), state);
+        this.getRoot().visit(visitor, state);
+        visitor.onEnd(this.getRoot(), state);
+    }
+}
+
+module.exports = {
+    BaseTree,
+    BaseNode,
+    Visitor,
+    CompositeVisitor
+};
+
+
+/***/ }),
+
+/***/ 410:
+/***/ ((module) => {
+
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+module.exports = {
+    getDefault() {
+        return {
+            statements: [50, 80],
+            functions: [50, 80],
+            branches: [50, 80],
+            lines: [50, 80]
+        };
+    }
+};
+
+
+/***/ }),
+
+/***/ 490:
+/***/ ((module) => {
+
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+const INDENT = '  ';
+
+function attrString(attrs) {
+    return Object.entries(attrs || {})
+        .map(([k, v]) => ` ${k}="${v}"`)
+        .join('');
+}
+
+/**
+ * a utility class to produce well-formed, indented XML
+ * @param {ContentWriter} contentWriter the content writer that this utility wraps
+ * @constructor
+ */
+class XMLWriter {
+    constructor(contentWriter) {
+        this.cw = contentWriter;
+        this.stack = [];
+    }
+
+    indent(str) {
+        return this.stack.map(() => INDENT).join('') + str;
+    }
+
+    /**
+     * writes the opening XML tag with the supplied attributes
+     * @param {String} name tag name
+     * @param {Object} [attrs=null] attrs attributes for the tag
+     */
+    openTag(name, attrs) {
+        const str = this.indent(`<${name + attrString(attrs)}>`);
+        this.cw.println(str);
+        this.stack.push(name);
+    }
+
+    /**
+     * closes an open XML tag.
+     * @param {String} name - tag name to close. This must match the writer's
+     *  notion of the tag that is currently open.
+     */
+    closeTag(name) {
+        if (this.stack.length === 0) {
+            throw new Error(`Attempt to close tag ${name} when not opened`);
+        }
+        const stashed = this.stack.pop();
+        const str = `</${name}>`;
+
+        if (stashed !== name) {
+            throw new Error(
+                `Attempt to close tag ${name} when ${stashed} was the one open`
+            );
+        }
+        this.cw.println(this.indent(str));
+    }
+
+    /**
+     * writes a tag and its value opening and closing it at the same time
+     * @param {String} name tag name
+     * @param {Object} [attrs=null] attrs tag attributes
+     * @param {String} [content=null] content optional tag content
+     */
+    inlineTag(name, attrs, content) {
+        let str = '<' + name + attrString(attrs);
+        if (content) {
+            str += `>${content}</${name}>`;
+        } else {
+            str += '/>';
+        }
+        str = this.indent(str);
+        this.cw.println(str);
+    }
+
+    /**
+     * closes all open tags and ends the document
+     */
+    closeAll() {
+        this.stack
+            .slice()
+            .reverse()
+            .forEach(name => {
+                this.closeTag(name);
+            });
+    }
+}
+
+module.exports = XMLWriter;
+
+
+/***/ }),
+
+/***/ 790:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+const path = __nccwpck_require__(928);
+const { escape } = __nccwpck_require__(19);
+const { ReportBase } = __nccwpck_require__(761);
+
+class CoberturaReport extends ReportBase {
+    constructor(opts) {
+        super();
+
+        opts = opts || {};
+
+        this.cw = null;
+        this.xml = null;
+        this.timestamp = opts.timestamp || Date.now().toString();
+        this.projectRoot = opts.projectRoot || process.cwd();
+        this.file = opts.file || 'cobertura-coverage.xml';
+    }
+
+    onStart(root, context) {
+        this.cw = context.writer.writeFile(this.file);
+        this.xml = context.getXMLWriter(this.cw);
+        this.writeRootStats(root);
+    }
+
+    onEnd() {
+        this.xml.closeAll();
+        this.cw.close();
+    }
+
+    writeRootStats(node) {
+        const metrics = node.getCoverageSummary();
+        this.cw.println('<?xml version="1.0" ?>');
+        this.cw.println(
+            '<!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">'
+        );
+        this.xml.openTag('coverage', {
+            'lines-valid': metrics.lines.total,
+            'lines-covered': metrics.lines.covered,
+            'line-rate': metrics.lines.pct / 100.0,
+            'branches-valid': metrics.branches.total,
+            'branches-covered': metrics.branches.covered,
+            'branch-rate': metrics.branches.pct / 100.0,
+            timestamp: this.timestamp,
+            complexity: '0',
+            version: '0.1'
+        });
+        this.xml.openTag('sources');
+        this.xml.inlineTag('source', null, this.projectRoot);
+        this.xml.closeTag('sources');
+        this.xml.openTag('packages');
+    }
+
+    onSummary(node) {
+        const metrics = node.getCoverageSummary(true);
+        if (!metrics) {
+            return;
+        }
+        this.xml.openTag('package', {
+            name: node.isRoot() ? 'main' : escape(asJavaPackage(node)),
+            'line-rate': metrics.lines.pct / 100.0,
+            'branch-rate': metrics.branches.pct / 100.0
+        });
+        this.xml.openTag('classes');
+    }
+
+    onSummaryEnd(node) {
+        const metrics = node.getCoverageSummary(true);
+        if (!metrics) {
+            return;
+        }
+        this.xml.closeTag('classes');
+        this.xml.closeTag('package');
+    }
+
+    onDetail(node) {
+        const fileCoverage = node.getFileCoverage();
+        const metrics = node.getCoverageSummary();
+        const branchByLine = fileCoverage.getBranchCoverageByLine();
+
+        this.xml.openTag('class', {
+            name: escape(asClassName(node)),
+            filename: path.relative(this.projectRoot, fileCoverage.path),
+            'line-rate': metrics.lines.pct / 100.0,
+            'branch-rate': metrics.branches.pct / 100.0
+        });
+
+        this.xml.openTag('methods');
+        const fnMap = fileCoverage.fnMap;
+        Object.entries(fnMap).forEach(([k, { name, decl }]) => {
+            const hits = fileCoverage.f[k];
+            this.xml.openTag('method', {
+                name: escape(name),
+                hits,
+                signature: '()V' //fake out a no-args void return
+            });
+            this.xml.openTag('lines');
+            //Add the function definition line and hits so that jenkins cobertura plugin records method hits
+            this.xml.inlineTag('line', {
+                number: decl.start.line,
+                hits
+            });
+            this.xml.closeTag('lines');
+            this.xml.closeTag('method');
+        });
+        this.xml.closeTag('methods');
+
+        this.xml.openTag('lines');
+        const lines = fileCoverage.getLineCoverage();
+        Object.entries(lines).forEach(([k, hits]) => {
+            const attrs = {
+                number: k,
+                hits,
+                branch: 'false'
+            };
+            const branchDetail = branchByLine[k];
+
+            if (branchDetail) {
+                attrs.branch = true;
+                attrs['condition-coverage'] =
+                    branchDetail.coverage +
+                    '% (' +
+                    branchDetail.covered +
+                    '/' +
+                    branchDetail.total +
+                    ')';
+            }
+            this.xml.inlineTag('line', attrs);
+        });
+
+        this.xml.closeTag('lines');
+        this.xml.closeTag('class');
+    }
+}
+
+function asJavaPackage(node) {
+    return node
+        .getRelativeName()
+        .replace(/\//g, '.')
+        .replace(/\\/g, '.')
+        .replace(/\.$/, '');
+}
+
+function asClassName(node) {
+    return node.getRelativeName().replace(/.*[\\/]/, '');
+}
+
+module.exports = CoberturaReport;
+
+
+/***/ }),
+
+/***/ 335:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+/*
+ Copyright 2012-2015, Yahoo Inc.
+ Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+
+const { ReportBase } = __nccwpck_require__(761);
+
+class LcovOnlyReport extends ReportBase {
+    constructor(opts) {
+        super();
+        opts = opts || {};
+        this.file = opts.file || 'lcov.info';
+        this.projectRoot = opts.projectRoot || process.cwd();
+        this.contentWriter = null;
+    }
+
+    onStart(root, context) {
+        this.contentWriter = context.writer.writeFile(this.file);
+    }
+
+    onDetail(node) {
+        const fc = node.getFileCoverage();
+        const writer = this.contentWriter;
+        const functions = fc.f;
+        const functionMap = fc.fnMap;
+        const lines = fc.getLineCoverage();
+        const branches = fc.b;
+        const branchMap = fc.branchMap;
+        const summary = node.getCoverageSummary();
+        const path = __nccwpck_require__(928);
+
+        writer.println('TN:');
+        const fileName = path.relative(this.projectRoot, fc.path);
+        writer.println('SF:' + fileName);
+
+        Object.values(functionMap).forEach(meta => {
+            // Some versions of the instrumenter in the wild populate 'loc'
+            // but not 'decl':
+            const decl = meta.decl || meta.loc;
+            writer.println('FN:' + [decl.start.line, meta.name].join(','));
+        });
+        writer.println('FNF:' + summary.functions.total);
+        writer.println('FNH:' + summary.functions.covered);
+
+        Object.entries(functionMap).forEach(([key, meta]) => {
+            const stats = functions[key];
+            writer.println('FNDA:' + [stats, meta.name].join(','));
+        });
+
+        Object.entries(lines).forEach(entry => {
+            writer.println('DA:' + entry.join(','));
+        });
+        writer.println('LF:' + summary.lines.total);
+        writer.println('LH:' + summary.lines.covered);
+
+        Object.entries(branches).forEach(([key, branchArray]) => {
+            const meta = branchMap[key];
+            if (meta) {
+                const { line } = meta.loc.start;
+                branchArray.forEach((b, i) => {
+                    writer.println('BRDA:' + [line, key, i, b].join(','));
+                });
+            } else {
+                console.warn('Missing coverage entries in', fileName, key);
+            }
+        });
+        writer.println('BRF:' + summary.branches.total);
+        writer.println('BRH:' + summary.branches.covered);
+        writer.println('end_of_record');
+    }
+
+    onEnd() {
+        this.contentWriter.close();
+    }
+}
+
+module.exports = LcovOnlyReport;
+
+
+/***/ }),
+
+/***/ 512:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+
+const fs = __nccwpck_require__(896);
+const path = __nccwpck_require__(928);
+const {promisify} = __nccwpck_require__(23);
+const semverGte = __nccwpck_require__(236);
+
+const useNativeRecursiveOption = semverGte(process.version, '10.12.0');
+
+// https://github.com/nodejs/node/issues/8987
+// https://github.com/libuv/libuv/pull/1088
+const checkPath = pth => {
+	if (process.platform === 'win32') {
+		const pathHasInvalidWinCharacters = /[<>:"|?*]/.test(pth.replace(path.parse(pth).root, ''));
+
+		if (pathHasInvalidWinCharacters) {
+			const error = new Error(`Path contains invalid characters: ${pth}`);
+			error.code = 'EINVAL';
+			throw error;
+		}
+	}
+};
+
+const processOptions = options => {
+	const defaults = {
+		mode: 0o777,
+		fs
+	};
+
+	return {
+		...defaults,
+		...options
+	};
+};
+
+const permissionError = pth => {
+	// This replicates the exception of `fs.mkdir` with native the
+	// `recusive` option when run on an invalid drive under Windows.
+	const error = new Error(`operation not permitted, mkdir '${pth}'`);
+	error.code = 'EPERM';
+	error.errno = -4048;
+	error.path = pth;
+	error.syscall = 'mkdir';
+	return error;
+};
+
+const makeDir = async (input, options) => {
+	checkPath(input);
+	options = processOptions(options);
+
+	const mkdir = promisify(options.fs.mkdir);
+	const stat = promisify(options.fs.stat);
+
+	if (useNativeRecursiveOption && options.fs.mkdir === fs.mkdir) {
+		const pth = path.resolve(input);
+
+		await mkdir(pth, {
+			mode: options.mode,
+			recursive: true
+		});
+
+		return pth;
+	}
+
+	const make = async pth => {
+		try {
+			await mkdir(pth, options.mode);
+
+			return pth;
+		} catch (error) {
+			if (error.code === 'EPERM') {
+				throw error;
+			}
+
+			if (error.code === 'ENOENT') {
+				if (path.dirname(pth) === pth) {
+					throw permissionError(pth);
+				}
+
+				if (error.message.includes('null bytes')) {
+					throw error;
+				}
+
+				await make(path.dirname(pth));
+
+				return make(pth);
+			}
+
+			try {
+				const stats = await stat(pth);
+				if (!stats.isDirectory()) {
+					throw new Error('The path is not a directory');
+				}
+			} catch {
+				throw error;
+			}
+
+			return pth;
+		}
+	};
+
+	return make(path.resolve(input));
+};
+
+module.exports = makeDir;
+
+module.exports.sync = (input, options) => {
+	checkPath(input);
+	options = processOptions(options);
+
+	if (useNativeRecursiveOption && options.fs.mkdirSync === fs.mkdirSync) {
+		const pth = path.resolve(input);
+
+		fs.mkdirSync(pth, {
+			mode: options.mode,
+			recursive: true
+		});
+
+		return pth;
+	}
+
+	const make = pth => {
+		try {
+			options.fs.mkdirSync(pth, options.mode);
+		} catch (error) {
+			if (error.code === 'EPERM') {
+				throw error;
+			}
+
+			if (error.code === 'ENOENT') {
+				if (path.dirname(pth) === pth) {
+					throw permissionError(pth);
+				}
+
+				if (error.message.includes('null bytes')) {
+					throw error;
+				}
+
+				make(path.dirname(pth));
+				return make(pth);
+			}
+
+			try {
+				if (!options.fs.statSync(pth).isDirectory()) {
+					throw new Error('The path is not a directory');
+				}
+			} catch {
+				throw error;
+			}
+		}
+
+		return pth;
+	};
+
+	return make(path.resolve(input));
+};
+
+
+/***/ }),
+
+/***/ 163:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+
+
+const debug = __nccwpck_require__(159)
+const { MAX_LENGTH, MAX_SAFE_INTEGER } = __nccwpck_require__(101)
+const { safeRe: re, t } = __nccwpck_require__(471)
+
+const parseOptions = __nccwpck_require__(356)
+const { compareIdentifiers } = __nccwpck_require__(348)
+
+const isPrereleaseIdentifier = (prerelease, identifier) => {
+  const identifiers = identifier.split('.')
+  if (identifiers.length > prerelease.length) {
+    return false
+  }
+
+  for (let i = 0; i < identifiers.length; i++) {
+    if (compareIdentifiers(prerelease[i], identifiers[i]) !== 0) {
+      return false
+    }
+  }
+
+  return true
+}
+
+class SemVer {
+  constructor (version, options) {
+    options = parseOptions(options)
+
+    if (version instanceof SemVer) {
+      if (version.loose === !!options.loose &&
+        version.includePrerelease === !!options.includePrerelease) {
+        return version
+      } else {
+        version = version.version
+      }
+    } else if (typeof version !== 'string') {
+      throw new TypeError(`Invalid version. Must be a string. Got type "${typeof version}".`)
+    }
+
+    if (version.length > MAX_LENGTH) {
+      throw new TypeError(
+        `version is longer than ${MAX_LENGTH} characters`
+      )
+    }
+
+    debug('SemVer', version, options)
+    this.options = options
+    this.loose = !!options.loose
+    // this isn't actually relevant for versions, but keep it so that we
+    // don't run into trouble passing this.options around.
+    this.includePrerelease = !!options.includePrerelease
+
+    const m = version.trim().match(options.loose ? re[t.LOOSE] : re[t.FULL])
+
+    if (!m) {
+      throw new TypeError(`Invalid Version: ${version}`)
+    }
+
+    this.raw = version
+
+    // these are actually numbers
+    this.major = +m[1]
+    this.minor = +m[2]
+    this.patch = +m[3]
+
+    if (this.major > MAX_SAFE_INTEGER || this.major < 0) {
+      throw new TypeError('Invalid major version')
+    }
+
+    if (this.minor > MAX_SAFE_INTEGER || this.minor < 0) {
+      throw new TypeError('Invalid minor version')
+    }
+
+    if (this.patch > MAX_SAFE_INTEGER || this.patch < 0) {
+      throw new TypeError('Invalid patch version')
+    }
+
+    // numberify any prerelease numeric ids
+    if (!m[4]) {
+      this.prerelease = []
+    } else {
+      this.prerelease = m[4].split('.').map((id) => {
+        if (/^[0-9]+$/.test(id)) {
+          const num = +id
+          if (num >= 0 && num < MAX_SAFE_INTEGER) {
+            return num
+          }
+        }
+        return id
+      })
+    }
+
+    this.build = m[5] ? m[5].split('.') : []
+    this.format()
+  }
+
+  format () {
+    this.version = `${this.major}.${this.minor}.${this.patch}`
+    if (this.prerelease.length) {
+      this.version += `-${this.prerelease.join('.')}`
+    }
+    return this.version
+  }
+
+  toString () {
+    return this.version
+  }
+
+  compare (other) {
+    debug('SemVer.compare', this.version, this.options, other)
+    if (!(other instanceof SemVer)) {
+      if (typeof other === 'string' && other === this.version) {
+        return 0
+      }
+      other = new SemVer(other, this.options)
+    }
+
+    if (other.version === this.version) {
+      return 0
+    }
+
+    return this.compareMain(other) || this.comparePre(other)
+  }
+
+  compareMain (other) {
+    if (!(other instanceof SemVer)) {
+      other = new SemVer(other, this.options)
+    }
+
+    if (this.major < other.major) {
+      return -1
+    }
+    if (this.major > other.major) {
+      return 1
+    }
+    if (this.minor < other.minor) {
+      return -1
+    }
+    if (this.minor > other.minor) {
+      return 1
+    }
+    if (this.patch < other.patch) {
+      return -1
+    }
+    if (this.patch > other.patch) {
+      return 1
+    }
+    return 0
+  }
+
+  comparePre (other) {
+    if (!(other instanceof SemVer)) {
+      other = new SemVer(other, this.options)
+    }
+
+    // NOT having a prerelease is > having one
+    if (this.prerelease.length && !other.prerelease.length) {
+      return -1
+    } else if (!this.prerelease.length && other.prerelease.length) {
+      return 1
+    } else if (!this.prerelease.length && !other.prerelease.length) {
+      return 0
+    }
+
+    let i = 0
+    do {
+      const a = this.prerelease[i]
+      const b = other.prerelease[i]
+      debug('prerelease compare', i, a, b)
+      if (a === undefined && b === undefined) {
+        return 0
+      } else if (b === undefined) {
+        return 1
+      } else if (a === undefined) {
+        return -1
+      } else if (a === b) {
+        continue
+      } else {
+        return compareIdentifiers(a, b)
+      }
+    } while (++i)
+  }
+
+  compareBuild (other) {
+    if (!(other instanceof SemVer)) {
+      other = new SemVer(other, this.options)
+    }
+
+    let i = 0
+    do {
+      const a = this.build[i]
+      const b = other.build[i]
+      debug('build compare', i, a, b)
+      if (a === undefined && b === undefined) {
+        return 0
+      } else if (b === undefined) {
+        return 1
+      } else if (a === undefined) {
+        return -1
+      } else if (a === b) {
+        continue
+      } else {
+        return compareIdentifiers(a, b)
+      }
+    } while (++i)
+  }
+
+  // preminor will bump the version up to the next minor release, and immediately
+  // down to pre-release. premajor and prepatch work the same way.
+  inc (release, identifier, identifierBase) {
+    if (release.startsWith('pre')) {
+      if (!identifier && identifierBase === false) {
+        throw new Error('invalid increment argument: identifier is empty')
+      }
+      // Avoid an invalid semver results
+      if (identifier) {
+        const match = `-${identifier}`.match(this.options.loose ? re[t.PRERELEASELOOSE] : re[t.PRERELEASE])
+        if (!match || match[1] !== identifier) {
+          throw new Error(`invalid identifier: ${identifier}`)
+        }
+      }
+    }
+
+    switch (release) {
+      case 'premajor':
+        this.prerelease.length = 0
+        this.patch = 0
+        this.minor = 0
+        this.major++
+        this.inc('pre', identifier, identifierBase)
+        break
+      case 'preminor':
+        this.prerelease.length = 0
+        this.patch = 0
+        this.minor++
+        this.inc('pre', identifier, identifierBase)
+        break
+      case 'prepatch':
+        // If this is already a prerelease, it will bump to the next version
+        // drop any prereleases that might already exist, since they are not
+        // relevant at this point.
+        this.prerelease.length = 0
+        this.inc('patch', identifier, identifierBase)
+        this.inc('pre', identifier, identifierBase)
+        break
+      // If the input is a non-prerelease version, this acts the same as
+      // prepatch.
+      case 'prerelease':
+        if (this.prerelease.length === 0) {
+          this.inc('patch', identifier, identifierBase)
+        }
+        this.inc('pre', identifier, identifierBase)
+        break
+      case 'release':
+        if (this.prerelease.length === 0) {
+          throw new Error(`version ${this.raw} is not a prerelease`)
+        }
+        this.prerelease.length = 0
+        break
+
+      case 'major':
+        // If this is a pre-major version, bump up to the same major version.
+        // Otherwise increment major.
+        // 1.0.0-5 bumps to 1.0.0
+        // 1.1.0 bumps to 2.0.0
+        if (
+          this.minor !== 0 ||
+          this.patch !== 0 ||
+          this.prerelease.length === 0
+        ) {
+          this.major++
+        }
+        this.minor = 0
+        this.patch = 0
+        this.prerelease = []
+        break
+      case 'minor':
+        // If this is a pre-minor version, bump up to the same minor version.
+        // Otherwise increment minor.
+        // 1.2.0-5 bumps to 1.2.0
+        // 1.2.1 bumps to 1.3.0
+        if (this.patch !== 0 || this.prerelease.length === 0) {
+          this.minor++
+        }
+        this.patch = 0
+        this.prerelease = []
+        break
+      case 'patch':
+        // If this is not a pre-release version, it will increment the patch.
+        // If it is a pre-release it will bump up to the same patch version.
+        // 1.2.0-5 patches to 1.2.0
+        // 1.2.0 patches to 1.2.1
+        if (this.prerelease.length === 0) {
+          this.patch++
+        }
+        this.prerelease = []
+        break
+      // This probably shouldn't be used publicly.
+      // 1.0.0 'pre' would become 1.0.0-0 which is the wrong direction.
+      case 'pre': {
+        const base = Number(identifierBase) ? 1 : 0
+
+        if (this.prerelease.length === 0) {
+          this.prerelease = [base]
+        } else {
+          let i = this.prerelease.length
+          while (--i >= 0) {
+            if (typeof this.prerelease[i] === 'number') {
+              this.prerelease[i]++
+              i = -2
+            }
+          }
+          if (i === -1) {
+            // didn't increment anything
+            if (identifier === this.prerelease.join('.') && identifierBase === false) {
+              throw new Error('invalid increment argument: identifier already exists')
+            }
+            this.prerelease.push(base)
+          }
+        }
+        if (identifier) {
+          // 1.2.0-beta.1 bumps to 1.2.0-beta.2,
+          // 1.2.0-beta.fooblz or 1.2.0-beta bumps to 1.2.0-beta.0
+          let prerelease = [identifier, base]
+          if (identifierBase === false) {
+            prerelease = [identifier]
+          }
+          if (isPrereleaseIdentifier(this.prerelease, identifier)) {
+            const prereleaseBase = this.prerelease[identifier.split('.').length]
+            if (isNaN(prereleaseBase)) {
+              this.prerelease = prerelease
+            }
+          } else {
+            this.prerelease = prerelease
+          }
+        }
+        break
+      }
+      default:
+        throw new Error(`invalid increment argument: ${release}`)
+    }
+    this.raw = this.format()
+    if (this.build.length) {
+      this.raw += `+${this.build.join('.')}`
+    }
+    return this
+  }
+}
+
+module.exports = SemVer
+
+
+/***/ }),
+
+/***/ 469:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+
+
+const SemVer = __nccwpck_require__(163)
+const compare = (a, b, loose) =>
+  new SemVer(a, loose).compare(new SemVer(b, loose))
+
+module.exports = compare
+
+
+/***/ }),
+
+/***/ 236:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+
+
+const compare = __nccwpck_require__(469)
+const gte = (a, b, loose) => compare(a, b, loose) >= 0
+module.exports = gte
+
+
+/***/ }),
+
+/***/ 101:
+/***/ ((module) => {
+
+
+
+// Note: this is the semver.org version of the spec that it implements
+// Not necessarily the package version of this code.
+const SEMVER_SPEC_VERSION = '2.0.0'
+
+const MAX_LENGTH = 256
+const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER ||
+/* istanbul ignore next */ 9007199254740991
+
+// Max safe segment length for coercion.
+const MAX_SAFE_COMPONENT_LENGTH = 16
+
+// Max safe length for a build identifier. The max length minus 6 characters for
+// the shortest version with a build 0.0.0+BUILD.
+const MAX_SAFE_BUILD_LENGTH = MAX_LENGTH - 6
+
+// ECMAScript whitespace and line terminators matched by \s.
+const WHITESPACE_CHARACTERS = [
+  '\t',
+  '\n',
+  '\v',
+  '\f',
+  '\r',
+  ' ',
+  '\u00a0',
+  '\u1680',
+  '\u2000',
+  '\u2001',
+  '\u2002',
+  '\u2003',
+  '\u2004',
+  '\u2005',
+  '\u2006',
+  '\u2007',
+  '\u2008',
+  '\u2009',
+  '\u200a',
+  '\u2028',
+  '\u2029',
+  '\u202f',
+  '\u205f',
+  '\u3000',
+  '\ufeff',
+]
+
+const RELEASE_TYPES = [
+  'major',
+  'premajor',
+  'minor',
+  'preminor',
+  'patch',
+  'prepatch',
+  'prerelease',
+]
+
+module.exports = {
+  MAX_LENGTH,
+  MAX_SAFE_COMPONENT_LENGTH,
+  MAX_SAFE_BUILD_LENGTH,
+  MAX_SAFE_INTEGER,
+  WHITESPACE_CHARACTERS,
+  RELEASE_TYPES,
+  SEMVER_SPEC_VERSION,
+  FLAG_INCLUDE_PRERELEASE: 0b001,
+  FLAG_LOOSE: 0b010,
+}
+
+
+/***/ }),
+
+/***/ 159:
+/***/ ((module) => {
+
+
+
+const debug = (
+  typeof process === 'object' &&
+  process.env &&
+  process.env.NODE_DEBUG &&
+  /\bsemver\b/i.test(process.env.NODE_DEBUG)
+) ? (...args) => console.error('SEMVER', ...args)
+  : () => {}
+
+module.exports = debug
+
+
+/***/ }),
+
+/***/ 348:
+/***/ ((module) => {
+
+
+
+const numeric = /^[0-9]+$/
+const compareIdentifiers = (a, b) => {
+  if (typeof a === 'number' && typeof b === 'number') {
+    return a === b ? 0 : a < b ? -1 : 1
+  }
+
+  const anum = numeric.test(a)
+  const bnum = numeric.test(b)
+
+  if (anum && bnum) {
+    a = +a
+    b = +b
+  }
+
+  return a === b ? 0
+    : (anum && !bnum) ? -1
+    : (bnum && !anum) ? 1
+    : a < b ? -1
+    : 1
+}
+
+const rcompareIdentifiers = (a, b) => compareIdentifiers(b, a)
+
+module.exports = {
+  compareIdentifiers,
+  rcompareIdentifiers,
+}
+
+
+/***/ }),
+
+/***/ 356:
+/***/ ((module) => {
+
+
+
+// parse out just the options we care about
+const looseOption = Object.freeze({ loose: true })
+const emptyOpts = Object.freeze({ })
+const parseOptions = options => {
+  if (!options) {
+    return emptyOpts
+  }
+
+  if (typeof options !== 'object') {
+    return looseOption
+  }
+
+  return options
+}
+module.exports = parseOptions
+
+
+/***/ }),
+
+/***/ 471:
+/***/ ((module, exports, __nccwpck_require__) => {
+
+
+
+const {
+  MAX_SAFE_COMPONENT_LENGTH,
+  MAX_SAFE_BUILD_LENGTH,
+  MAX_LENGTH,
+} = __nccwpck_require__(101)
+const debug = __nccwpck_require__(159)
+exports = module.exports = {}
+
+// The actual regexps go on exports.re
+const re = exports.re = []
+const safeRe = exports.safeRe = []
+const src = exports.src = []
+const safeSrc = exports.safeSrc = []
+const t = exports.t = {}
+let R = 0
+
+const LETTERDASHNUMBER = '[a-zA-Z0-9-]'
+
+// Replace some greedy regex tokens to prevent regex dos issues. These regex are
+// used internally via the safeRe object since all inputs in this library get
+// normalized first to trim and collapse all extra whitespace. The original
+// regexes are exported for userland consumption and lower level usage. A
+// future breaking change could export the safer regex only with a note that
+// all input should have extra whitespace removed.
+const safeRegexReplacements = [
+  ['\\s', 1],
+  ['\\d', MAX_LENGTH],
+  [LETTERDASHNUMBER, MAX_SAFE_BUILD_LENGTH],
+]
+
+const makeSafeRegex = (value) => {
+  for (const [token, max] of safeRegexReplacements) {
+    value = value
+      .split(`${token}*`).join(`${token}{0,${max}}`)
+      .split(`${token}+`).join(`${token}{1,${max}}`)
+  }
+  return value
+}
+
+const createToken = (name, value, isGlobal) => {
+  const safe = makeSafeRegex(value)
+  const index = R++
+  debug(name, index, value)
+  t[name] = index
+  src[index] = value
+  safeSrc[index] = safe
+  re[index] = new RegExp(value, isGlobal ? 'g' : undefined)
+  safeRe[index] = new RegExp(safe, isGlobal ? 'g' : undefined)
+}
+
+// The following Regular Expressions can be used for tokenizing,
+// validating, and parsing SemVer version strings.
+
+// ## Numeric Identifier
+// A single `0`, or a non-zero digit followed by zero or more digits.
+
+createToken('NUMERICIDENTIFIER', '0|[1-9]\\d*')
+createToken('NUMERICIDENTIFIERLOOSE', '\\d+')
+
+// ## Non-numeric Identifier
+// Zero or more digits, followed by a letter or hyphen, and then zero or
+// more letters, digits, or hyphens.
+
+createToken('NONNUMERICIDENTIFIER', `\\d*[a-zA-Z-]${LETTERDASHNUMBER}*`)
+
+// ## Main Version
+// Three dot-separated numeric identifiers.
+
+createToken('MAINVERSION', `(${src[t.NUMERICIDENTIFIER]})\\.` +
+                   `(${src[t.NUMERICIDENTIFIER]})\\.` +
+                   `(${src[t.NUMERICIDENTIFIER]})`)
+
+createToken('MAINVERSIONLOOSE', `(${src[t.NUMERICIDENTIFIERLOOSE]})\\.` +
+                        `(${src[t.NUMERICIDENTIFIERLOOSE]})\\.` +
+                        `(${src[t.NUMERICIDENTIFIERLOOSE]})`)
+
+// ## Pre-release Version Identifier
+// A numeric identifier, or a non-numeric identifier.
+// Non-numeric identifiers include numeric identifiers but can be longer.
+// Therefore non-numeric identifiers must go first.
+
+createToken('PRERELEASEIDENTIFIER', `(?:${src[t.NONNUMERICIDENTIFIER]
+}|${src[t.NUMERICIDENTIFIER]})`)
+
+createToken('PRERELEASEIDENTIFIERLOOSE', `(?:${src[t.NONNUMERICIDENTIFIER]
+}|${src[t.NUMERICIDENTIFIERLOOSE]})`)
+
+// ## Pre-release Version
+// Hyphen, followed by one or more dot-separated pre-release version
+// identifiers.
+
+createToken('PRERELEASE', `(?:-(${src[t.PRERELEASEIDENTIFIER]
+}(?:\\.${src[t.PRERELEASEIDENTIFIER]})*))`)
+
+createToken('PRERELEASELOOSE', `(?:-?(${src[t.PRERELEASEIDENTIFIERLOOSE]
+}(?:\\.${src[t.PRERELEASEIDENTIFIERLOOSE]})*))`)
+
+// ## Build Metadata Identifier
+// Any combination of digits, letters, or hyphens.
+
+createToken('BUILDIDENTIFIER', `${LETTERDASHNUMBER}+`)
+
+// ## Build Metadata
+// Plus sign, followed by one or more period-separated build metadata
+// identifiers.
+
+createToken('BUILD', `(?:\\+(${src[t.BUILDIDENTIFIER]
+}(?:\\.${src[t.BUILDIDENTIFIER]})*))`)
+
+// ## Full Version String
+// A main version, followed optionally by a pre-release version and
+// build metadata.
+
+// Note that the only major, minor, patch, and pre-release sections of
+// the version string are capturing groups.  The build metadata is not a
+// capturing group, because it should not ever be used in version
+// comparison.
+
+createToken('FULLPLAIN', `v?${src[t.MAINVERSION]
+}${src[t.PRERELEASE]}?${
+  src[t.BUILD]}?`)
+
+createToken('FULL', `^${src[t.FULLPLAIN]}$`)
+
+// like full, but allows v1.2.3 and =1.2.3, which people do sometimes.
+// also, 1.0.0alpha1 (prerelease without the hyphen) which is pretty
+// common in the npm registry.
+createToken('LOOSEPLAIN', `[v=\\s]*${src[t.MAINVERSIONLOOSE]
+}${src[t.PRERELEASELOOSE]}?${
+  src[t.BUILD]}?`)
+
+createToken('LOOSE', `^${src[t.LOOSEPLAIN]}$`)
+
+createToken('GTLT', '((?:<|>)?=?)')
+
+// Something like "2.*" or "1.2.x".
+// Note that "x.x" is a valid xRange identifier, meaning "any version"
+// Only the first item is strictly required.
+createToken('XRANGEIDENTIFIERLOOSE', `${src[t.NUMERICIDENTIFIERLOOSE]}|x|X|\\*`)
+createToken('XRANGEIDENTIFIER', `${src[t.NUMERICIDENTIFIER]}|x|X|\\*`)
+
+createToken('XRANGEPLAIN', `[v=\\s]*(${src[t.XRANGEIDENTIFIER]})` +
+                   `(?:\\.(${src[t.XRANGEIDENTIFIER]})` +
+                   `(?:\\.(${src[t.XRANGEIDENTIFIER]})` +
+                   `(?:${src[t.PRERELEASE]})?${
+                     src[t.BUILD]}?` +
+                   `)?)?`)
+
+createToken('XRANGEPLAINLOOSE', `[v=\\s]*(${src[t.XRANGEIDENTIFIERLOOSE]})` +
+                        `(?:\\.(${src[t.XRANGEIDENTIFIERLOOSE]})` +
+                        `(?:\\.(${src[t.XRANGEIDENTIFIERLOOSE]})` +
+                        `(?:${src[t.PRERELEASELOOSE]})?${
+                          src[t.BUILD]}?` +
+                        `)?)?`)
+
+createToken('XRANGE', `^${src[t.GTLT]}\\s*${src[t.XRANGEPLAIN]}$`)
+createToken('XRANGELOOSE', `^${src[t.GTLT]}\\s*${src[t.XRANGEPLAINLOOSE]}$`)
+
+// Coercion.
+// Extract anything that could conceivably be a part of a valid semver
+createToken('COERCEPLAIN', `${'(^|[^\\d])' +
+              '(\\d{1,'}${MAX_SAFE_COMPONENT_LENGTH}})` +
+              `(?:\\.(\\d{1,${MAX_SAFE_COMPONENT_LENGTH}}))?` +
+              `(?:\\.(\\d{1,${MAX_SAFE_COMPONENT_LENGTH}}))?`)
+createToken('COERCE', `${src[t.COERCEPLAIN]}(?:$|[^\\d])`)
+createToken('COERCEFULL', src[t.COERCEPLAIN] +
+              `(?:${src[t.PRERELEASE]})?` +
+              `(?:${src[t.BUILD]})?` +
+              `(?:$|[^\\d])`)
+createToken('COERCERTL', src[t.COERCE], true)
+createToken('COERCERTLFULL', src[t.COERCEFULL], true)
+
+// Tilde ranges.
+// Meaning is "reasonably at or greater than"
+createToken('LONETILDE', '(?:~>?)')
+
+createToken('TILDETRIM', `(\\s*)${src[t.LONETILDE]}\\s+`, true)
+exports.tildeTrimReplace = '$1~'
+
+createToken('TILDE', `^${src[t.LONETILDE]}${src[t.XRANGEPLAIN]}$`)
+createToken('TILDELOOSE', `^${src[t.LONETILDE]}${src[t.XRANGEPLAINLOOSE]}$`)
+
+// Caret ranges.
+// Meaning is "at least and backwards compatible with"
+createToken('LONECARET', '(?:\\^)')
+
+createToken('CARETTRIM', `(\\s*)${src[t.LONECARET]}\\s+`, true)
+exports.caretTrimReplace = '$1^'
+
+createToken('CARET', `^${src[t.LONECARET]}${src[t.XRANGEPLAIN]}$`)
+createToken('CARETLOOSE', `^${src[t.LONECARET]}${src[t.XRANGEPLAINLOOSE]}$`)
+
+// A simple gt/lt/eq thing, or just "" to indicate "any version"
+createToken('COMPARATORLOOSE', `^${src[t.GTLT]}\\s*(${src[t.LOOSEPLAIN]})$|^$`)
+createToken('COMPARATOR', `^${src[t.GTLT]}\\s*(${src[t.FULLPLAIN]})$|^$`)
+
+// An expression to strip any whitespace between the gtlt and the thing
+// it modifies, so that `> 1.2.3` ==> `>1.2.3`
+createToken('COMPARATORTRIM', `(\\s*)${src[t.GTLT]
+}\\s*(${src[t.LOOSEPLAIN]}|${src[t.XRANGEPLAIN]})`, true)
+exports.comparatorTrimReplace = '$1$2$3'
+
+// Something like `1.2.3 - 1.2.4`
+// Note that these all use the loose form, because they'll be
+// checked against either the strict or loose comparator form
+// later.
+createToken('HYPHENRANGE', `^\\s*(${src[t.XRANGEPLAIN]})` +
+                   `\\s+-\\s+` +
+                   `(${src[t.XRANGEPLAIN]})` +
+                   `\\s*$`)
+
+createToken('HYPHENRANGELOOSE', `^\\s*(${src[t.XRANGEPLAINLOOSE]})` +
+                        `\\s+-\\s+` +
+                        `(${src[t.XRANGEPLAINLOOSE]})` +
+                        `\\s*$`)
+
+// Star ranges basically just allow anything at all.
+createToken('STAR', '(<|>)?=?\\s*\\*')
+// >=0.0.0 is like a star
+createToken('GTE0', '^\\s*>=\\s*0\\.0\\.0\\s*$')
+createToken('GTE0PRE', '^\\s*>=\\s*0\\.0\\.0-0\\s*$')
+
+
+/***/ }),
+
+/***/ 450:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+
+const os = __nccwpck_require__(857);
+const tty = __nccwpck_require__(18);
+const hasFlag = __nccwpck_require__(813);
+
+const {env} = process;
+
+let forceColor;
+if (hasFlag('no-color') ||
+	hasFlag('no-colors') ||
+	hasFlag('color=false') ||
+	hasFlag('color=never')) {
+	forceColor = 0;
+} else if (hasFlag('color') ||
+	hasFlag('colors') ||
+	hasFlag('color=true') ||
+	hasFlag('color=always')) {
+	forceColor = 1;
+}
+
+if ('FORCE_COLOR' in env) {
+	if (env.FORCE_COLOR === 'true') {
+		forceColor = 1;
+	} else if (env.FORCE_COLOR === 'false') {
+		forceColor = 0;
+	} else {
+		forceColor = env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3);
+	}
+}
+
+function translateLevel(level) {
+	if (level === 0) {
+		return false;
+	}
+
+	return {
+		level,
+		hasBasic: true,
+		has256: level >= 2,
+		has16m: level >= 3
+	};
+}
+
+function supportsColor(haveStream, streamIsTTY) {
+	if (forceColor === 0) {
+		return 0;
+	}
+
+	if (hasFlag('color=16m') ||
+		hasFlag('color=full') ||
+		hasFlag('color=truecolor')) {
+		return 3;
+	}
+
+	if (hasFlag('color=256')) {
+		return 2;
+	}
+
+	if (haveStream && !streamIsTTY && forceColor === undefined) {
+		return 0;
+	}
+
+	const min = forceColor || 0;
+
+	if (env.TERM === 'dumb') {
+		return min;
+	}
+
+	if (process.platform === 'win32') {
+		// Windows 10 build 10586 is the first Windows release that supports 256 colors.
+		// Windows 10 build 14931 is the first release that supports 16m/TrueColor.
+		const osRelease = os.release().split('.');
+		if (
+			Number(osRelease[0]) >= 10 &&
+			Number(osRelease[2]) >= 10586
+		) {
+			return Number(osRelease[2]) >= 14931 ? 3 : 2;
+		}
+
+		return 1;
+	}
+
+	if ('CI' in env) {
+		if (['TRAVIS', 'CIRCLECI', 'APPVEYOR', 'GITLAB_CI', 'GITHUB_ACTIONS', 'BUILDKITE'].some(sign => sign in env) || env.CI_NAME === 'codeship') {
+			return 1;
+		}
+
+		return min;
+	}
+
+	if ('TEAMCITY_VERSION' in env) {
+		return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
+	}
+
+	if (env.COLORTERM === 'truecolor') {
+		return 3;
+	}
+
+	if ('TERM_PROGRAM' in env) {
+		const version = parseInt((env.TERM_PROGRAM_VERSION || '').split('.')[0], 10);
+
+		switch (env.TERM_PROGRAM) {
+			case 'iTerm.app':
+				return version >= 3 ? 3 : 2;
+			case 'Apple_Terminal':
+				return 2;
+			// No default
+		}
+	}
+
+	if (/-256(color)?$/i.test(env.TERM)) {
+		return 2;
+	}
+
+	if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
+		return 1;
+	}
+
+	if ('COLORTERM' in env) {
+		return 1;
+	}
+
+	return min;
+}
+
+function getSupportLevel(stream) {
+	const level = supportsColor(stream, stream && stream.isTTY);
+	return translateLevel(level);
+}
+
+module.exports = {
+	supportsColor: getSupportLevel,
+	stdout: translateLevel(supportsColor(true, tty.isatty(1))),
+	stderr: translateLevel(supportsColor(true, tty.isatty(2)))
+};
+
+
+/***/ }),
+
+/***/ 896:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("fs");
+
+/***/ }),
+
+/***/ 857:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("os");
+
+/***/ }),
+
+/***/ 928:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("path");
+
+/***/ }),
+
+/***/ 18:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("tty");
+
+/***/ }),
+
+/***/ 23:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("util");
+
+/***/ }),
+
+/***/ 19:
+/***/ ((__unused_webpack_module, exports) => {
+
+
+/**
+ * Copyright (C) 2017-present by Andrea Giammarchi - @WebReflection
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+var replace = ''.replace;
+
+var ca = /[&<>'"]/g;
+var es = /&(?:amp|#38|lt|#60|gt|#62|apos|#39|quot|#34);/g;
+
+var esca = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  "'": '&#39;',
+  '"': '&quot;'
+};
+var unes = {
+  '&amp;': '&',
+  '&#38;': '&',
+  '&lt;': '<',
+  '&#60;': '<',
+  '&gt;': '>',
+  '&#62;': '>',
+  '&apos;': "'",
+  '&#39;': "'",
+  '&quot;': '"',
+  '&#34;': '"'
+};
+
+function escape(es) {
+  return replace.call(es, ca, pe);
+}
+exports.escape = escape;
+
+function unescape(un) {
+  return replace.call(un, es, cape);
+}
+exports.unescape = unescape;
+
+function pe(m) {
+  return esca[m];
+}
+
+function cape(m) {
+  return unes[m];
+}
+
+
+/***/ })
+
+/******/ });
+/************************************************************************/
+/******/ // The module cache
+/******/ var __webpack_module_cache__ = {};
+/******/ 
+/******/ // The require function
+/******/ function __nccwpck_require__(moduleId) {
+/******/ 	// Check if module is in cache
+/******/ 	var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 	if (cachedModule !== undefined) {
+/******/ 		return cachedModule.exports;
+/******/ 	}
+/******/ 	// Create a new module (and put it into the cache)
+/******/ 	var module = __webpack_module_cache__[moduleId] = {
+/******/ 		// no module.id needed
+/******/ 		// no module.loaded needed
+/******/ 		exports: {}
+/******/ 	};
+/******/ 
+/******/ 	// Execute the module function
+/******/ 	var threw = true;
+/******/ 	try {
+/******/ 		__webpack_modules__[moduleId](module, module.exports, __nccwpck_require__);
+/******/ 		threw = false;
+/******/ 	} finally {
+/******/ 		if(threw) delete __webpack_module_cache__[moduleId];
+/******/ 	}
+/******/ 
+/******/ 	// Return the exports of the module
+/******/ 	return module.exports;
+/******/ }
 /******/ 
 /************************************************************************/
+/******/ /* webpack/runtime/asset-relocator-loader */
+/******/ if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = decodeURIComponent(new URL('.', import.meta.url).pathname).slice(import.meta.url.match(/^file:\/\/\/\w:/) ? 1 : 0, -1) + "/";
+/******/ 
 /******/ /* webpack/runtime/define property getters */
 /******/ (() => {
 /******/ 	// define getter functions for harmony exports
@@ -26,6 +3451,7 @@ var __webpack_exports__ = {};
 // EXPORTS
 __nccwpck_require__.d(__webpack_exports__, {
   gR: () => (/* reexport */ Collector),
+  nu: () => (/* reexport */ CoveragePublication),
   K4: () => (/* reexport */ Recording),
   Tr: () => (/* reexport */ Reporters),
   vY: () => (/* reexport */ Runtime)
@@ -9861,8 +13287,20 @@ class CoberturaParser extends BaseParser {
 				return [total, covered];
 			};
 			if (totalLines === 0) [totalLines, coveredLines] = counts("lines");
-			if (totalBranches === 0)
-				[totalBranches, coveredBranches] = counts("branches");
+			if (coverage["@_branches-valid"] !== undefined) {
+				// Istanbul can report branches on lines without a statement. These
+				// contribute to exact aggregate counts but not class line entries.
+				const [total, covered] = counts("branches");
+				if (
+					total < totalBranches ||
+					covered < coveredBranches ||
+					total - covered < totalBranches - coveredBranches
+				)
+					throw new Error(
+						"Aggregate branch counts contradict measured branches.",
+					);
+				[totalBranches, coveredBranches] = [total, covered];
+			}
 
 			reportData.setCoverage(
 				new Coverage({
@@ -19678,7 +23116,298 @@ class GoCoverageProfile {
 	}
 }
 
+// EXTERNAL MODULE: ./node_modules/istanbul-lib-coverage/index.js
+var istanbul_lib_coverage = __nccwpck_require__(377);
+// EXTERNAL MODULE: ./node_modules/istanbul-lib-report/index.js
+var istanbul_lib_report = __nccwpck_require__(761);
+// EXTERNAL MODULE: ./node_modules/istanbul-reports/lib/cobertura/index.js
+var cobertura = __nccwpck_require__(790);
+// EXTERNAL MODULE: ./node_modules/istanbul-reports/lib/lcovonly/index.js
+var lcovonly = __nccwpck_require__(335);
+;// CONCATENATED MODULE: ./src/IstanbulCoverage.js
+
+
+
+// Import the pinned writers statically so ncc bundles their dependencies.
+// The dynamic report factory copies CommonJS files into this ESM action.
+
+
+
+
+/** Use Istanbul's native line semantics and writers, retaining the original map. */
+class IstanbulCoverage {
+	constructor(value) {
+		Protocol.object(value, "coverageMap");
+		for (const [source, file] of Object.entries(value)) {
+			if (!source || Protocol.hasControl(source) || file?.path !== source)
+				throw new Error("Coverage source key and path must match.");
+			for (const [counts, locations] of [
+				["s", "statementMap"],
+				["f", "fnMap"],
+				["b", "branchMap"],
+			]) {
+				Protocol.object(file[counts], `coverage ${counts}`);
+				Protocol.object(file[locations], `coverage ${locations}`);
+				if (
+					JSON.stringify(Object.keys(file[counts]).sort()) !==
+					JSON.stringify(Object.keys(file[locations]).sort())
+				)
+					throw new Error("Coverage counts and locations do not match.");
+				for (const [id, count] of Object.entries(file[counts])) {
+					const location = file[locations][id];
+					const hits = counts === "b" ? count : [count];
+					if (
+						!Array.isArray(hits) ||
+						hits.some((hit) => !Number.isSafeInteger(hit) || hit < 0)
+					)
+						throw new Error("Invalid Istanbul coverage hit counts.");
+					IstanbulCoverage.location(counts === "s" ? location : location.loc);
+					if (counts === "f") {
+						if (
+							typeof location.name !== "string" ||
+							Protocol.hasControl(location.name)
+						)
+							throw new Error("Invalid coverage function name.");
+						if (location.decl) IstanbulCoverage.location(location.decl);
+					}
+					if (counts === "b") {
+						if (
+							!Array.isArray(location.locations) ||
+							location.locations.length !== hits.length
+						)
+							throw new Error(
+								"Coverage branch counts and locations do not match.",
+							);
+						for (const branch of location.locations)
+							IstanbulCoverage.location(branch, true);
+					}
+				}
+			}
+		}
+		this.map = istanbul_lib_coverage.createCoverageMap(value);
+		if (this.map.getCoverageSummary().lines.total < 1)
+			throw new Error("Required coverage report has no instrumented lines.");
+	}
+
+	static location(value, implicitBranch = false) {
+		// Istanbul represents an implicit else with empty positions, and JSON
+		// serializes V8's infinite end-of-line column as null.
+		if (
+			implicitBranch &&
+			value?.start &&
+			value?.end &&
+			Object.keys(value.start).length === 0 &&
+			Object.keys(value.end).length === 0
+		)
+			return;
+		for (const [side, point] of [
+			["start", value?.start],
+			["end", value?.end],
+		])
+			if (
+				!Number.isSafeInteger(point?.line) ||
+				point.line < 1 ||
+				(!(side === "end" && point.column === null) &&
+					(!Number.isSafeInteger(point?.column) || point.column < 0))
+			)
+				throw new Error("Invalid Istanbul source location.");
+		if (
+			value.end.line < value.start.line ||
+			(value.end.line === value.start.line &&
+				value.end.column !== null &&
+				value.end.column < value.start.column)
+		)
+			throw new Error("Invalid Istanbul source range.");
+	}
+
+	summary() {
+		const summary = this.map.getCoverageSummary();
+		return Object.fromEntries(
+			["lines", "statements", "functions", "branches"].map((kind) => {
+				const { total, covered } = summary[kind];
+				return [
+					kind,
+					{ total, covered, percentage: total ? (covered / total) * 100 : 100 },
+				];
+			}),
+		);
+	}
+
+	measurement(sourceMap) {
+		if (
+			new Set(this.map.files().map((file) => sourceMap[file])).size !==
+			this.map.files().length
+		)
+			throw new Error(
+				"Coverage sources must map to distinct repository files.",
+			);
+		const lines = [];
+		for (const source of this.map.files())
+			for (const [line, hits] of Object.entries(
+				this.map.fileCoverageFor(source).getLineCoverage(),
+			))
+				lines.push([`${sourceMap[source]}:${line}`, hits > 0]);
+		const covered = lines.filter(([, hit]) => hit).length;
+		return {
+			measurementDigest: Protocol.digest(
+				JSON.stringify(
+					lines.sort(([left], [right]) => left.localeCompare(right)),
+				),
+			),
+			lines: {
+				total: lines.length,
+				covered,
+				percentage: (covered / lines.length) * 100,
+			},
+		};
+	}
+
+	write(directory, format, sourceMap) {
+		const mapped = istanbul_lib_coverage.createCoverageMap({});
+		for (const source of this.map.files()) {
+			const file = structuredClone(this.map.fileCoverageFor(source).toJSON());
+			file.path = Protocol.relative(sourceMap[source]);
+			for (const fn of Object.values(file.fnMap)) fn.decl ??= fn.loc;
+			mapped.addFileCoverage(file);
+		}
+		const file = format === "cobertura" ? "coverage.xml" : "coverage.info";
+		const Writer = format === "cobertura" ? cobertura : lcovonly;
+		new Writer({
+			file,
+			projectRoot: ".",
+		}).execute(
+			istanbul_lib_report.createContext({
+				dir: directory,
+				coverageMap: mapped,
+				sourceFinder: () => {
+					throw new Error(
+						"Coverage publication must not read project sources.",
+					);
+				},
+			}),
+		);
+		return { file: external_node_path_namespaceObject.join(directory, file), format };
+	}
+}
+
+;// CONCATENATED MODULE: ./src/JestReport.js
+
+
+
+/** Vitest and Jest serialize test outcomes and the final Istanbul map together. */
+class JestReport {
+	constructor(value) {
+		this.value = Protocol.object(value, "Jest/Vitest report");
+	}
+
+	tests() {
+		const report = this.value;
+		if (
+			!Array.isArray(report.testResults) ||
+			typeof report.success !== "boolean"
+		)
+			throw new Error("Expected native Jest/Vitest testResults and success.");
+		const tests = [];
+		let assertions = 0;
+		for (const suite of report.testResults) {
+			if (
+				typeof suite.name !== "string" ||
+				!Array.isArray(suite.assertionResults) ||
+				!["passed", "failed", "skipped", "focused"].includes(suite.status)
+			)
+				throw new Error("Invalid Jest/Vitest test suite.");
+			for (const item of suite.assertionResults) {
+				const name = item.fullName || item.title;
+				const messages = item.failureMessages ?? [];
+				const duration = item.duration ?? 0;
+				if (
+					typeof name !== "string" ||
+					!name ||
+					![
+						"passed",
+						"failed",
+						"skipped",
+						"pending",
+						"todo",
+						"disabled",
+					].includes(item.status) ||
+					!Array.isArray(messages) ||
+					messages.some((message) => typeof message !== "string") ||
+					!Number.isFinite(duration) ||
+					duration < 0
+				)
+					throw new Error("Invalid Jest/Vitest assertion result.");
+				tests.push({
+					name,
+					status: ["passed", "failed"].includes(item.status)
+						? item.status
+						: "skipped",
+					duration: duration / 1000,
+					message: messages.join("\n"),
+					stackTrace: messages.join("\n"),
+					file: suite.name,
+					suite: suite.name,
+				});
+				assertions++;
+			}
+			// Setup, teardown and worker failures may have no failed assertion.
+			if (
+				suite.status === "failed" &&
+				!suite.assertionResults.some((item) => item.status === "failed")
+			)
+				tests.push({
+					name: suite.name,
+					status: "error",
+					duration: 0,
+					file: suite.name,
+					message:
+						typeof suite.message === "string"
+							? suite.message
+							: "Test suite failed before reporting an assertion.",
+				});
+		}
+		if (
+			!Number.isSafeInteger(report.numTotalTests) ||
+			report.numTotalTests !== assertions
+		)
+			throw new Error("Jest/Vitest test count does not match its assertions.");
+		if (
+			!report.success &&
+			!tests.some((item) => ["failed", "error"].includes(item.status))
+		)
+			tests.push({
+				name: "Test run",
+				status: "error",
+				duration: 0,
+				file: "",
+				message:
+					"The runner reported an unsuccessful run. See its native report and job logs.",
+			});
+		if (!tests.length)
+			throw new Error("Required test report has no test cases.");
+		return tests;
+	}
+
+	native(kind) {
+		if (kind === "coverage") {
+			const coverage = new IstanbulCoverage(this.value.coverageMap);
+			return {
+				format: "jest-json",
+				data: { tests: [], lintIssues: [], coverage: coverage.summary() },
+				sourceFiles: coverage.map.files(),
+			};
+		}
+		return {
+			format: "jest-json",
+			data: { tests: this.tests(), lintIssues: [] },
+			sourceFiles: [],
+		};
+	}
+}
+
 ;// CONCATENATED MODULE: ./src/NativeReports.js
+
+
 
 
 
@@ -19696,6 +23425,14 @@ class NativeReports {
 	parse(content, filename, kind) {
 		if (Buffer.byteLength(content) > Protocol.maxFileBytes)
 			throw new Error("Native report exceeds 64 MiB.");
+		if (
+			["test", "coverage"].includes(kind) &&
+			content.trimStart().startsWith("{")
+		) {
+			const value = JSON.parse(content);
+			if (Object.hasOwn(value, "testResults"))
+				return new JestReport(value).native(kind);
+		}
 		if (kind === "coverage" && content.startsWith("mode:"))
 			return new GoCoverageProfile(content).native();
 		// Cobertura generators commonly emit an external DTD. It is metadata,
@@ -19844,6 +23581,10 @@ class NativeReports {
 	}
 
 	static measurement(content, format, sourceMap) {
+		if (format === "jest-json")
+			return new IstanbulCoverage(JSON.parse(content).coverageMap).measurement(
+				sourceMap,
+			);
 		if (format === "golang") {
 			const normalized = new GoCoverageProfile(content).lcov(sourceMap);
 			const mapped = Object.fromEntries(
@@ -19891,6 +23632,7 @@ class NativeReports {
 		const assets = [];
 		const errors = [];
 		const found = new Map();
+		const files = new Set();
 		let totalBytes = 0;
 		for (const selector of definition.reports) {
 			const matches = [...external_node_fs_namespaceObject.globSync(selector.pattern, { cwd: directory })];
@@ -19900,17 +23642,17 @@ class NativeReports {
 				);
 			for (const relative of matches) {
 				try {
-					if (found.has(relative)) {
-						if (
-							JSON.stringify(found.get(relative)) !== JSON.stringify(selector)
-						)
+					const aspect = `${selector.kind}:${relative}`;
+					if (found.has(aspect)) {
+						if (JSON.stringify(found.get(aspect)) !== JSON.stringify(selector))
 							throw new Error(`Conflicting report selectors for ${relative}.`);
 						continue;
 					}
-					found.set(relative, selector);
+					found.set(aspect, selector);
 					const file = Protocol.file(directory, relative);
 					const bytes = external_node_fs_namespaceObject.readFileSync(file);
-					totalBytes += bytes.length;
+					if (!files.has(relative)) totalBytes += bytes.length;
+					files.add(relative);
 					if (totalBytes > Protocol.maxBundleBytes || assets.length >= 512)
 						throw new Error("Report bundle exceeds its resource limit.");
 					const parsed = this.parse(
@@ -19978,7 +23720,11 @@ class NativeReports {
 						if (
 							totalBytes <= Protocol.maxBundleBytes &&
 							assets.length < 512 &&
-							!assets.some((asset) => asset.file === relative)
+							!assets.some(
+								(asset) =>
+									asset.file === relative &&
+									asset.selector.kind === selector.kind,
+							)
 						)
 							assets.push({
 								file: relative,
@@ -20481,8 +24227,13 @@ class Collector {
 				const destination = external_node_path_namespaceObject.join(directory, "checks", registration.id);
 				external_node_fs_namespaceObject.mkdirSync(destination, { recursive: true });
 				const verifiedAssets = [];
+				const aspects = new Set();
 				for (const asset of result.assets) {
 					try {
+						const aspect = `${asset.selector.kind}:${asset.file}`;
+						if (aspects.has(aspect))
+							throw new Error("Duplicate report aspect.");
+						aspects.add(aspect);
 						if (
 							!asset.file.startsWith("reports/") ||
 							!external_node_path_namespaceObject.matchesGlob(asset.file.slice(8), asset.selector.pattern)
@@ -20505,7 +24256,8 @@ class Collector {
 						}
 						const target = external_node_path_namespaceObject.join(destination, asset.file);
 						external_node_fs_namespaceObject.mkdirSync(external_node_path_namespaceObject.dirname(target), { recursive: true });
-						external_node_fs_namespaceObject.copyFileSync(Protocol.file(stage, asset.file), target);
+						if (!external_node_fs_namespaceObject.existsSync(target))
+							external_node_fs_namespaceObject.copyFileSync(Protocol.file(stage, asset.file), target);
 						asset.file = `checks/${registration.id}/${asset.file}`;
 						verifiedAssets.push(asset);
 					} catch (error) {
@@ -20633,6 +24385,146 @@ class Collector {
 
 ;// CONCATENATED MODULE: external "node:child_process"
 const external_node_child_process_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:child_process");
+;// CONCATENATED MODULE: ./src/CoveragePublication.js
+
+
+
+
+
+
+
+
+
+/** Stage explicit, source-normalized inputs without searching the consumer tree. */
+class CoveragePublication {
+	constructor({
+		directory,
+		actionPath,
+		temporaryDirectory,
+		execute = external_node_child_process_namespaceObject.execFileSync,
+	}) {
+		Object.assign(this, { directory, actionPath, temporaryDirectory, execute });
+	}
+
+	normalized(asset) {
+		const input = external_node_fs_namespaceObject.readFileSync(Protocol.file(this.directory, asset.file));
+		if (Protocol.digest(input) !== asset.sha256)
+			throw new Error("Coverage changed after collection.");
+		if (asset.format === "golang") {
+			for (const source of Object.values(asset.sourceMap))
+				Protocol.relative(source);
+			return new GoCoverageProfile(input.toString("utf8")).lcov(
+				asset.sourceMap,
+			);
+		}
+		if (asset.format === "lcov")
+			return input
+				.toString("utf8")
+				.replace(/^SF:(.+)$/gm, (_line, filename) => {
+					const mapped = asset.sourceMap[filename.trim()];
+					if (!mapped) throw new Error("LCOV source mapping is missing.");
+					return `SF:${Protocol.relative(mapped)}`;
+				});
+		if (asset.format === "cobertura") {
+			const report = new CoberturaReport(input.toString("utf8"));
+			for (const item of report.classes)
+				item["@_filename"] = Protocol.relative(
+					asset.sourceMap[item["@_filename"]],
+				);
+			report.document.coverage.sources = { source: "." };
+			delete report.document["!DOCTYPE"];
+			return new json2xml({ ignoreAttributes: false }).build(report.document);
+		}
+		throw new Error(
+			`Unsupported coverage normalization: ${asset.format}. Native evidence is retained.`,
+		);
+	}
+
+	prepare(dataset, reporter) {
+		if (dataset.errors.length || !dataset.assets.length)
+			throw new Error("Cannot publish incomplete coverage.");
+		const preferred =
+			reporter === "github"
+				? ["cobertura", "jest-json", "lcov", "golang"]
+				: ["jest-json", "golang", "lcov", "cobertura"];
+		const asset = preferred
+			.map((format) => dataset.assets.find((item) => item.format === format))
+			.find(Boolean);
+		if (!asset)
+			throw new Error(
+				`No supported ${reporter} representation for ${dataset.label}.`,
+			);
+		const stage = external_node_path_namespaceObject.join(this.directory, "publication", dataset.id);
+		external_node_fs_namespaceObject.mkdirSync(stage, { recursive: true });
+		if (asset.format === "jest-json") {
+			const input = external_node_fs_namespaceObject.readFileSync(Protocol.file(this.directory, asset.file));
+			if (Protocol.digest(input) !== asset.sha256)
+				throw new Error("Coverage changed after collection.");
+			return new IstanbulCoverage(JSON.parse(input).coverageMap).write(
+				stage,
+				reporter === "github" ? "cobertura" : "lcov",
+				asset.sourceMap,
+			);
+		}
+		// Preserve the native profile; normalize block spans only for a selected publisher.
+		// LCOV avoids the Coveralls Go parser stripping arbitrary module path segments.
+		// https://github.com/coverallsapp/coverage-reporter/blob/master/src/coverage_reporter/parsers/golang_parser.cr
+		const format = asset.format === "golang" ? "lcov" : asset.format;
+		const file = external_node_path_namespaceObject.join(
+			stage,
+			format === "lcov" ? "coverage.info" : "coverage.xml",
+		);
+		external_node_fs_namespaceObject.writeFileSync(file, this.normalized(asset));
+		if (reporter !== "github" || asset.format === "cobertura")
+			return { file, format };
+		const output = external_node_path_namespaceObject.join(stage, "coverage.xml");
+		const packages = external_node_path_namespaceObject.join(
+			this.temporaryDirectory,
+			"ci-coverage-converter",
+		);
+		if (!external_node_fs_namespaceObject.existsSync(external_node_path_namespaceObject.join(packages, "lcov_cobertura"))) {
+			this.execute(
+				"python3",
+				[
+					"-I",
+					"-m",
+					"pip",
+					"--isolated",
+					"install",
+					"--disable-pip-version-check",
+					"--no-deps",
+					"--no-cache-dir",
+					"--only-binary=:all:",
+					"--require-hashes",
+					"--target",
+					packages,
+					"-r",
+					external_node_path_namespaceObject.join(this.actionPath, "converters", "requirements.txt"),
+				],
+				{ cwd: this.actionPath, timeout: 60000, stdio: "pipe" },
+			);
+		}
+		this.execute(
+			"python3",
+			[
+				"-I",
+				external_node_path_namespaceObject.join(this.actionPath, "converters", "lcov.py"),
+				packages,
+				file,
+				output,
+			],
+			{ cwd: stage, timeout: 30000, stdio: "pipe" },
+		);
+		const converted = new CoberturaReport(external_node_fs_namespaceObject.readFileSync(output, "utf8"));
+		for (const source of converted.files())
+			if (!Object.values(asset.sourceMap).includes(source))
+				throw new Error(
+					"Converted coverage changed the verified source mapping.",
+				);
+		return { file: output, format: "cobertura" };
+	}
+}
+
 ;// CONCATENATED MODULE: ./src/Recording.js
 
 
@@ -20701,7 +24593,7 @@ class Recording {
 	async upload(name, directory, files) {
 		const result = await this.artifacts.uploadArtifact(
 			name,
-			files.map((file) => Protocol.file(directory, file)),
+			[...new Set(files)].map((file) => Protocol.file(directory, file)),
 			directory,
 			{ retentionDays: 7 },
 		);
@@ -20920,135 +24812,6 @@ class CheckRunner {
 					: "failure",
 			...(execution.code === null ? {} : { exitCode: execution.code }),
 		});
-	}
-}
-
-;// CONCATENATED MODULE: ./src/CoveragePublication.js
-
-
-
-
-
-
-
-
-/** Stage explicit, source-normalized inputs without searching the consumer tree. */
-class CoveragePublication {
-	constructor({
-		directory,
-		actionPath,
-		temporaryDirectory,
-		execute = external_node_child_process_namespaceObject.execFileSync,
-	}) {
-		Object.assign(this, { directory, actionPath, temporaryDirectory, execute });
-	}
-
-	normalized(asset) {
-		const input = external_node_fs_namespaceObject.readFileSync(Protocol.file(this.directory, asset.file));
-		if (Protocol.digest(input) !== asset.sha256)
-			throw new Error("Coverage changed after collection.");
-		if (asset.format === "golang") {
-			for (const source of Object.values(asset.sourceMap))
-				Protocol.relative(source);
-			return new GoCoverageProfile(input.toString("utf8")).lcov(
-				asset.sourceMap,
-			);
-		}
-		if (asset.format === "lcov")
-			return input
-				.toString("utf8")
-				.replace(/^SF:(.+)$/gm, (_line, filename) => {
-					const mapped = asset.sourceMap[filename.trim()];
-					if (!mapped) throw new Error("LCOV source mapping is missing.");
-					return `SF:${Protocol.relative(mapped)}`;
-				});
-		if (asset.format === "cobertura") {
-			const report = new CoberturaReport(input.toString("utf8"));
-			for (const item of report.classes)
-				item["@_filename"] = Protocol.relative(
-					asset.sourceMap[item["@_filename"]],
-				);
-			report.document.coverage.sources = { source: "." };
-			delete report.document["!DOCTYPE"];
-			return new json2xml({ ignoreAttributes: false }).build(report.document);
-		}
-		throw new Error(
-			`Unsupported coverage normalization: ${asset.format}. Native evidence is retained.`,
-		);
-	}
-
-	prepare(dataset, reporter) {
-		if (dataset.errors.length || !dataset.assets.length)
-			throw new Error("Cannot publish incomplete coverage.");
-		const preferred =
-			reporter === "github"
-				? ["cobertura", "lcov", "golang"]
-				: ["golang", "lcov", "cobertura"];
-		const asset = preferred
-			.map((format) => dataset.assets.find((item) => item.format === format))
-			.find(Boolean);
-		if (!asset)
-			throw new Error(
-				`No supported ${reporter} representation for ${dataset.label}.`,
-			);
-		const stage = external_node_path_namespaceObject.join(this.directory, "publication", dataset.id);
-		external_node_fs_namespaceObject.mkdirSync(stage, { recursive: true });
-		// Preserve the native profile; normalize block spans only for a selected publisher.
-		// LCOV avoids the Coveralls Go parser stripping arbitrary module path segments.
-		// https://github.com/coverallsapp/coverage-reporter/blob/master/src/coverage_reporter/parsers/golang_parser.cr
-		const format = asset.format === "golang" ? "lcov" : asset.format;
-		const file = external_node_path_namespaceObject.join(
-			stage,
-			format === "lcov" ? "coverage.info" : "coverage.xml",
-		);
-		external_node_fs_namespaceObject.writeFileSync(file, this.normalized(asset));
-		if (reporter !== "github" || asset.format === "cobertura")
-			return { file, format };
-		const output = external_node_path_namespaceObject.join(stage, "coverage.xml");
-		const packages = external_node_path_namespaceObject.join(
-			this.temporaryDirectory,
-			"ci-coverage-converter",
-		);
-		if (!external_node_fs_namespaceObject.existsSync(external_node_path_namespaceObject.join(packages, "lcov_cobertura"))) {
-			this.execute(
-				"python3",
-				[
-					"-I",
-					"-m",
-					"pip",
-					"--isolated",
-					"install",
-					"--disable-pip-version-check",
-					"--no-deps",
-					"--no-cache-dir",
-					"--only-binary=:all:",
-					"--require-hashes",
-					"--target",
-					packages,
-					"-r",
-					external_node_path_namespaceObject.join(this.actionPath, "converters", "requirements.txt"),
-				],
-				{ cwd: this.actionPath, timeout: 60000, stdio: "pipe" },
-			);
-		}
-		this.execute(
-			"python3",
-			[
-				"-I",
-				external_node_path_namespaceObject.join(this.actionPath, "converters", "lcov.py"),
-				packages,
-				file,
-				output,
-			],
-			{ cwd: stage, timeout: 30000, stdio: "pipe" },
-		);
-		const converted = new CoberturaReport(external_node_fs_namespaceObject.readFileSync(output, "utf8"));
-		for (const source of converted.files())
-			if (!Object.values(asset.sourceMap).includes(source))
-				throw new Error(
-					"Converted coverage changed the verified source mapping.",
-				);
-		return { file: output, format: "cobertura" };
 	}
 }
 
@@ -22210,8 +25973,10 @@ class Runtime {
 
 
 
+
 var __webpack_exports__Collector = __webpack_exports__.gR;
+var __webpack_exports__CoveragePublication = __webpack_exports__.nu;
 var __webpack_exports__Recording = __webpack_exports__.K4;
 var __webpack_exports__Reporters = __webpack_exports__.Tr;
 var __webpack_exports__Runtime = __webpack_exports__.vY;
-export { __webpack_exports__Collector as Collector, __webpack_exports__Recording as Recording, __webpack_exports__Reporters as Reporters, __webpack_exports__Runtime as Runtime };
+export { __webpack_exports__Collector as Collector, __webpack_exports__CoveragePublication as CoveragePublication, __webpack_exports__Recording as Recording, __webpack_exports__Reporters as Reporters, __webpack_exports__Runtime as Runtime };

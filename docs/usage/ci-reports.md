@@ -175,10 +175,40 @@ A definition can contain:
 | `path-mapping`    | Native path prefixes mapped to repository-relative prefixes. Conflicting mappings fail.                                                                                                   |
 | `subject`         | Optional tested image/archive metadata: `kind`, `name`, `digest` (`sha256:...`), optional `platform` and `engine`. Providers verify build provenance and record the exact tested subject. |
 
-Native test formats currently include JUnit and TAP. Lint formats use the existing
+Native test formats include Vitest/Jest JSON, JUnit and TAP. For combined JSON,
+use the same path for `test-results` and `test-coverage`. Each requirement is
+validated independently, and the native file is retained once. Test outcomes
+are counted once; coverage requires a nonempty valid `coverageMap` when requested.
+If coverage is disabled, a JSON report containing only test results is sufficient.
+
+For example, a Vitest custom command can declare:
+
+```yaml
+with:
+  command: >-
+    npx --no-install vitest run --coverage.enabled --coverage.reportOnFailure
+    --coverage.reporter=text --reporter=default --reporter=json
+    --outputFile.json="$CI_REPORTS_DIR/results.json"
+  test-results: results.json
+  test-coverage: results.json
+```
+
+Jest uses `--json --outputFile="$CI_REPORTS_DIR/results.json" --coverage`
+with `--coverageReporters=text`. Its native JSON also includes the final map.
+Publishers derive LCOV or Cobertura with Istanbul only when needed; neither
+project scripts nor project dependencies execute in publication jobs.
+
+Vitest shard merging emits JSON test results and coverage separately. Keep
+the merged JSON and LCOV outputs on that path. OpenClover XML cannot replace
+a complete test report: it omits skipped outcomes and collapses parameterized
+executions. Keep JUnit alongside a supported coverage format for those producers.
+The [format decision and verification](../adr/0006-combined-native-test-reports.md)
+records the tested cases and limitations.
+
+Lint formats use the existing
 ESLint, Checkstyle, Prettier, Astro and SARIF parsers. The shared linter retains
 its native Super-Linter summary and keeps ownership of its diagnostics.
-Coverage accepts LCOV, Cobertura and native Go coverage profiles. Go summaries
+Coverage accepts Vitest/Jest JSON, LCOV, Cobertura and native Go coverage profiles. Go summaries
 use native statement counts, with the unit shown explicitly. Selected line-oriented
 destinations receive normalized block spans as LCOV (and Cobertura for GitHub);
 the original Go profile remains unchanged. This also avoids Coveralls' native Go

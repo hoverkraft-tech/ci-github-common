@@ -10,13 +10,16 @@
 		"pretest:ci": "node -e \"require('node:fs').mkdirSync('coverage', {recursive:true})\"",
 		"build": "node -e \"require('node:fs').rmSync('dist', {recursive:true,force:true})\" && ncc build src/index.js --out dist --target es2022 --no-cache --license licenses.txt",
 		"check:dist": "npm run build && git diff --exit-code -- dist && test -z \"$(git ls-files --others --exclude-standard -- dist)\"",
-		"test:distribution": "node --test src/Recording.test.js src/Collector.test.js"
+		"test:distribution": "node --test src/Recording.test.js src/Collector.test.js src/JestReport.test.js"
 	},
 	"engines": {
 		"node": ">=24.0.0"
 	},
 	"dependencies": {
-		"fast-xml-parser": "^5.12.1"
+		"fast-xml-parser": "^5.12.1",
+		"istanbul-lib-coverage": "3.2.2",
+		"istanbul-lib-report": "3.0.1",
+		"istanbul-reports": "3.2.0"
 	},
 	"devDependencies": {
 		"@vercel/ncc": "0.45.0"

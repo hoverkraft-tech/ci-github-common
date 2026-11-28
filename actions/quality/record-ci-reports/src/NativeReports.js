@@ -4,6 +4,8 @@ import { XMLValidator } from "fast-xml-parser";
 import { ParserFactory } from "../../parse-ci-reports/dist/index.js";
 import { CoberturaReport } from "./CoberturaReport.js";
 import { GoCoverageProfile } from "./GoCoverageProfile.js";
+import { IstanbulCoverage } from "./IstanbulCoverage.js";
+import { JestReport } from "./JestReport.js";
 import { Protocol } from "./Protocol.js";
 
 /** Validate native formats without installing or executing project dependencies. */
@@ -15,6 +17,14 @@ export class NativeReports {
 	parse(content, filename, kind) {
 		if (Buffer.byteLength(content) > Protocol.maxFileBytes)
 			throw new Error("Native report exceeds 64 MiB.");
+		if (
+			["test", "coverage"].includes(kind) &&
+			content.trimStart().startsWith("{")
+		) {
+			const value = JSON.parse(content);
+			if (Object.hasOwn(value, "testResults"))
+				return new JestReport(value).native(kind);
+		}
 		if (kind === "coverage" && content.startsWith("mode:"))
 			return new GoCoverageProfile(content).native();
 		// Cobertura generators commonly emit an external DTD. It is metadata,
@@ -164,6 +174,10 @@ export class NativeReports {
 	}
 
 	static measurement(content, format, sourceMap) {
+		if (format === "jest-json")
+			return new IstanbulCoverage(JSON.parse(content).coverageMap).measurement(
+				sourceMap,
+			);
 		if (format === "golang") {
 			const normalized = new GoCoverageProfile(content).lcov(sourceMap);
 			const mapped = Object.fromEntries(
@@ -211,6 +225,7 @@ export class NativeReports {
 		const assets = [];
 		const errors = [];
 		const found = new Map();
+		const files = new Set();
 		let totalBytes = 0;
 		for (const selector of definition.reports) {
 			const matches = [...fs.globSync(selector.pattern, { cwd: directory })];
@@ -220,17 +235,17 @@ export class NativeReports {
 				);
 			for (const relative of matches) {
 				try {
-					if (found.has(relative)) {
-						if (
-							JSON.stringify(found.get(relative)) !== JSON.stringify(selector)
-						)
+					const aspect = `${selector.kind}:${relative}`;
+					if (found.has(aspect)) {
+						if (JSON.stringify(found.get(aspect)) !== JSON.stringify(selector))
 							throw new Error(`Conflicting report selectors for ${relative}.`);
 						continue;
 					}
-					found.set(relative, selector);
+					found.set(aspect, selector);
 					const file = Protocol.file(directory, relative);
 					const bytes = fs.readFileSync(file);
-					totalBytes += bytes.length;
+					if (!files.has(relative)) totalBytes += bytes.length;
+					files.add(relative);
 					if (totalBytes > Protocol.maxBundleBytes || assets.length >= 512)
 						throw new Error("Report bundle exceeds its resource limit.");
 					const parsed = this.parse(
@@ -298,7 +313,11 @@ export class NativeReports {
 						if (
 							totalBytes <= Protocol.maxBundleBytes &&
 							assets.length < 512 &&
-							!assets.some((asset) => asset.file === relative)
+							!assets.some(
+								(asset) =>
+									asset.file === relative &&
+									asset.selector.kind === selector.kind,
+							)
 						)
 							assets.push({
 								file: relative,

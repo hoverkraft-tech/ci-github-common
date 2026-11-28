@@ -224,8 +224,13 @@ export class Collector {
 				const destination = path.join(directory, "checks", registration.id);
 				fs.mkdirSync(destination, { recursive: true });
 				const verifiedAssets = [];
+				const aspects = new Set();
 				for (const asset of result.assets) {
 					try {
+						const aspect = `${asset.selector.kind}:${asset.file}`;
+						if (aspects.has(aspect))
+							throw new Error("Duplicate report aspect.");
+						aspects.add(aspect);
 						if (
 							!asset.file.startsWith("reports/") ||
 							!path.matchesGlob(asset.file.slice(8), asset.selector.pattern)
@@ -248,7 +253,8 @@ export class Collector {
 						}
 						const target = path.join(destination, asset.file);
 						fs.mkdirSync(path.dirname(target), { recursive: true });
-						fs.copyFileSync(Protocol.file(stage, asset.file), target);
+						if (!fs.existsSync(target))
+							fs.copyFileSync(Protocol.file(stage, asset.file), target);
 						asset.file = `checks/${registration.id}/${asset.file}`;
 						verifiedAssets.push(asset);
 					} catch (error) {

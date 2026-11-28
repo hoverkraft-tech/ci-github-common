@@ -33,6 +33,26 @@ suite("Cobertura auto-detection", () => {
 	}
 });
 
+test("exact branch aggregates retain branches without a statement line and reject contradictions", () => {
+	const parser = new CoberturaParser();
+	const xml =
+		'<coverage branches-valid="5" branches-covered="3"><packages><package><classes><class filename="index.js"><lines><line number="1" hits="1" branch="true" condition-coverage="50% (1/2)"/></lines></class></classes></package></packages></coverage>';
+	assert.deepEqual(parser.parse(xml).coverage.branches, {
+		total: 5,
+		covered: 3,
+		percentage: 60,
+	});
+	assert.throws(
+		() => parser.parse(xml.replace('branches-valid="5"', 'branches-valid="1"')),
+		/counts/,
+	);
+	assert.throws(
+		() =>
+			parser.parse(xml.replace('branches-covered="3"', 'branches-covered="5"')),
+		/contradict/,
+	);
+});
+
 const SAMPLE_COBERTURA_XML = `<?xml version="1.0"?>
 <coverage line-rate="0.75" branch-rate="0.5">
 	<packages>

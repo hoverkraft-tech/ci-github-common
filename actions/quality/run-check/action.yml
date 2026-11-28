@@ -21,7 +21,7 @@ inputs:
   test-results:
     description: Newline-separated native test report patterns, relative to CI_REPORTS_DIR.
   test-coverage:
-    description: Newline-separated native coverage patterns, relative to CI_REPORTS_DIR. One measurement per project.
+    description: Newline-separated native coverage patterns, relative to CI_REPORTS_DIR. One measurement per project. May use the same path as test-results for native Vitest/Jest JSON containing coverageMap.
   lint-results:
     description: Newline-separated native lint report patterns, relative to CI_REPORTS_DIR.
 outputs:

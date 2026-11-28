@@ -96,8 +96,20 @@ export class CoberturaParser extends BaseParser {
 				return [total, covered];
 			};
 			if (totalLines === 0) [totalLines, coveredLines] = counts("lines");
-			if (totalBranches === 0)
-				[totalBranches, coveredBranches] = counts("branches");
+			if (coverage["@_branches-valid"] !== undefined) {
+				// Istanbul can report branches on lines without a statement. These
+				// contribute to exact aggregate counts but not class line entries.
+				const [total, covered] = counts("branches");
+				if (
+					total < totalBranches ||
+					covered < coveredBranches ||
+					total - covered < totalBranches - coveredBranches
+				)
+					throw new Error(
+						"Aggregate branch counts contradict measured branches.",
+					);
+				[totalBranches, coveredBranches] = [total, covered];
+			}
 
 			reportData.setCoverage(
 				new Coverage({
